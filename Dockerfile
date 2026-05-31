@@ -24,8 +24,10 @@ RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=base /app/dist ./dist
 COPY drizzle/ ./drizzle/
+COPY scripts/ ./scripts/
+COPY seed-products.mjs ./seed-products.mjs
 
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "node scripts/db-init.mjs && node seed-products.mjs && node dist/index.js"]
