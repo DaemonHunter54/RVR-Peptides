@@ -48,32 +48,81 @@ function extractPeptideName(name: string): string {
     .trim();
 }
 
-function splitLines(text: string, maxChars: number, maxLines: number): string[] {
-  const clean = String(text || "").trim().replace(/\s*\/\s*/g, " / ").replace(/\s+/g, " ");
-  if (!clean) return [];
-  const words = clean.split(" ");
+function estimateSvgTextWidth(text: string, fontSize: number): number {
+  // Conservative approximation for bold uppercase product text. This is used only
+  // to choose wrapping/font size before the browser renders the SVG.
+  let units = 0;
+  for (const ch of String(text || "")) {
+    if (ch === " ") units += 0.32;
+    else if (ch === "/") units += 0.34;
+    else if (ch === "-" || ch === "(") units += 0.34;
+    else if (ch === ")") units += 0.34;
+    else if (ch === "1" || ch === "I" || ch === "L") units += 0.38;
+    else if (ch === "M" || ch === "W") units += 0.86;
+    else units += 0.66;
+  }
+  return units * fontSize;
+}
+
+function tokenizeLabel(text: string): string[] {
+  return String(text || "")
+    .trim()
+    .replace(/\s*\/\s*/g, " / ")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter(Boolean);
+}
+
+function wrapTokens(tokens: string[], fontSize: number, maxWidth: number, maxLines: number): string[] | null {
   const lines: string[] = [];
   let line = "";
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (test.length > maxChars && line) {
-      lines.push(line);
-      line = word;
+  for (const token of tokens) {
+    // Treat slashes as a preferred line break for blends instead of printing a
+    // slash at the edge of the vial.
+    if (token === "/") {
+      if (line) {
+        lines.push(line.trim());
+        line = "";
+      }
+      continue;
+    }
+    const test = line ? `${line} ${token}` : token;
+    if (line && estimateSvgTextWidth(test, fontSize) > maxWidth) {
+      lines.push(line.trim());
+      line = token;
     } else {
       line = test;
     }
+    if (estimateSvgTextWidth(line, fontSize) > maxWidth) return null;
   }
-  if (line) lines.push(line);
-  if (lines.length <= maxLines) return lines;
-  const kept = lines.slice(0, maxLines);
-  kept[maxLines - 1] = kept[maxLines - 1].replace(/\.{3}$|…$/g, "") + "…";
-  return kept;
+  if (line) lines.push(line.trim());
+  if (lines.length > maxLines) return null;
+  return lines;
 }
 
-function textBlock(lines: string[], x: number, y: number, fontSize: number, lineHeight: number): string {
+function fitSvgLines(text: string, maxWidth: number, maxLines: number, startSize: number, minSize: number): { lines: string[]; fontSize: number } {
+  const clean = String(text || "").trim().replace(/\s+/g, " ");
+  if (!clean) return { lines: [], fontSize: startSize };
+  const tokens = tokenizeLabel(clean);
+  for (let size = startSize; size >= minSize; size -= 2) {
+    const wrapped = wrapTokens(tokens, size, maxWidth, maxLines);
+    if (wrapped?.length && wrapped.every((l) => estimateSvgTextWidth(l, size) <= maxWidth)) {
+      return { lines: wrapped, fontSize: size };
+    }
+  }
+  // Last-resort fallback for an unusually long single token. Keep it centered
+  // and compressed by SVG textLength so it cannot spill outside the vial face.
+  return { lines: [clean], fontSize: minSize };
+}
+
+function textBlock(lines: string[], x: number, y: number, fontSize: number, lineHeight: number, maxWidth = 430): string {
   if (!lines.length) return "";
   const startY = y - ((lines.length - 1) * lineHeight) / 2;
-  return `<text x="${x}" y="${startY}" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="900" fill="#005AA4">${lines.map((line, i) => `<tspan x="${x}" dy="${i === 0 ? 0 : lineHeight}">${escXml(line)}</tspan>`).join("")}</text>`;
+  return `<text x="${x}" y="${startY}" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="900" fill="#005AA4">${lines.map((line, i) => {
+    const needsFit = estimateSvgTextWidth(line, fontSize) > maxWidth;
+    const fitAttrs = needsFit ? ` textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : "";
+    return `<tspan x="${x}" dy="${i === 0 ? 0 : lineHeight}"${fitAttrs}>${escXml(line)}</tspan>`;
+  }).join("")}</text>`;
 }
 
 function buildPhotorealVialSvg(name?: string, size?: string): string {
@@ -83,10 +132,12 @@ function buildPhotorealVialSvg(name?: string, size?: string): string {
   const peptideName = (extractPeptideName(name || "") || "PRODUCT").toUpperCase();
   const dosage = extractDosage(name || "", size).toUpperCase();
 
-  const nameLines = splitLines(peptideName, peptideName.length > 22 ? 13 : 16, 3);
-  const doseLines = splitLines(dosage, 15, 2);
-  const nameFont = nameLines.length >= 3 ? 43 : peptideName.length > 24 ? 48 : peptideName.length > 15 ? 58 : 72;
-  const doseFont = doseLines.length > 1 || dosage.length > 14 ? 50 : 70;
+  const nameFit = fitSvgLines(peptideName, 410, 3, 72, 30);
+  const doseFit = fitSvgLines(dosage, 410, 2, 70, 30);
+  const nameLines = nameFit.lines;
+  const doseLines = doseFit.lines;
+  const nameFont = nameFit.fontSize;
+  const doseFont = doseFit.fontSize;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -116,7 +167,7 @@ export function generatedVialUrl(slug: string, name?: string, size?: string): st
   const params = new URLSearchParams();
   if (name) params.set("name", name);
   if (size) params.set("size", size);
-  params.set("v", "rvr-photoreal-svg-layout-3");
+  params.set("v", "rvr-photoreal-adaptive-fit-v1");
   return `/api/vial/${safeSlug}.png?${params.toString()}`;
 }
 

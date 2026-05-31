@@ -87,26 +87,36 @@ function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: numb
 }
 
 function fitLines(ctx: any, text: string, maxWidth: number, maxLines: number, startSize: number, minSize: number) {
-  const words = text.replace(/\s*\/\s*/g, ' / ').split(/\s+/).filter(Boolean);
+  const words = String(text || '').replace(/\s*\/\s*/g, ' / ').split(/\s+/).filter(Boolean);
   for (let size = startSize; size >= minSize; size -= 2) {
     ctx.font = `900 ${size}px Inter, Arial, sans-serif`;
     const lines: string[] = [];
     let line = '';
     for (const word of words) {
+      if (word === '/') {
+        if (line) {
+          lines.push(line.trim());
+          line = '';
+        }
+        continue;
+      }
       const test = line ? `${line} ${word}` : word;
       if (ctx.measureText(test).width > maxWidth && line) {
-        lines.push(line);
+        lines.push(line.trim());
         line = word;
       } else {
         line = test;
       }
     }
-    if (line) lines.push(line);
+    if (line) lines.push(line.trim());
     if (lines.length <= maxLines && lines.every((l) => ctx.measureText(l).width <= maxWidth)) return { lines, size };
   }
+  // Fallback: use the smallest size and split on slash/space as much as possible.
   ctx.font = `900 ${minSize}px Inter, Arial, sans-serif`;
-  return { lines: [text], size: minSize };
+  const cleaned = words.filter((w) => w !== '/').join(' ');
+  return { lines: [cleaned], size: minSize };
 }
+
 
 
 function escXml(value: string): string {
@@ -123,32 +133,74 @@ function assetDataUri(filePath: string, mime: string): string {
   return `data:${mime};base64,${data}`;
 }
 
-function splitSvgLines(text: string, maxChars: number, maxLines: number): string[] {
-  const cleaned = String(text || '').trim().replace(/\s+/g, ' ');
-  if (!cleaned) return [];
-  const words = cleaned.split(' ');
+function estimateSvgTextWidth(text: string, fontSize: number): number {
+  let units = 0;
+  for (const ch of String(text || '')) {
+    if (ch === ' ') units += 0.32;
+    else if (ch === '/') units += 0.34;
+    else if (ch === '-' || ch === '(' || ch === ')') units += 0.34;
+    else if (ch === '1' || ch === 'I' || ch === 'L') units += 0.38;
+    else if (ch === 'M' || ch === 'W') units += 0.86;
+    else units += 0.66;
+  }
+  return units * fontSize;
+}
+
+function tokenizeSvgLabel(text: string): string[] {
+  return String(text || '')
+    .trim()
+    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean);
+}
+
+function wrapSvgTokens(tokens: string[], fontSize: number, maxWidth: number, maxLines: number): string[] | null {
   const lines: string[] = [];
   let line = '';
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (test.length > maxChars && line) {
-      lines.push(line);
-      line = word;
+  for (const token of tokens) {
+    if (token === '/') {
+      if (line) {
+        lines.push(line.trim());
+        line = '';
+      }
+      continue;
+    }
+    const test = line ? `${line} ${token}` : token;
+    if (line && estimateSvgTextWidth(test, fontSize) > maxWidth) {
+      lines.push(line.trim());
+      line = token;
     } else {
       line = test;
     }
+    if (estimateSvgTextWidth(line, fontSize) > maxWidth) return null;
   }
-  if (line) lines.push(line);
-  if (lines.length <= maxLines) return lines;
-  const kept = lines.slice(0, maxLines);
-  kept[maxLines - 1] = `${kept[maxLines - 1].replace(/\.{3}$/,'')}…`;
-  return kept;
+  if (line) lines.push(line.trim());
+  if (lines.length > maxLines) return null;
+  return lines;
 }
 
-function svgTextBlock(lines: string[], x: number, y: number, fontSize: number, lineHeight: number, fill: string): string {
+function fitSvgLines(text: string, maxWidth: number, maxLines: number, startSize: number, minSize: number): { lines: string[]; fontSize: number } {
+  const clean = String(text || '').trim().replace(/\s+/g, ' ');
+  if (!clean) return { lines: [], fontSize: startSize };
+  const tokens = tokenizeSvgLabel(clean);
+  for (let size = startSize; size >= minSize; size -= 2) {
+    const wrapped = wrapSvgTokens(tokens, size, maxWidth, maxLines);
+    if (wrapped?.length && wrapped.every((l) => estimateSvgTextWidth(l, size) <= maxWidth)) {
+      return { lines: wrapped, fontSize: size };
+    }
+  }
+  return { lines: [clean], fontSize: minSize };
+}
+
+function svgTextBlock(lines: string[], x: number, y: number, fontSize: number, lineHeight: number, fill: string, maxWidth = 430): string {
   if (!lines.length) return '';
   const startY = y - ((lines.length - 1) * lineHeight) / 2;
-  return `<text x="${x}" y="${startY}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="900" fill="${fill}">${lines.map((line, i) => `<tspan x="${x}" dy="${i === 0 ? 0 : lineHeight}">${escXml(line)}</tspan>`).join('')}</text>`;
+  return `<text x="${x}" y="${startY}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="900" fill="${fill}">${lines.map((line, i) => {
+    const needsFit = estimateSvgTextWidth(line, fontSize) > maxWidth;
+    const fitAttrs = needsFit ? ` textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : '';
+    return `<tspan x="${x}" dy="${i === 0 ? 0 : lineHeight}"${fitAttrs}>${escXml(line)}</tspan>`;
+  }).join('')}</text>`;
 }
 
 export async function generateVialSvgBuffer(productName: string): Promise<Buffer> {
@@ -168,10 +220,12 @@ export async function generateVialSvgBuffer(productName: string): Promise<Buffer
   // Tight, center-mounted label area that matches the approved sample vial.
   // Everything is clipped inside this rounded rectangle so no letters can spill
   // past the glass/body sides when long blend names are used.
-  const nameLines = splitSvgLines(peptideName.replace(/\s*\/\s*/g, ' / '), peptideName.length > 24 ? 13 : 16, 3);
-  const doseLines = splitSvgLines(dosage.replace(/\s*\/\s*/g, ' / '), 15, 2);
-  const nameFont = nameLines.length >= 3 ? 43 : peptideName.length > 24 ? 48 : peptideName.length > 15 ? 58 : 72;
-  const doseFont = doseLines.length > 1 || dosage.length > 14 ? 50 : 70;
+  const nameFit = fitSvgLines(peptideName.replace(/\s*\/\s*/g, ' / '), 410, 3, 72, 30);
+  const doseFit = fitSvgLines(dosage.replace(/\s*\/\s*/g, ' / '), 410, 2, 70, 30);
+  const nameLines = nameFit.lines;
+  const doseLines = doseFit.lines;
+  const nameFont = nameFit.fontSize;
+  const doseFont = doseFit.fontSize;
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
