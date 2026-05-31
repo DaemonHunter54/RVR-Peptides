@@ -307,6 +307,7 @@ const generatedVialPreviewUrl = (slug: string, name: string, size?: string) => {
   const params = new URLSearchParams();
   if (name) params.set("name", name);
   if (size) params.set("size", size);
+  params.set("v", "rvr-short-clear-vial-1");
   return `/api/vial/${safeSlug}.png${params.toString() ? `?${params.toString()}` : ""}`;
 };
 const imageUrlForSlug = (slug: string) => productAssetForSlug(slug) || generatedVialUrl(slug);
@@ -317,51 +318,23 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
 function ProductVialPreview({ name, slug, size }: { name: string; slug: string; size?: string }) {
-  // Live preview uses the company blank vial asset and overlays the typed
-  // product details without depending on a cached generated image.
-  const cleanName = String(name || "").trim();
-  const cleanSize = String(size || "").trim();
-  const displayName = cleanName.toUpperCase();
-  const displaySize = cleanSize.toUpperCase();
+  const previewSrc = generatedVialPreviewUrl(slug, name || "Preview Product", size);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="font-semibold text-slate-800 text-sm">Live Vial Preview</h3>
-          <p className="text-xs text-slate-500">Auto-updates from product name and size.</p>
+          <p className="text-xs text-slate-500">Auto-updates from product name and dose/size.</p>
         </div>
-        <Badge variant="outline">Company blank vial</Badge>
+        <Badge variant="outline">Dynamic company vial</Badge>
       </div>
       <div className="flex justify-center rounded-lg bg-white p-4 min-h-[300px] overflow-hidden">
-        <div className="relative w-[300px] h-[300px]">
-          <img
-            src={ASSETS.vialTemplate}
-            alt="Live vial preview"
-            className="absolute inset-0 h-full w-full object-contain"
-          />
-
-          <div className="absolute left-[25%] top-[58%] w-[50%] text-center pointer-events-none">
-            {displayName ? (
-              <div
-                className="font-black leading-tight text-[#0b3767] break-words drop-shadow-sm"
-                style={{ fontSize: displayName.length > 20 ? 10 : displayName.length > 13 ? 12 : 15 }}
-              >
-                {displayName}
-              </div>
-            ) : null}
-            {displaySize ? (
-              <div className="mt-1 text-[13px] font-black leading-none text-[#0b3767] drop-shadow-sm">
-                {displaySize}
-              </div>
-            ) : null}
-            {(displayName || displaySize) ? (
-              <div className="mt-1 text-[6px] font-bold tracking-[0.08em] text-slate-500 uppercase">
-                Research Use Only
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <img
+          src={previewSrc}
+          alt="Live vial preview"
+          className="h-[300px] w-auto object-contain"
+        />
       </div>
     </div>
   );

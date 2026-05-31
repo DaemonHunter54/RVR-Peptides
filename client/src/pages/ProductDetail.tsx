@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { useGuestCart } from "@/hooks/useGuestCart";
+import { productImageUrl } from "@/lib/vialDisplay";
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -111,7 +112,7 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     const cartPrice = activeVariant ? activeVariant.price : product.price;
     const cartName = activeVariant ? `${product.name} (${activeVariant.label})` : product.name;
-    const cartImage = activeVariant?.imageUrl || product.imageUrl;
+    const cartImage = productImageUrl(product, activeVariant) || activeVariant?.imageUrl || product.imageUrl;
     
     if (!isAuthenticated) {
       guestCart.addItem({
@@ -155,7 +156,7 @@ export default function ProductDetail() {
           {/* Image */}
           <div className="rounded-2xl p-8 lg:p-12 flex items-center justify-center">
             <img
-              src={product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
+              src={productImageUrl(product, activeVariant) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
               alt={product.name}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
               className="w-full max-w-md object-contain"

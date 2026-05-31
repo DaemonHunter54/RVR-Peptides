@@ -7,29 +7,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Register Inter font
 const fontPath = '/usr/share/fonts/truetype/inter/InterVariable.ttf';
-if (fs.existsSync(fontPath)) {
-  GlobalFonts.registerFromPath(fontPath, 'Inter');
-}
+if (fs.existsSync(fontPath)) GlobalFonts.registerFromPath(fontPath, 'Inter');
 
-// Cache the loaded vial template image
-let cachedVialTemplate: Image | null = null;
 let cachedHeroImage: Buffer | null = null;
-
-const VIAL_TEMPLATE_PATHS = [
-  path.join(__dirname, 'vial-template.png'),
-  path.join(process.cwd(), 'client/public/assets/rvr-vial-template-single_c7ba8797.png'),
-];
-
-const HD_VIAL_BASE_PATHS = [
-  path.join(process.cwd(), 'client/public/assets/rvr-company-blank-vial.png'),
-  path.join(process.cwd(), 'client/public/assets/rvr-vial-template-single_c7ba8797.png'),
-];
+let cachedLogo: Image | null = null;
 
 const HERO_IMAGE_PATHS = [
+  path.join(process.cwd(), 'client/public/assets/rvr-company-hero-3-vials.png'),
   path.join(__dirname, 'hero-3vials.png'),
   path.join(process.cwd(), 'client/public/assets/rvr-hero-3vials-composed_5511eda3.png'),
+];
+
+const LOGO_PATHS = [
+  path.join(process.cwd(), 'client/public/assets/rvr-company-logo-small.png'),
+  path.join(process.cwd(), 'client/public/assets/rvr-logo_19fbf80f.png'),
 ];
 
 function firstExisting(paths: string[]): string {
@@ -38,171 +30,38 @@ function firstExisting(paths: string[]): string {
   return found;
 }
 
-async function getVialTemplate(): Promise<Image> {
-  if (!cachedVialTemplate) {
-    cachedVialTemplate = await loadImage(firstExisting(VIAL_TEMPLATE_PATHS));
-  }
-  return cachedVialTemplate;
+async function getLogo(): Promise<Image> {
+  if (!cachedLogo) cachedLogo = await loadImage(firstExisting(LOGO_PATHS));
+  return cachedLogo;
 }
 
 function getHeroImageBuffer(): Buffer {
-  if (!cachedHeroImage) {
-    cachedHeroImage = fs.readFileSync(firstExisting(HERO_IMAGE_PATHS));
-  }
+  if (!cachedHeroImage) cachedHeroImage = fs.readFileSync(firstExisting(HERO_IMAGE_PATHS));
   return cachedHeroImage;
 }
 
+function normalizeDoseText(value: string): string {
+  const m = value.match(/(\d+(?:,\d+)?(?:\.\d+)?)\s*(mg|mcg|iu|ml|g)(?:\s*\/\s*(ml|vial))?/i);
+  if (!m) return value.toUpperCase().trim();
+  const unit = m[2].toUpperCase();
+  const per = m[3] ? `/${m[3].toUpperCase()}` : '';
+  return `${m[1]} ${unit}${per}`;
+}
+
 function extractDosage(name: string): string {
-  const multiMatch = name.match(/(\d+(?:,\d+)?(?:\.\d+)?)\s*(mg|mcg|iu|ml)(?:\s*\/\s*\d+(?:,\d+)?(?:\.\d+)?\s*(?:mg|mcg|iu|ml))+/i);
-  if (multiMatch) {
-    const allDosages = multiMatch[0].match(/(\d+(?:,\d+)?(?:\.\d+)?)\s*(mg|mcg|iu|ml)/gi);
-    if (allDosages && allDosages.length > 1) {
-      return allDosages.map(d => {
-        const m = d.match(/(\d+(?:,\d+)?(?:\.\d+)?)\s*(mg|mcg|iu|ml)/i);
-        return m ? `${m[1]}${m[2].toUpperCase()}` : d;
-      }).join('/');
-    }
-  }
-  const match = name.match(/(\d+(?:,\d+)?(?:\.\d+)?)\s*(mg|mcg|iu|ml|mL)(?:\s*\/\s*mL)?/i);
-  if (match) {
-    const perMl = match[0].match(/\/\s*mL/i) ? '/ML' : '';
-    return `${match[1]}${match[2].toUpperCase()}${perMl}`;
-  }
-  return '';
+  const matches = String(name || '').match(/\d+(?:,\d+)?(?:\.\d+)?\s*(?:mg|mcg|iu|ml|g)(?:\s*\/\s*(?:ml|vial))?/gi);
+  if (!matches || !matches.length) return '';
+  return matches.map(normalizeDoseText).join(' / ');
 }
 
 function extractPeptideName(name: string): string {
-  return name
-    .replace(/\s*\d+(?:,\d+)?(?:\.\d+)?\s*(?:mg|mcg|iu|ml)(?:\s*\/\s*\d+(?:,\d+)?(?:\.\d+)?\s*(?:mg|mcg|iu|ml))*(?:\s*\/\s*(?:mL|ml))?\s*(?:\(\d+(?:mL|ml)?\))?\s*/gi, ' ')
-    .replace(/\s*\(\d+\)\s*/g, ' ')
+  return String(name || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\d+(?:,\d+)?(?:\.\d+)?\s*(?:mg|mcg|iu|ml|g)(?:\s*\/\s*(?:ml|vial))?/gi, ' ')
     .replace(/\s*\/\s*$/g, '')
     .replace(/^\s*\/\s*/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-/**
- * Draw text that appears wrapped around a cylindrical vial surface.
- * Uses subtle letter spacing compression at edges to simulate curvature.
- */
-function drawWrappedText(
-  ctx: any,
-  text: string,
-  centerX: number,
-  y: number,
-  maxWidth: number,
-  fontSize: number,
-  fontWeight: string = 'bold',
-  color: string = '#ffffff'
-) {
-  ctx.fillStyle = color;
-  ctx.font = `${fontWeight} ${fontSize}px Inter, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  const measured = ctx.measureText(text);
-  
-  // If text fits easily, draw with subtle perspective effect
-  if (measured.width <= maxWidth * 0.9) {
-    // Draw character by character with slight compression at edges for wrap effect
-    const chars = text.split('');
-    const totalWidth = measured.width;
-    let startX = centerX - totalWidth / 2;
-    
-    for (let i = 0; i < chars.length; i++) {
-      const charWidth = ctx.measureText(chars[i]).width;
-      const progress = (startX + charWidth / 2 - (centerX - totalWidth / 2)) / totalWidth;
-      // Slight compression at edges (simulating cylinder wrap)
-      const edgeFactor = 1 - Math.pow((progress - 0.5) * 2, 2) * 0.08;
-      const adjustedWidth = charWidth * edgeFactor;
-      
-      // Slight opacity reduction at edges
-      const alpha = 1 - Math.pow((progress - 0.5) * 2, 4) * 0.15;
-      ctx.globalAlpha = alpha;
-      ctx.fillText(chars[i], startX + adjustedWidth / 2, y);
-      ctx.globalAlpha = 1.0;
-      
-      startX += adjustedWidth;
-    }
-  } else {
-    // Text is too wide, just draw centered (will be scaled down by caller)
-    ctx.fillText(text, centerX, y);
-  }
-}
-
-/**
- * Generate a single product vial image using the real vial template photo
- * with product-specific text overlaid on the black label area
- */
-async function drawVialWithLabel(productName: string): Promise<Buffer> {
-  // Use the real Manus/RVR HD vial artwork as the visual base, but repaint the
-  // label area before adding dynamic product text. This keeps the HD transparent
-  // vial style and prevents drawing a new label on top of an already-labeled vial.
-  const base = await loadImage(firstExisting(HD_VIAL_BASE_PATHS));
-  const outW = base.width;
-  const outH = base.height;
-  const canvas = createCanvas(outW, outH);
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, outW, outH);
-  ctx.drawImage(base, 0, 0, outW, outH);
-
-  const centerX = outW / 2;
-
-  const combined = productName.trim();
-  const peptideName = extractPeptideName(combined) || 'PRODUCT';
-  const dosage = extractDosage(combined);
-
-  // Coordinates are tuned for the company blank vial artwork. The provided
-  // blank already includes the correct glass, label, logo, and transparent
-  // background, so we only add editable product information below the logo.
-  const labelX = Math.round(outW * 0.315);
-  const labelY = Math.round(outH * 0.420);
-  const labelW = Math.round(outW * 0.370);
-  const maxNameW = labelW * 0.94;
-
-  const productTextY = Math.round(outH * 0.710);
-  let nameFontSize = Math.round(outW * 0.044);
-  const words = peptideName.split(/\s+/).filter(Boolean);
-  let lines: string[] = [];
-  while (nameFontSize >= Math.round(outW * 0.024)) {
-    ctx.font = `900 ${nameFontSize}px Inter, Arial, sans-serif`;
-    lines = [];
-    let line = '';
-    for (const word of words) {
-      const test = line ? `${line} ${word}` : word;
-      if (ctx.measureText(test).width > maxNameW && line) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = test;
-      }
-    }
-    if (line) lines.push(line);
-    if (lines.length <= 2 && lines.every(l => ctx.measureText(l).width <= maxNameW)) break;
-    nameFontSize -= 2;
-  }
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#0b3767';
-  const lineGap = nameFontSize * 1.02;
-  const firstY = productTextY - ((Math.min(lines.length, 2) - 1) * lineGap) / 2;
-  lines.slice(0, 2).forEach((line, i) => {
-    ctx.font = `900 ${nameFontSize}px Inter, Arial, sans-serif`;
-    ctx.fillText(line.toUpperCase(), centerX, firstY + i * lineGap);
-  });
-
-  if (dosage) {
-    ctx.font = `900 ${Math.round(outW * 0.036)}px Inter, Arial, sans-serif`;
-    ctx.fillStyle = '#0b3767';
-    ctx.fillText(dosage, centerX, Math.round(outH * 0.765));
-  }
-
-  ctx.font = `700 ${Math.round(outW * 0.014)}px Inter, Arial, sans-serif`;
-  ctx.fillStyle = '#657487';
-  ctx.fillText('Research Use Only', centerX, Math.round(outH * 0.805));
-
-  return Buffer.from(canvas.toBuffer('image/png'));
 }
 
 function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: number) {
@@ -216,36 +75,202 @@ function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: numb
   ctx.closePath();
 }
 
-/**
- * Generate a single product vial image and upload to storage
- */
+function fitLines(ctx: any, text: string, maxWidth: number, maxLines: number, startSize: number, minSize: number) {
+  const words = text.split(/\s+/).filter(Boolean);
+  for (let size = startSize; size >= minSize; size -= 2) {
+    ctx.font = `900 ${size}px Inter, Arial, sans-serif`;
+    const lines: string[] = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    if (lines.length <= maxLines && lines.every((l) => ctx.measureText(l).width <= maxWidth)) return { lines, size };
+  }
+  ctx.font = `900 ${minSize}px Inter, Arial, sans-serif`;
+  return { lines: [text], size: minSize };
+}
+
+async function drawVialWithLabel(productName: string): Promise<Buffer> {
+  // Transparent HD-style generated vial. This keeps every vial consistent and lets
+  // /api/vial render the name/dose dynamically for products and variants.
+  const W = 1000;
+  const H = 1200;
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const cx = W / 2;
+  const vialX = 265;
+  const vialY = 150;
+  const vialW = 470;
+  const bodyY = 355;
+  const bodyH = 675;
+  const bodyR = 70;
+
+  // Soft realistic shadow.
+  const shadow = ctx.createRadialGradient(cx, 1070, 30, cx, 1070, 285);
+  shadow.addColorStop(0, 'rgba(0,0,0,0.25)');
+  shadow.addColorStop(0.55, 'rgba(0,0,0,0.10)');
+  shadow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = shadow;
+  ctx.beginPath();
+  ctx.ellipse(cx, 1070, 270, 48, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Glass body.
+  const bodyGrad = ctx.createLinearGradient(vialX, 0, vialX + vialW, 0);
+  bodyGrad.addColorStop(0, 'rgba(245,250,255,0.52)');
+  bodyGrad.addColorStop(0.10, 'rgba(255,255,255,0.92)');
+  bodyGrad.addColorStop(0.23, 'rgba(205,218,229,0.38)');
+  bodyGrad.addColorStop(0.50, 'rgba(255,255,255,0.30)');
+  bodyGrad.addColorStop(0.78, 'rgba(198,214,226,0.42)');
+  bodyGrad.addColorStop(0.91, 'rgba(255,255,255,0.90)');
+  bodyGrad.addColorStop(1, 'rgba(225,236,246,0.50)');
+  ctx.fillStyle = bodyGrad;
+  roundRect(ctx, vialX, bodyY, vialW, bodyH, bodyR);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(30,45,58,0.28)';
+  ctx.lineWidth = 4;
+  roundRect(ctx, vialX, bodyY, vialW, bodyH, bodyR);
+  ctx.stroke();
+
+  // Shoulder and small neck.
+  const shoulderGrad = ctx.createLinearGradient(vialX, 0, vialX + vialW, 0);
+  shoulderGrad.addColorStop(0, 'rgba(240,248,255,0.15)');
+  shoulderGrad.addColorStop(0.5, 'rgba(255,255,255,0.80)');
+  shoulderGrad.addColorStop(1, 'rgba(210,225,238,0.18)');
+  ctx.fillStyle = shoulderGrad;
+  roundRect(ctx, vialX + 30, 305, vialW - 60, 95, 60);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(20,35,50,0.22)';
+  ctx.lineWidth = 3;
+  roundRect(ctx, vialX + 30, 305, vialW - 60, 95, 60);
+  ctx.stroke();
+
+  roundRect(ctx, vialX + 145, 240, vialW - 290, 105, 28);
+  ctx.fillStyle = 'rgba(246,250,255,0.58)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(15,30,45,0.24)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Metal ring.
+  const metal = ctx.createLinearGradient(vialX + 45, 0, vialX + vialW - 45, 0);
+  metal.addColorStop(0, '#9a9a9a');
+  metal.addColorStop(0.16, '#eeeeee');
+  metal.addColorStop(0.38, '#c8c8c8');
+  metal.addColorStop(0.55, '#ffffff');
+  metal.addColorStop(0.76, '#bebebe');
+  metal.addColorStop(1, '#8c8c8c');
+  ctx.fillStyle = metal;
+  roundRect(ctx, vialX + 30, 165, vialW - 60, 115, 30);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Black top cap.
+  const cap = ctx.createLinearGradient(vialX + 15, 0, vialX + vialW - 15, 0);
+  cap.addColorStop(0, '#111111');
+  cap.addColorStop(0.5, '#292929');
+  cap.addColorStop(1, '#111111');
+  ctx.fillStyle = cap;
+  roundRect(ctx, vialX + 10, 125, vialW - 20, 72, 35);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Bottom glass thickness.
+  ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.ellipse(cx, 1015, 200, 24, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.80)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(cx, 998, 175, 16, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Vertical highlights.
+  const shine = ctx.createLinearGradient(vialX, 0, vialX + vialW, 0);
+  shine.addColorStop(0, 'rgba(255,255,255,0)');
+  shine.addColorStop(0.13, 'rgba(255,255,255,0.70)');
+  shine.addColorStop(0.20, 'rgba(255,255,255,0.05)');
+  shine.addColorStop(0.82, 'rgba(255,255,255,0.42)');
+  shine.addColorStop(0.90, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  roundRect(ctx, vialX + 18, bodyY + 25, vialW - 36, bodyH - 60, bodyR - 10);
+  ctx.fill();
+
+  const combined = String(productName || '').trim();
+  const peptideName = (extractPeptideName(combined) || 'PRODUCT').toUpperCase();
+  const dosage = extractDosage(combined).toUpperCase();
+
+  // Clear-label text printed directly on the glass.
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#005AA4';
+  const nameFit = fitLines(ctx, peptideName, 390, 2, 68, 34);
+  ctx.font = `900 ${nameFit.size}px Inter, Arial, sans-serif`;
+  const nameLineGap = nameFit.size * 1.02;
+  const nameStartY = 520 - ((nameFit.lines.length - 1) * nameLineGap) / 2;
+  for (let i = 0; i < nameFit.lines.length; i++) ctx.fillText(nameFit.lines[i], cx, nameStartY + i * nameLineGap);
+
+  // Company logo in the middle.
+  try {
+    const logo = await getLogo();
+    const maxLogoW = 310;
+    const maxLogoH = 150;
+    const scale = Math.min(maxLogoW / logo.width, maxLogoH / logo.height);
+    const lw = logo.width * scale;
+    const lh = logo.height * scale;
+    ctx.drawImage(logo, cx - lw / 2, 610 - lh / 2, lw, lh);
+  } catch {
+    ctx.font = '900 40px Inter, Arial, sans-serif';
+    ctx.fillStyle = '#8c939b';
+    ctx.fillText('RIVER VALLEY', cx, 595);
+    ctx.font = '800 28px Inter, Arial, sans-serif';
+    ctx.fillStyle = '#005AA4';
+    ctx.fillText('RESEARCH PEPTIDES', cx, 635);
+  }
+
+  if (dosage) {
+    ctx.fillStyle = '#005AA4';
+    const doseFit = fitLines(ctx, dosage, 360, 2, 58, 34);
+    ctx.font = `900 ${doseFit.size}px Inter, Arial, sans-serif`;
+    const gap = doseFit.size * 1.05;
+    const start = 785 - ((doseFit.lines.length - 1) * gap) / 2;
+    for (let i = 0; i < doseFit.lines.length; i++) ctx.fillText(doseFit.lines[i], cx, start + i * gap);
+  }
+
+  return Buffer.from(canvas.toBuffer('image/png'));
+}
+
 export async function generateVialImage(productName: string, productSlug: string): Promise<string> {
-  // Railway-native: generated vial images are served dynamically by /api/vial/:slug.png.
-  // This avoids Manus/Forge storage requirements while preserving the auto-filled Image URL field.
   return `/api/vial/${productSlug}.png`;
 }
 
-/**
- * Generate hero image - returns the user's actual 3-vial photo
- */
-export async function generateHeroVialsImage(
-  products: Array<{ name: string }>
-): Promise<string> {
+export async function generateHeroVialsImage(products: Array<{ name: string }>): Promise<string> {
   const buffer = getHeroImageBuffer();
   const fileKey = `product-vials/hero-vials.png`;
   const { url } = await storagePut(fileKey, buffer, 'image/png');
   return url;
 }
 
-/**
- * Generate a vial image and return as a buffer (for dynamic endpoint)
- */
 export async function generateVialBuffer(productName: string): Promise<Buffer> {
   return drawVialWithLabel(productName);
 }
 
-export function generateHeroVialsBuffer(
-  products: Array<{ name: string }>
-): Buffer {
+export function generateHeroVialsBuffer(products: Array<{ name: string }>): Buffer {
   return getHeroImageBuffer();
 }

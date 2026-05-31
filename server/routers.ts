@@ -38,6 +38,24 @@ function getProductAssetMap(): Map<string, string> {
   return cachedProductAssets;
 }
 
+
+const NON_VIAL_TERMS = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
+function isNonVialProduct(input: { slug?: string | null; name?: string | null; form?: string | null; category?: string | null; categories?: any[] | null }): boolean {
+  const text = [input.slug, input.name, input.form, input.category, ...(input.categories || []).map((c: any) => c?.name)]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return NON_VIAL_TERMS.some((term) => text.includes(term));
+}
+function generatedVialUrlForProduct(input: { slug?: string | null; name?: string | null; size?: string | null; contents?: string | null }): string {
+  const slug = makeProductSlug(input.slug || input.name || "product") || "product";
+  const params = new URLSearchParams();
+  if (input.name) params.set("name", String(input.name));
+  if (input.size || input.contents) params.set("size", String(input.size || input.contents));
+  params.set("v", "rvr-short-clear-vial-1");
+  return `/api/vial/${slug}.png?${params.toString()}`;
+}
+
 function productAssetForInput(input: { slug?: string | null; name?: string | null; imageUrl?: string | null }): string {
   const assets = getProductAssetMap();
   const slugKey = makeProductSlug(input.slug || "");
@@ -82,6 +100,9 @@ function productAssetForDisplay(input: { slug?: string | null; name?: string | n
 
 function preserveManusImage(product: any): any {
   if (!product) return product;
+  if (!isNonVialProduct(product)) {
+    return { ...product, imageUrl: generatedVialUrlForProduct(product) };
+  }
   const mappedImage = productAssetForDisplay(product);
   if (mappedImage && shouldReplaceGeneratedImage(product.imageUrl)) {
     return { ...product, imageUrl: mappedImage };
@@ -467,7 +488,9 @@ export const appRouter = router({
         const { categoryIds, variants, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
-        if (mappedImage && shouldReplaceGeneratedImage(data.imageUrl)) {
+        if (!isNonVialProduct(data)) {
+          data.imageUrl = generatedVialUrlForProduct(data);
+        } else if (mappedImage && shouldReplaceGeneratedImage(data.imageUrl)) {
           data.imageUrl = mappedImage;
         }
         const id = await db.createProduct(data as any, categoryIds);
@@ -504,7 +527,9 @@ export const appRouter = router({
         const { id, categoryIds, variants, regenerateVial, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
-        if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
+        if (!isNonVialProduct(data)) {
+          data.imageUrl = generatedVialUrlForProduct(data);
+        } else if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
           data.imageUrl = mappedImage;
         }
         await db.updateProduct(id, data as any, categoryIds);
