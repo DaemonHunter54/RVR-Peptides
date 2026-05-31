@@ -2,15 +2,14 @@ FROM node:22-slim AS base
 RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
 WORKDIR /app
 
-# Install dependencies
+# Install all deps once. The final image reuses this node_modules so Railway
+# does not download the dependency tree twice on every deploy.
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
-RUN pnpm install --frozen-lockfile --prod=false
+RUN pnpm install --frozen-lockfile
 
-# Copy source
+# Copy source and build
 COPY . .
-
-# Build
 RUN pnpm run build
 
 # Production
@@ -19,9 +18,7 @@ RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
-COPY patches/ ./patches/
-RUN pnpm install --frozen-lockfile --prod
-
+COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/dist ./dist
 COPY drizzle/ ./drizzle/
 COPY scripts/ ./scripts/
