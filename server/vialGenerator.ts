@@ -108,6 +108,90 @@ function fitLines(ctx: any, text: string, maxWidth: number, maxLines: number, st
   return { lines: [text], size: minSize };
 }
 
+
+function escXml(value: string): string {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function assetDataUri(filePath: string, mime: string): string {
+  const data = fs.readFileSync(filePath).toString('base64');
+  return `data:${mime};base64,${data}`;
+}
+
+function splitSvgLines(text: string, maxChars: number, maxLines: number): string[] {
+  const cleaned = String(text || '').trim().replace(/\s+/g, ' ');
+  if (!cleaned) return [];
+  const words = cleaned.split(' ');
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (test.length > maxChars && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  kept[maxLines - 1] = `${kept[maxLines - 1].replace(/\.{3}$/,'')}…`;
+  return kept;
+}
+
+function svgTextBlock(lines: string[], x: number, y: number, fontSize: number, lineHeight: number, fill: string): string {
+  if (!lines.length) return '';
+  const startY = y - ((lines.length - 1) * lineHeight) / 2;
+  return `<text x="${x}" y="${startY}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="900" fill="${fill}">${lines.map((line, i) => `<tspan x="${x}" dy="${i === 0 ? 0 : lineHeight}">${escXml(line)}</tspan>`).join('')}</text>`;
+}
+
+export async function generateVialSvgBuffer(productName: string): Promise<Buffer> {
+  const templatePath = firstExisting(PHOTOREAL_VIAL_TEMPLATE_PATHS);
+  const logoPath = firstExisting(LOGO_PATHS);
+  const templateUri = assetDataUri(templatePath, 'image/png');
+  const logoUri = assetDataUri(logoPath, 'image/png');
+
+  const W = 1116;
+  const H = 1410;
+  const cx = W / 2;
+  const combined = String(productName || '').trim();
+  const peptideName = (extractPeptideName(combined) || 'PRODUCT').toUpperCase();
+  const dosage = extractDosage(combined).toUpperCase();
+  const blue = '#005AA4';
+
+  const nameLines = splitSvgLines(peptideName, peptideName.length > 20 ? 15 : 18, 2);
+  const doseLines = splitSvgLines(dosage, 16, 2);
+  const nameFont = peptideName.length > 24 ? 46 : peptideName.length > 16 ? 54 : 64;
+  const doseFont = dosage.length > 14 ? 48 : 60;
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <image href="${templateUri}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>
+
+  <!-- Clean clear-label zone over the sample BPC text while preserving the HD cap, glass bottom, and shadow. -->
+  <rect x="250" y="450" width="616" height="600" rx="70" fill="#ffffff" opacity="0.965"/>
+  <linearGradient id="glassSheen" x1="250" y1="0" x2="866" y2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+    <stop offset="0.15" stop-color="#eaf4ff" stop-opacity="0.24"/>
+    <stop offset="0.25" stop-color="#8da6bc" stop-opacity="0.08"/>
+    <stop offset="0.80" stop-color="#eaf4ff" stop-opacity="0.18"/>
+    <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <rect x="268" y="470" width="580" height="560" rx="64" fill="url(#glassSheen)"/>
+
+  ${svgTextBlock(nameLines, cx, 585, nameFont, Math.round(nameFont * 0.95), blue)}
+  <image href="${logoUri}" x="353" y="670" width="410" height="273" preserveAspectRatio="xMidYMid meet"/>
+  ${doseLines.length ? svgTextBlock(doseLines, cx, 955, doseFont, Math.round(doseFont * 1.02), blue) : ''}
+</svg>`;
+  return Buffer.from(svg, 'utf8');
+}
+
 async function drawVialWithLabel(productName: string): Promise<Buffer> {
   // IMPORTANT: this uses the approved photorealistic RVR vial image as the base.
   // The only generated pieces are the product name, RVR logo, and selected dose.

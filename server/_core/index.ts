@@ -46,7 +46,7 @@ async function startServer() {
   app.get("/api/vial/:slug.png", async (req, res) => {
     try {
       const { getProductBySlug } = await import("../db");
-      const { generateVialBuffer } = await import("../vialGenerator");
+      const { generateVialSvgBuffer } = await import("../vialGenerator");
       const product = await getProductBySlug(req.params.slug);
       const queryName = typeof req.query.name === "string" ? req.query.name : "";
       const querySize = typeof req.query.size === "string" ? req.query.size : "";
@@ -55,9 +55,9 @@ async function startServer() {
       const displayName = productSize && !productName.toLowerCase().includes(productSize.toLowerCase())
         ? `${productName} ${productSize}`
         : productName;
-      const buffer = await generateVialBuffer(displayName);
-      res.setHeader("Content-Type", "image/png");
-      res.setHeader("Cache-Control", (queryName || querySize) ? "no-store" : "public, max-age=86400");
+      const buffer = await generateVialSvgBuffer(displayName);
+      res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
       res.send(buffer);
     } catch (err: any) {
       console.error('[Vial Generate Error]', err.message);
