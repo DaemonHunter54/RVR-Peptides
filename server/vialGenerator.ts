@@ -153,9 +153,9 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
   // The rectangle fully covers existing Manus product text/logo while preserving
   // the glass, cap, transparent background, and overall visual design.
   const labelX = Math.round(outW * 0.305);
-  const labelY = Math.round(outH * 0.405);
+  const labelY = Math.round(outH * 0.365);
   const labelW = Math.round(outW * 0.390);
-  const labelH = Math.round(outH * 0.390);
+  const labelH = Math.round(outH * 0.445);
   const labelR = Math.round(outW * 0.020);
 
   // Repaint a clean, blank curved black label over the pre-labeled asset.

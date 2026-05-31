@@ -317,10 +317,15 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
 function ProductVialPreview({ name, slug, size }: { name: string; slug: string; size?: string }) {
-  // Always use the generated blank-HD-vial endpoint for the admin live preview.
-  // Existing storefront/product assets remain untouched; this preview is only for
-  // seeing how a new generated vial will look as product data is typed.
-  const src = generatedVialPreviewUrl(slug, name, size);
+  // Client-side live preview so typing updates instantly and never depends on a
+  // cached /api/vial image. The backend still saves /api/vial/<slug>.png for
+  // generated product images, but this preview uses the HD Manus vial art with a
+  // freshly painted blank label.
+  const cleanName = String(name || "").trim();
+  const cleanSize = String(size || "").trim();
+  const displayName = cleanName.toUpperCase();
+  const displaySize = cleanSize.toUpperCase();
+
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -330,13 +335,58 @@ function ProductVialPreview({ name, slug, size }: { name: string; slug: string; 
         </div>
         <Badge variant="outline">Generated HD vial</Badge>
       </div>
-      <div className="flex justify-center rounded-lg bg-white p-4 min-h-[260px]">
-        <img
-          key={src}
-          src={src}
-          alt="Live vial preview"
-          className="max-h-[360px] w-auto object-contain"
-        />
+      <div className="flex justify-center rounded-lg bg-white p-4 min-h-[300px] overflow-hidden">
+        <div className="relative w-[300px] h-[300px]">
+          <img
+            src="/assets/bpc-157-5mg_1e10350a.png"
+            alt="Live vial preview"
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+
+          {/* Fresh blank label painted over the pre-labeled Manus vial. */}
+          <div
+            className="absolute overflow-hidden rounded-[8px] shadow-inner"
+            style={{
+              left: "30.5%",
+              top: "36.5%",
+              width: "39%",
+              height: "44.5%",
+              background:
+                "linear-gradient(90deg, #02050b 0%, #151a22 12%, #060a11 30%, #020409 50%, #060a11 70%, #151a22 88%, #02050b 100%)",
+            }}
+          >
+            <div className="absolute left-0 top-0 h-[5%] w-full bg-gradient-to-r from-[#003d65] via-[#55d0ff] to-[#003d65]" />
+            <div className="absolute left-0 bottom-0 h-[5%] w-full bg-gradient-to-r from-[#003d65] via-[#55d0ff] to-[#003d65]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+
+            <div className="absolute inset-x-[8%] top-[13%] text-center">
+              <div className="text-[24px] font-black tracking-tight leading-none text-slate-200">RVR</div>
+              <div className="mt-1 text-[5px] font-bold tracking-[0.13em] text-slate-400">
+                RIVER VALLEY RESEARCH
+              </div>
+            </div>
+
+            <div className="absolute inset-x-[8%] top-[43%] text-center">
+              {displayName ? (
+                <div
+                  className="font-black leading-tight text-white break-words"
+                  style={{ fontSize: displayName.length > 18 ? 12 : displayName.length > 11 ? 15 : 18 }}
+                >
+                  {displayName}
+                </div>
+              ) : null}
+              {displaySize ? (
+                <div className="mt-1 text-[15px] font-black leading-none text-white">
+                  {displaySize}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="absolute inset-x-[8%] bottom-[9%] text-center text-[7px] font-bold text-slate-200">
+              Research Use Only
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
