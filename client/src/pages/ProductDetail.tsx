@@ -104,6 +104,7 @@ export default function ProductDetail() {
             <img
               src={product.imageUrl || ASSETS.peptideVial}
               alt={product.name}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
               className="w-full max-w-md object-contain"
             />
           </div>

@@ -83,6 +83,7 @@ export default function OrderDetail() {
                     <img
                       src={item.product?.imageUrl || ASSETS.peptideVial}
                       alt={item.productName}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-16 h-16 object-contain bg-slate-50 rounded-lg"
                     />
                     <div className="flex-1">

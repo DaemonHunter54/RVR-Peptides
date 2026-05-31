@@ -15,9 +15,9 @@ export default function Footer() {
           {/* Brand */}
           <div className="lg:col-span-1">
             <img
-              src={settings.logo_url || ASSETS.logo}
+              src={ASSETS.logo}
               alt="River Valley Research Peptides"
-              className="h-12 w-auto mb-4 brightness-0 invert"
+              className="h-14 w-auto mb-4 rounded-md bg-white object-contain"
             />
             <p className="text-sm text-slate-400 leading-relaxed">
               {settings.site_description || "We are proud to carry the highest quality peptides and peptide blends in the research industry."}

@@ -70,7 +70,7 @@ export default function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 shrink-0">
               <img
-                src={settings.logo_url || ASSETS.logo}
+                src={ASSETS.logo}
                 alt="River Valley Research Peptides"
                 className="h-10 lg:h-14 w-auto object-contain"
               />

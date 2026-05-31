@@ -251,7 +251,8 @@ function ProductsSection() {
                 <tr key={product.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img src={product.imageUrl || ASSETS.peptideVial} alt="" className="w-10 h-10 object-contain bg-slate-50 rounded" />
+                      <img src={product.imageUrl || ASSETS.peptideVial} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+                      className="w-10 h-10 object-contain bg-slate-50 rounded" />
                       <div>
                         <p className="font-medium text-slate-800">{product.name}</p>
                         <p className="text-xs text-slate-400">{product.sku || "No SKU"}</p>

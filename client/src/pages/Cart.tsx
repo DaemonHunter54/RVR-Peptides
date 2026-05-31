@@ -106,6 +106,7 @@ export default function Cart() {
                     <img
                       src={item.product.imageUrl || ASSETS.peptideVial}
                       alt={item.product.name}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-20 h-20 object-contain bg-slate-50 rounded-lg"
                     />
                     <div className="flex-1">

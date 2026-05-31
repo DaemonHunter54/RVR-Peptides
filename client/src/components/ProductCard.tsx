@@ -35,6 +35,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           <img
             src={product.imageUrl || ASSETS.peptideVial}
             alt={product.name}
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-500"
           />
           {/* Badges */}
