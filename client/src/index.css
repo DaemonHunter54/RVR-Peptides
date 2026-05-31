@@ -153,3 +153,44 @@ a, button {
 button:active {
   transform: scale(0.97);
 }
+
+/* ─── Holiday Decoration Animations ─── */
+@keyframes snowfall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 0.7; }
+  100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+}
+@keyframes gentle-sway {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+@keyframes bat-fly {
+  0%, 100% { transform: translate(0, 0) scaleX(1); }
+  25% { transform: translate(15px, -8px) scaleX(1); }
+  50% { transform: translate(30px, 0) scaleX(-1); }
+  75% { transform: translate(15px, 8px) scaleX(-1); }
+}
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-10px); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes heart-float {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+  100% { transform: translateY(-110vh) rotate(20deg); opacity: 0; }
+}
+
+.animate-snowfall { animation: snowfall linear infinite; }
+.animate-gentle-sway { animation: gentle-sway 3s ease-in-out infinite; }
+.animate-float { animation: float 4s ease-in-out infinite; }
+.animate-twinkle { animation: twinkle 2s ease-in-out infinite; }
+.animate-bat-fly { animation: bat-fly 6s ease-in-out infinite; }
+.animate-hop { animation: hop 2s ease-in-out infinite; }
+.animate-heart-float { animation: heart-float linear infinite; }

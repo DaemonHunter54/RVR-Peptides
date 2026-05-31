@@ -16,6 +16,7 @@ import OrderDetail from "./pages/OrderDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import { lazy, Suspense } from "react";
+import HolidayDecorations from "./components/HolidayDecorations";
 
 const AdminPanel = lazy(() => import("./pages/admin/AdminPanel"));
 
@@ -60,6 +61,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
+          <HolidayDecorations />
           <Router />
         </TooltipProvider>
       </ThemeProvider>
