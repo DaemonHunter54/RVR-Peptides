@@ -165,29 +165,34 @@ export async function generateVialSvgBuffer(productName: string): Promise<Buffer
   const dosage = extractDosage(combined).toUpperCase();
   const blue = '#005AA4';
 
-  const nameLines = splitSvgLines(peptideName, peptideName.length > 20 ? 15 : 18, 2);
-  const doseLines = splitSvgLines(dosage, 16, 2);
-  const nameFont = peptideName.length > 24 ? 46 : peptideName.length > 16 ? 54 : 64;
-  const doseFont = dosage.length > 14 ? 48 : 60;
+  // Tight, center-mounted label area that matches the approved sample vial.
+  // Everything is clipped inside this rounded rectangle so no letters can spill
+  // past the glass/body sides when long blend names are used.
+  const nameLines = splitSvgLines(peptideName.replace(/\s*\/\s*/g, ' / '), peptideName.length > 24 ? 13 : 16, 3);
+  const doseLines = splitSvgLines(dosage.replace(/\s*\/\s*/g, ' / '), 15, 2);
+  const nameFont = nameLines.length >= 3 ? 36 : peptideName.length > 24 ? 40 : peptideName.length > 15 ? 48 : 60;
+  const doseFont = doseLines.length > 1 || dosage.length > 14 ? 42 : 58;
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <image href="${templateUri}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>
-
-  <!-- Clean clear-label zone over the sample BPC text while preserving the HD cap, glass bottom, and shadow. -->
-  <rect x="250" y="450" width="616" height="600" rx="70" fill="#ffffff" opacity="0.965"/>
-  <linearGradient id="glassSheen" x1="250" y1="0" x2="866" y2="0" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
-    <stop offset="0.15" stop-color="#eaf4ff" stop-opacity="0.24"/>
-    <stop offset="0.25" stop-color="#8da6bc" stop-opacity="0.08"/>
-    <stop offset="0.80" stop-color="#eaf4ff" stop-opacity="0.18"/>
-    <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-  </linearGradient>
-  <rect x="268" y="470" width="580" height="560" rx="64" fill="url(#glassSheen)"/>
-
-  ${svgTextBlock(nameLines, cx, 585, nameFont, Math.round(nameFont * 0.95), blue)}
-  <image href="${logoUri}" x="353" y="670" width="410" height="273" preserveAspectRatio="xMidYMid meet"/>
-  ${doseLines.length ? svgTextBlock(doseLines, cx, 955, doseFont, Math.round(doseFont * 1.02), blue) : ''}
+  <defs>
+    <clipPath id="labelClip"><rect x="318" y="452" width="480" height="660" rx="72"/></clipPath>
+    <linearGradient id="glassSheen" x1="318" y1="0" x2="798" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.12" stop-color="#eaf4ff" stop-opacity="0.24"/>
+      <stop offset="0.24" stop-color="#8fa8be" stop-opacity="0.08"/>
+      <stop offset="0.78" stop-color="#eaf4ff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#labelClip)">
+    <rect x="318" y="452" width="480" height="660" rx="72" fill="#ffffff" opacity="1"/>
+    <rect x="330" y="470" width="456" height="620" rx="66" fill="url(#glassSheen)"/>
+    ${svgTextBlock(nameLines, cx, 575, nameFont, Math.round(nameFont * 0.98), blue)}
+    <image href="${logoUri}" x="378" y="668" width="360" height="190" preserveAspectRatio="xMidYMid meet"/>
+    ${doseLines.length ? svgTextBlock(doseLines, cx, 935, doseFont, Math.round(doseFont * 1.03), blue) : ''}
+  </g>
 </svg>`;
   return Buffer.from(svg, 'utf8');
 }

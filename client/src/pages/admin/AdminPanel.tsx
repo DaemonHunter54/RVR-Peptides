@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { ASSETS } from "@/lib/assets";
 import { productAssetForSlug } from "@/lib/productAssetMap";
+import { generatedVialUrl as makeDynamicVialUrl } from "@/lib/vialDisplay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -302,14 +303,7 @@ function ProductsSection() {
 // ─── Product Form ────────────────────────────────────────────────────
 const makeSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 const generatedVialUrl = (slug: string) => slug ? `/api/vial/${slug}.png` : "";
-const generatedVialPreviewUrl = (slug: string, name: string, size?: string) => {
-  const safeSlug = slug || makeSlug(name || "preview-product") || "preview-product";
-  const params = new URLSearchParams();
-  if (name) params.set("name", name);
-  if (size) params.set("size", size);
-  params.set("v", "rvr-photoreal-template-v7");
-  return `/api/vial/${safeSlug}.png${params.toString() ? `?${params.toString()}` : ""}`;
-};
+const generatedVialPreviewUrl = (slug: string, name: string, size?: string) => makeDynamicVialUrl(slug || makeSlug(name || "preview-product"), name || "Preview Product", size || "");
 const imageUrlForSlug = (slug: string) => productAssetForSlug(slug) || generatedVialUrl(slug);
 const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
   const variantSlug = makeSlug(`${productSlug} ${variantLabel}`);
