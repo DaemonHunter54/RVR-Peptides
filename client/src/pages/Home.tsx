@@ -50,7 +50,7 @@ export default function Home() {
             {/* Right side - 3 Vials image (transparent bg, larger) */}
             <div className="flex justify-center lg:justify-end">
               <img
-                src="/rvr-peptide-vial.png"
+                src="https://d2xsxph8kpxj0f.cloudfront.net/310519663676993362/LxShBu2HV8xnNRdhLxHVuV/rvr-hero-vials-nobg-J2FQYwCYYdycbnfWhhvWxA.png"
                 alt="River Valley Research Peptide Vials - BPC-157, TB-500, GHK-Cu"
                 className="w-full max-w-2xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-110"
               />
@@ -139,7 +139,7 @@ export default function Home() {
       <section className="bg-white py-20 lg:py-28 relative overflow-hidden border-t border-gray-100">
         {/* Decorative logo watermark in background - like the swirl in corepeptides */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <img src="/rvr-logo.png" alt="" className="w-[700px] h-[700px] object-contain opacity-[0.04]" />
+          <img src="/manus-storage/rvr-logo_19fbf80f.png" alt="" className="w-[700px] h-[700px] object-contain opacity-[0.04]" />
         </div>
 
         {/* Decorative curved lines - mimicking the corepeptides swirl design */}
