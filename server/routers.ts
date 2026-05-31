@@ -10,47 +10,8 @@ import * as db from "./db";
 import { nanoid } from "nanoid";
 import { createPayment, getPaymentStatus, getApiStatus } from "./nowpayments";
 import { generateVialImage, generateHeroVialsImage, generateVialBuffer, generateHeroVialsBuffer } from "./vialGenerator";
-import fs from "fs";
-import path from "path";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret-key");
-
-function makeProductSlug(value: string): string {
-  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-let cachedProductAssets: Map<string, string> | null = null;
-function getProductAssetMap(): Map<string, string> {
-  if (cachedProductAssets) return cachedProductAssets;
-  cachedProductAssets = new Map();
-  const assetsDir = path.join(process.cwd(), "client", "public", "assets");
-  try {
-    for (const file of fs.readdirSync(assetsDir)) {
-      if (!/\.(png|jpg|jpeg|webp)$/i.test(file)) continue;
-      const key = makeProductSlug(file.replace(/\.[^.]+$/, "").replace(/_[0-9a-f]{8}$/i, ""));
-      if (key && !key.startsWith("rvr-logo") && !key.startsWith("rvr-hero") && !key.startsWith("rvr-vial-template")) {
-        cachedProductAssets.set(key, `/assets/${file}`);
-      }
-    }
-  } catch {
-    // Assets may be unavailable in some local tooling; return an empty map.
-  }
-  return cachedProductAssets;
-}
-
-function productAssetForInput(input: { slug?: string | null; name?: string | null; imageUrl?: string | null }): string {
-  const assets = getProductAssetMap();
-  const slugKey = makeProductSlug(input.slug || "");
-  if (slugKey && assets.has(slugKey)) return assets.get(slugKey)!;
-  const nameKey = makeProductSlug(input.name || "");
-  if (nameKey && assets.has(nameKey)) return assets.get(nameKey)!;
-  return "";
-}
-
-function shouldReplaceGeneratedImage(image?: string | null): boolean {
-  if (!image) return true;
-  return String(image).startsWith("/api/vial/") || String(image).includes("rvr-vial-template-single");
-}
 
 // Admin middleware
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -427,9 +388,8 @@ export const appRouter = router({
       })).mutation(async ({ input }) => {
         const { categoryIds, variants, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
-        const mappedImage = productAssetForInput(data);
-        if (mappedImage && shouldReplaceGeneratedImage(data.imageUrl)) {
-          data.imageUrl = mappedImage;
+        if (!data.imageUrl) {
+          data.imageUrl = `/api/vial/${data.slug}.png`;
         }
         const id = await db.createProduct(data as any, categoryIds);
         if (variants?.length) {
@@ -464,9 +424,9 @@ export const appRouter = router({
       })).mutation(async ({ input }) => {
         const { id, categoryIds, variants, regenerateVial, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
-        const mappedImage = productAssetForInput(data);
-        if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
-          data.imageUrl = mappedImage;
+        if ((regenerateVial || !data.imageUrl) && (data.slug || data.name)) {
+          const slug = data.slug || data.name!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          data.imageUrl = `/api/vial/${slug}.png`;
         }
         await db.updateProduct(id, data as any, categoryIds);
         if (variants !== undefined) {

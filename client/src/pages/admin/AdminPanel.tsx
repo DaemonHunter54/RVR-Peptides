@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { ASSETS } from "@/lib/assets";
-import { productAssetForSlug } from "@/lib/productAssetMap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -301,7 +300,7 @@ function ProductsSection() {
 
 // ─── Product Form ────────────────────────────────────────────────────
 const makeSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-const imageUrlForSlug = (slug: string) => productAssetForSlug(slug) || "";
+const vialUrlForSlug = (slug: string) => slug ? `/api/vial/${slug}.png` : "";
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
 function ProductForm({ product, onSave, onCancel, saving }: any) {
@@ -353,11 +352,11 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         const slug = makeSlug(value);
         next.slug = slug;
         if (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/")) {
-          next.imageUrl = imageUrlForSlug(slug);
+          next.imageUrl = vialUrlForSlug(slug);
         }
       }
       if (field === "slug" && !product?.id && (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/"))) {
-        next.imageUrl = imageUrlForSlug(makeSlug(value));
+        next.imageUrl = vialUrlForSlug(makeSlug(value));
       }
       return next;
     });
@@ -386,12 +385,12 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         label: String(v.label || "").trim(),
         price: String(v.price || form.price || "0").trim(),
         sortOrder: index,
-        imageUrl: v.imageUrl || form.imageUrl || imageUrlForSlug(form.slug),
+        imageUrl: v.imageUrl || form.imageUrl || vialUrlForSlug(form.slug),
       }));
 
     const payload = {
       ...form,
-      imageUrl: form.imageUrl || imageUrlForSlug(form.slug),
+      imageUrl: form.imageUrl || vialUrlForSlug(form.slug),
       variants,
     };
 
