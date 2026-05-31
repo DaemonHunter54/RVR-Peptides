@@ -104,9 +104,9 @@ function buildPhotorealVialSvg(name?: string, size?: string): string {
   <g clip-path="url(#labelClip)">
     <rect x="318" y="452" width="480" height="660" rx="72" fill="#fff" opacity="1"/>
     <rect x="330" y="470" width="456" height="620" rx="66" fill="url(#sheen)"/>
-    ${textBlock(nameLines, cx, 575, nameFont, Math.round(nameFont * 0.98))}
-    <image href="/assets/rvr-company-logo-large.png" x="378" y="668" width="360" height="190" preserveAspectRatio="xMidYMid meet"/>
-    ${doseLines.length ? textBlock(doseLines, cx, 935, doseFont, Math.round(doseFont * 1.03)) : ""}
+    ${textBlock(nameLines, cx, 640, Math.round(nameFont * 1.15), Math.round(nameFont * 1.05))}
+    <image href="/assets/rvr-company-logo-large.png" x="340" y="720" width="440" height="232" preserveAspectRatio="xMidYMid meet"/>
+    ${doseLines.length ? textBlock(doseLines, cx, 1025, Math.round(doseFont * 1.18), Math.round(doseFont * 1.08)) : ""}
   </g>
 </svg>`;
 }
@@ -116,7 +116,7 @@ export function generatedVialUrl(slug: string, name?: string, size?: string): st
   const params = new URLSearchParams();
   if (name) params.set("name", name);
   if (size) params.set("size", size);
-  params.set("v", "rvr-photoreal-svg-final-1");
+  params.set("v", "rvr-photoreal-svg-final-2");
   return `/api/vial/${safeSlug}.png?${params.toString()}`;
 }
 
