@@ -34,4 +34,4 @@ COPY scripts/ ./scripts/
 COPY seed-products.mjs ./seed-products.mjs
 
 EXPOSE 8080
-CMD ["sh", "-c", "node scripts/db-init.mjs && node seed-products.mjs && node dist/index.js"]
+CMD ["node", "dist/index.js"]

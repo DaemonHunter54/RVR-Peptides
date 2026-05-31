@@ -192,7 +192,8 @@ const alterStatements = [
   ["lastSignedIn", "ALTER TABLE users ADD COLUMN lastSignedIn timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"]
 ];
 
-const conn = await mysql.createConnection(url);
+console.log("[DB init] Connecting to database...");
+const conn = await mysql.createConnection({ uri: url, connectTimeout: 10000 });
 try {
   console.log("[DB init] Ensuring required tables exist...");
   for (const statement of statements) await conn.execute(statement);

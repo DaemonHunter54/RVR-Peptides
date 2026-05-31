@@ -210,7 +210,8 @@ export async function ensureDatabaseReady() {
       return;
     }
 
-    const conn = await mysql.createConnection(url);
+    console.log("[DB init] Connecting to database...");
+    const conn = await mysql.createConnection({ uri: url, connectTimeout: 10000 });
     try {
       console.log("[DB init] Ensuring required tables and columns exist...");
       for (const statement of TABLES) {
@@ -224,7 +225,11 @@ export async function ensureDatabaseReady() {
     } finally {
       await conn.end();
     }
-  })();
+  })().catch((error) => {
+    initPromise = null;
+    console.error("[DB init] Failed:", error);
+    throw error;
+  });
 
   return initPromise;
 }
