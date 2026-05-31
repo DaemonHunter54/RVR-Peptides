@@ -86,6 +86,12 @@ export async function createLocalUser(data: { email: string; username: string; p
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const openId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminUsername = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+  const isConfiguredAdmin =
+    (!!adminEmail && data.email.trim().toLowerCase() === adminEmail) ||
+    (!!adminUsername && data.username.trim().toLowerCase() === adminUsername);
+
   await db.insert(users).values({
     openId,
     email: data.email,
@@ -93,7 +99,7 @@ export async function createLocalUser(data: { email: string; username: string; p
     passwordHash: data.passwordHash,
     name: data.name || data.username,
     loginMethod: "local",
-    role: "user",
+    role: isConfiguredAdmin ? "admin" : "user",
     lastSignedIn: new Date(),
   });
   return getUserByOpenId(openId);
