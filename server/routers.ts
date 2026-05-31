@@ -52,7 +52,7 @@ function generatedVialUrlForProduct(input: { slug?: string | null; name?: string
   const params = new URLSearchParams();
   if (input.name) params.set("name", String(input.name));
   if (input.size || input.contents) params.set("size", String(input.size || input.contents));
-  params.set("v", "rvr-short-clear-vial-1");
+  params.set("v", "rvr-photoreal-template-v3");
   return `/api/vial/${slug}.png?${params.toString()}`;
 }
 
