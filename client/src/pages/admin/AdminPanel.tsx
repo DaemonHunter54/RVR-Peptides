@@ -317,8 +317,10 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
 function ProductVialPreview({ name, slug, size }: { name: string; slug: string; size?: string }) {
-  const exactAsset = productAssetForSlug(slug);
-  const src = exactAsset || generatedVialPreviewUrl(slug, name, size);
+  // Always use the generated blank-HD-vial endpoint for the admin live preview.
+  // Existing storefront/product assets remain untouched; this preview is only for
+  // seeing how a new generated vial will look as product data is typed.
+  const src = generatedVialPreviewUrl(slug, name, size);
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center justify-between mb-3">
@@ -326,7 +328,7 @@ function ProductVialPreview({ name, slug, size }: { name: string; slug: string; 
           <h3 className="font-semibold text-slate-800 text-sm">Live Vial Preview</h3>
           <p className="text-xs text-slate-500">Auto-updates from product name and size.</p>
         </div>
-        <Badge variant={exactAsset ? "secondary" : "outline"}>{exactAsset ? "Manus asset" : "Generated HD vial"}</Badge>
+        <Badge variant="outline">Generated HD vial</Badge>
       </div>
       <div className="flex justify-center rounded-lg bg-white p-4 min-h-[260px]">
         <img

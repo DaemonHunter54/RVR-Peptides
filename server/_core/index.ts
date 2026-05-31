@@ -57,7 +57,7 @@ async function startServer() {
         : productName;
       const buffer = await generateVialBuffer(displayName);
       res.setHeader("Content-Type", "image/png");
-      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Cache-Control", (queryName || querySize) ? "no-store" : "public, max-age=86400");
       res.send(buffer);
     } catch (err: any) {
       console.error('[Vial Generate Error]', err.message);
