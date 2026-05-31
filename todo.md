@@ -36,3 +36,11 @@
 - [x] Remove background from hero vials image (transparent/no box)
 - [x] Make hero vials slightly larger on the page
 - [x] Upgrade product card vials to match high-quality photorealistic hero vial style
+- [x] Add "Email" link in admin panel header next to "Admin Panel" title (placeholder for future email platform)
+- [ ] Fix holiday templates to actually apply visual changes with decorations (Christmas trees, Easter bunny/eggs, pumpkins, etc.)
+- [ ] Add "Main" template that reverts all holiday decorations back to default
+- [ ] Add account profile management: change username, email, phone number
+- [ ] Add option to save payment information for faster checkout
+- [ ] Add option to save shipping information for faster checkout
+- [ ] Offer account creation during checkout flow (link order to new account)
+- [ ] Require email address for guest checkout (for receipt, tracking, thank you emails)

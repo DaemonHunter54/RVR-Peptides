@@ -60,11 +60,14 @@ export default function AdminPanel() {
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-slate-200 fixed h-full overflow-y-auto hidden lg:block">
-        <div className="p-4 border-b border-slate-100">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
             <span className="font-bold text-slate-800 text-sm">Admin Panel</span>
           </Link>
+          <button onClick={() => toast.info("Email platform coming soon. This will link to your email management dashboard once configured.")} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
+            Email
+          </button>
         </div>
         <nav className="p-3 space-y-1">
           {menuItems.map((item) => (
@@ -84,10 +87,15 @@ export default function AdminPanel() {
       {/* Main Content */}
       <main className="flex-1 lg:ml-64">
         <div className="lg:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
-            <span className="font-bold text-slate-800 text-sm">Admin</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2">
+              <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
+              <span className="font-bold text-slate-800 text-sm">Admin</span>
+            </Link>
+            <button onClick={() => toast.info("Email platform coming soon. This will link to your email management dashboard once configured.")} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
+              Email
+            </button>
+          </div>
           <div className="flex gap-1 overflow-x-auto">
             {menuItems.map((item) => (
               <Link key={item.id} href={item.id === "dashboard" ? "/admin" : `/admin/${item.id}`}>
