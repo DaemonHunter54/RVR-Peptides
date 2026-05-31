@@ -5,10 +5,11 @@ import { nanoid } from "nanoid";
 import path from "path";
 
 export async function setupVite(app: Express, server: Server) {
-  const [{ createServer: createViteServer }, { default: viteConfig }] = await Promise.all([
-    import("vite"),
-    import("../../vite.config"),
-  ]);
+  // Keep all Vite/dev-server dependencies out of the production bundle.
+  // Do not import ../../vite.config here: esbuild can pull that file and its
+  // development-only plugins into dist/index.js, which breaks Railway because
+  // production installs only runtime dependencies.
+  const { createServer: createViteServer } = await import("vite");
 
   const serverOptions = {
     middlewareMode: true,
@@ -17,8 +18,9 @@ export async function setupVite(app: Express, server: Server) {
   };
 
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
+    // Let Vite load vite.config.ts only when setupVite() is called in development.
+    // Production uses serveStatic() and never calls this function.
+    configFile: path.resolve(import.meta.dirname, "../..", "vite.config.ts"),
     server: serverOptions,
     appType: "custom",
   });
