@@ -10,8 +10,84 @@ import * as db from "./db";
 import { nanoid } from "nanoid";
 import { createPayment, getPaymentStatus, getApiStatus } from "./nowpayments";
 import { generateVialImage, generateHeroVialsImage, generateVialBuffer, generateHeroVialsBuffer } from "./vialGenerator";
+import fs from "fs";
+import path from "path";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret-key");
+
+function makeProductSlug(value: string): string {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+let cachedProductAssets: Map<string, string> | null = null;
+function getProductAssetMap(): Map<string, string> {
+  if (cachedProductAssets) return cachedProductAssets;
+  cachedProductAssets = new Map();
+  const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+  try {
+    for (const file of fs.readdirSync(assetsDir)) {
+      if (!/\.(png|jpg|jpeg|webp)$/i.test(file)) continue;
+      const key = makeProductSlug(file.replace(/\.[^.]+$/, "").replace(/_[0-9a-f]{8}$/i, ""));
+      if (key && !key.startsWith("rvr-logo") && !key.startsWith("rvr-hero") && !key.startsWith("rvr-vial-template")) {
+        cachedProductAssets.set(key, `/assets/${file}`);
+      }
+    }
+  } catch {
+    // Assets may be unavailable in some local tooling; return an empty map.
+  }
+  return cachedProductAssets;
+}
+
+function productAssetForInput(input: { slug?: string | null; name?: string | null; imageUrl?: string | null }): string {
+  const assets = getProductAssetMap();
+  const slugKey = makeProductSlug(input.slug || "");
+  if (slugKey && assets.has(slugKey)) return assets.get(slugKey)!;
+  const nameKey = makeProductSlug(input.name || "");
+  if (nameKey && assets.has(nameKey)) return assets.get(nameKey)!;
+  return "";
+}
+
+function shouldReplaceGeneratedImage(image?: string | null): boolean {
+  if (!image) return true;
+  const value = String(image);
+  return value.startsWith("/api/vial/")
+    || value.includes("rvr-vial-template-single")
+    || value.includes("rvr-vial-template")
+    || value.includes("/assets/generated/");
+}
+
+function productAssetForDisplay(input: { slug?: string | null; name?: string | null; imageUrl?: string | null; size?: string | null; contents?: string | null }): string {
+  const assets = getProductAssetMap();
+  const exact = productAssetForInput(input);
+  if (exact) return exact;
+
+  const baseKeys = [makeProductSlug(input.slug || ""), makeProductSlug(input.name || "")].filter(Boolean);
+  const sizeKey = makeProductSlug(input.size || input.contents || "");
+
+  for (const baseKey of baseKeys) {
+    if (sizeKey && assets.has(`${baseKey}-${sizeKey}`)) return assets.get(`${baseKey}-${sizeKey}`)!;
+    const matches = Array.from(assets.entries())
+      .filter(([key]) => key === baseKey || key.startsWith(`${baseKey}-`))
+      .sort(([a], [b]) => {
+        const aCaps = a.includes("capsule");
+        const bCaps = b.includes("capsule");
+        if (aCaps !== bCaps) return aCaps ? 1 : -1;
+        return a.localeCompare(b, undefined, { numeric: true });
+      });
+    if (matches.length) return matches[0][1];
+  }
+
+  return "";
+}
+
+function preserveManusImage(product: any): any {
+  if (!product) return product;
+  const mappedImage = productAssetForDisplay(product);
+  if (mappedImage && shouldReplaceGeneratedImage(product.imageUrl)) {
+    return { ...product, imageUrl: mappedImage };
+  }
+  return product;
+}
 
 // Admin middleware
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -137,10 +213,12 @@ export const appRouter = router({
       limit: z.number().optional(),
       offset: z.number().optional(),
     }).optional()).query(async ({ input }) => {
-      return db.getAllProductsWithVariantCount({ activeOnly: true, categorySlug: input?.category, search: input?.search, limit: input?.limit, offset: input?.offset });
+      const result = await db.getAllProductsWithVariantCount({ activeOnly: true, categorySlug: input?.category, search: input?.search, limit: input?.limit, offset: input?.offset });
+      return { ...result, products: result.products.map(preserveManusImage) };
     }),
     featured: publicProcedure.query(async () => {
-      return db.getFeaturedProducts();
+      const products = await db.getFeaturedProducts();
+      return products.map(preserveManusImage);
     }),
     bySlug: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ input }) => {
       const product = await db.getProductBySlug(input.slug);
@@ -149,7 +227,7 @@ export const appRouter = router({
       const research = await db.getProductResearch(product.id);
       const citations = await db.getProductCitations(product.id);
       const variants = await db.getProductVariants(product.id);
-      return { ...product, categories: cats, research, citations, variants };
+      return { ...preserveManusImage(product), categories: cats, research, citations, variants };
     }),
     variants: publicProcedure.input(z.object({ productId: z.number() })).query(async ({ input }) => {
       return db.getProductVariants(input.productId);
@@ -361,7 +439,7 @@ export const appRouter = router({
       list: adminProcedure.input(z.object({ search: z.string().optional(), limit: z.number().optional(), offset: z.number().optional() }).optional()).query(async ({ input }) => {
         const result = await db.getAllProducts({ search: input?.search, limit: input?.limit, offset: input?.offset });
         const enrichedProducts = await Promise.all(result.products.map(async (product: any) => ({
-          ...product,
+          ...preserveManusImage(product),
           variants: await db.getProductVariants(product.id),
         })));
         return { ...result, products: enrichedProducts };
@@ -373,7 +451,7 @@ export const appRouter = router({
         const research = await db.getProductResearch(product.id);
         const citations = await db.getProductCitations(product.id);
         const variants = await db.getProductVariants(product.id);
-        return { ...product, categories: cats, research, citations, variants };
+        return { ...preserveManusImage(product), categories: cats, research, citations, variants };
       }),
       create: adminProcedure.input(z.object({
         name: z.string(), slug: z.string(), description: z.string().optional(), shortDescription: z.string().optional(),
@@ -388,8 +466,9 @@ export const appRouter = router({
       })).mutation(async ({ input }) => {
         const { categoryIds, variants, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
-        if (!data.imageUrl) {
-          data.imageUrl = `/api/vial/${data.slug}.png`;
+        const mappedImage = productAssetForInput(data);
+        if (mappedImage && shouldReplaceGeneratedImage(data.imageUrl)) {
+          data.imageUrl = mappedImage;
         }
         const id = await db.createProduct(data as any, categoryIds);
         if (variants?.length) {
@@ -424,9 +503,9 @@ export const appRouter = router({
       })).mutation(async ({ input }) => {
         const { id, categoryIds, variants, regenerateVial, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
-        if ((regenerateVial || !data.imageUrl) && (data.slug || data.name)) {
-          const slug = data.slug || data.name!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-          data.imageUrl = `/api/vial/${slug}.png`;
+        const mappedImage = productAssetForInput(data);
+        if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
+          data.imageUrl = mappedImage;
         }
         await db.updateProduct(id, data as any, categoryIds);
         if (variants !== undefined) {
