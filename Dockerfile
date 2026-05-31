@@ -26,7 +26,6 @@ COPY patches/ ./patches/
 COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/dist ./dist
 COPY drizzle/ ./drizzle/
-COPY scripts/ ./scripts/
 COPY seed-products.mjs ./seed-products.mjs
 
 EXPOSE 3000

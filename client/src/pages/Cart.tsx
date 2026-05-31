@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useGuestCart } from "@/hooks/useGuestCart";
@@ -114,7 +114,7 @@ export default function Cart() {
                     <img
                       src={item.product.imageUrl || ASSETS.peptideVial}
                       alt={item.product.name}
-                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
                       className="w-20 h-20 object-contain bg-slate-50 rounded-lg"
                     />
                     <div className="flex-1">

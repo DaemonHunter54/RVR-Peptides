@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
 
 interface ProductCardProps {
   product: {
@@ -35,7 +35,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               src={product.imageUrl || `/api/vial/${product.slug}.png`}
               alt={product.name}
               className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
             />
           </div>
 

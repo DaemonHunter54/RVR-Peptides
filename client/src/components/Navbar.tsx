@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { Menu, ShoppingCart, User, X, ChevronDown, LogOut, Package, Settings } from "lucide-react";
@@ -82,6 +82,7 @@ export default function Navbar() {
                 src={ASSETS.logo}
                 alt="River Valley Research Peptides"
                 className="h-10 lg:h-14 w-auto object-contain"
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.logo; }}
               />
             </Link>
 

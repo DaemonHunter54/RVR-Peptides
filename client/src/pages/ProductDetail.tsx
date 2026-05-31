@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,7 @@ export default function ProductDetail() {
             <img
               src={product.imageUrl || `/api/vial/${product.slug}.png`}
               alt={product.name}
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
               className="w-full max-w-md object-contain"
             />
           </div>

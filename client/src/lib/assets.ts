@@ -7,3 +7,11 @@ export const ASSETS = {
   // Backward compatibility - used as fallback in product cards/detail pages
   peptideVial: "/manus-storage/rvr-vial-template-single_c7ba8797.png",
 } as const;
+
+
+export const ASSET_FALLBACKS = {
+  logo: "/rvr-logo-fallback.svg",
+  logoIcon: "/rvr-logo-icon-fallback.svg",
+  heroVials: "/rvr-hero-3vials-transparent_af6612a1.png",
+  peptideVial: "/rvr-vial-template-single_c7ba8797.png",
+} as const;
