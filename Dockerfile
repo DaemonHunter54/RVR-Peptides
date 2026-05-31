@@ -23,7 +23,6 @@ COPY patches/ ./patches/
 RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=base /app/dist ./dist
-COPY --from=base /app/client/dist ./client/dist
 COPY drizzle/ ./drizzle/
 
 ENV NODE_ENV=production
