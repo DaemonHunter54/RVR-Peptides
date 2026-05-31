@@ -51,7 +51,7 @@ export default function Footer() {
             {/* Left - Logo and disclaimer */}
             <div className="lg:col-span-1">
               <img
-                src="/manus-storage/rvr-logo_19fbf80f.png"
+                src="/rvr-logo.png"
                 alt="River Valley Research Peptides"
                 className="h-14 w-auto mb-6"
               />
