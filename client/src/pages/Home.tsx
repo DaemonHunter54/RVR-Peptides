@@ -53,7 +53,7 @@ export default function Home() {
               <img
                 src={ASSETS.heroVials}
                 alt="River Valley Research Peptide Vials - BPC-157, TB-500, GHK-Cu"
-                className="w-full max-w-3xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-125"
+                className="w-full max-w-3xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-110"
               />
             </div>
           </div>
