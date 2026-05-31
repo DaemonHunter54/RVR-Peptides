@@ -13,10 +13,14 @@ import {
   siteSettings,
   cartItems,
 } from "../drizzle/schema";
+import { ensureDatabaseReady } from "./db-init";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
+  if (process.env.DATABASE_URL) {
+    await ensureDatabaseReady();
+  }
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL);

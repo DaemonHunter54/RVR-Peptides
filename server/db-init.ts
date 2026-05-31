@@ -171,10 +171,18 @@ const TABLES = [
 ];
 
 const REQUIRED_COLUMNS: Array<[string, string, string]> = [
+  ["users", "openId", "varchar(64)"],
+  ["users", "name", "text"],
+  ["users", "email", "varchar(320)"],
+  ["users", "loginMethod", "varchar(64)"],
+  ["users", "role", "enum('user','admin') NOT NULL DEFAULT 'user'"],
   ["users", "passwordHash", "varchar(255)"],
   ["users", "username", "varchar(100)"],
   ["users", "phone", "varchar(20)"],
   ["users", "shippingAddress", "text"],
+  ["users", "createdAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],
+  ["users", "updatedAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ["users", "lastSignedIn", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],
 ];
 
 let initialized = false;
@@ -211,7 +219,7 @@ export async function ensureDatabaseReady() {
       for (const [table, column, definition] of REQUIRED_COLUMNS) {
         await addColumnIfMissing(conn, table, column, definition);
       }
-      console.log("[DB init] Database schema ready.");
+      console.log("[DB init] Database schema ready. Users table columns verified.");
       initialized = true;
     } finally {
       await conn.end();

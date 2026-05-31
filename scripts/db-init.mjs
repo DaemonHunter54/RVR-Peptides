@@ -178,22 +178,33 @@ const statements = [
 ];
 
 const alterStatements = [
-  "ALTER TABLE users ADD COLUMN passwordHash varchar(255)",
-  "ALTER TABLE users ADD COLUMN username varchar(100)",
-  "ALTER TABLE users ADD COLUMN phone varchar(20)",
-  "ALTER TABLE users ADD COLUMN shippingAddress text"
+  ["openId", "ALTER TABLE users ADD COLUMN openId varchar(64)"],
+  ["name", "ALTER TABLE users ADD COLUMN name text"],
+  ["email", "ALTER TABLE users ADD COLUMN email varchar(320)"],
+  ["loginMethod", "ALTER TABLE users ADD COLUMN loginMethod varchar(64)"],
+  ["role", "ALTER TABLE users ADD COLUMN role enum('user','admin') NOT NULL DEFAULT 'user'"],
+  ["passwordHash", "ALTER TABLE users ADD COLUMN passwordHash varchar(255)"],
+  ["username", "ALTER TABLE users ADD COLUMN username varchar(100)"],
+  ["phone", "ALTER TABLE users ADD COLUMN phone varchar(20)"],
+  ["shippingAddress", "ALTER TABLE users ADD COLUMN shippingAddress text"],
+  ["createdAt", "ALTER TABLE users ADD COLUMN createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],
+  ["updatedAt", "ALTER TABLE users ADD COLUMN updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ["lastSignedIn", "ALTER TABLE users ADD COLUMN lastSignedIn timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"]
 ];
 
 const conn = await mysql.createConnection(url);
 try {
   console.log("[DB init] Ensuring required tables exist...");
   for (const statement of statements) await conn.execute(statement);
-  for (const statement of alterStatements) {
-    try { await conn.execute(statement); } catch (err) {
+  for (const [column, statement] of alterStatements) {
+    try {
+      await conn.execute(statement);
+      console.log(`[DB init] Added missing users.${column}`);
+    } catch (err) {
       if (err?.code !== "ER_DUP_FIELDNAME") throw err;
     }
   }
-  console.log("[DB init] Database schema ready.");
+  console.log("[DB init] Database schema ready. Users table columns verified.");
 } finally {
   await conn.end();
 }
