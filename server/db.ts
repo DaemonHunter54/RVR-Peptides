@@ -272,10 +272,53 @@ export async function getAllProductsWithVariantCount(opts?: { activeOnly?: boole
   return { products: enriched, total };
 }
 
+
+function cleanProductMutationData(data: Partial<InsertProduct>): Partial<InsertProduct> {
+  const cleaned: Record<string, unknown> = {};
+  const nullableDecimalFields = new Set(["compareAtPrice", "discountPercent"]);
+  const nullableTextFields = new Set([
+    "sku",
+    "imageUrl",
+    "size",
+    "contents",
+    "form",
+    "purity",
+    "molecularFormula",
+    "molecularWeight",
+    "otherNames",
+    "coaUrl",
+    "hplcUrl",
+    "massSpecUrl",
+  ]);
+
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (value === undefined) continue;
+
+    if (nullableDecimalFields.has(key)) {
+      cleaned[key] = value === "" || value === null ? null : String(value);
+      continue;
+    }
+
+    if (nullableTextFields.has(key)) {
+      cleaned[key] = value === "" || value === null ? null : value;
+      continue;
+    }
+
+    if (key === "description" || key === "shortDescription") {
+      cleaned[key] = value === null || value === undefined ? "" : String(value);
+      continue;
+    }
+
+    cleaned[key] = value;
+  }
+
+  return cleaned as Partial<InsertProduct>;
+}
+
 export async function createProduct(data: InsertProduct, categoryIds?: number[]) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(products).values(data);
+  const result = await db.insert(products).values(cleanProductMutationData(data) as InsertProduct);
   const productId = Number(result[0].insertId);
   if (categoryIds && categoryIds.length > 0) {
     await db.insert(productCategories).values(categoryIds.map(cid => ({ productId, categoryId: cid })));
@@ -286,7 +329,7 @@ export async function createProduct(data: InsertProduct, categoryIds?: number[])
 export async function updateProduct(id: number, data: Partial<InsertProduct>, categoryIds?: number[]) {
   const db = await getDb();
   if (!db) return;
-  await db.update(products).set(data).where(eq(products.id, id));
+  await db.update(products).set(cleanProductMutationData(data)).where(eq(products.id, id));
   if (categoryIds !== undefined) {
     await db.delete(productCategories).where(eq(productCategories.productId, id));
     if (categoryIds.length > 0) {

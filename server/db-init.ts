@@ -54,6 +54,9 @@ const TABLES = [
   inStock boolean NOT NULL DEFAULT true,
   discountPercent decimal(5,2),
   discountActive boolean NOT NULL DEFAULT false,
+  coaUrl text,
+  hplcUrl text,
+  massSpecUrl text,
   isActive boolean NOT NULL DEFAULT true,
   isFeatured boolean NOT NULL DEFAULT false,
   sortOrder int NOT NULL DEFAULT 0,
@@ -783,6 +786,27 @@ async function ensureDefaultCatalog(conn: mysql.Connection) {
 let initialized = false;
 let initPromise: Promise<void> | null = null;
 
+
+async function ensureProductColumnTypes(conn: mysql.Connection) {
+  const statements = [
+    "ALTER TABLE products MODIFY COLUMN description LONGTEXT",
+    "ALTER TABLE products MODIFY COLUMN shortDescription LONGTEXT",
+    "ALTER TABLE products MODIFY COLUMN imageUrl TEXT",
+    "ALTER TABLE products MODIFY COLUMN otherNames TEXT",
+    "ALTER TABLE products MODIFY COLUMN coaUrl TEXT",
+    "ALTER TABLE products MODIFY COLUMN hplcUrl TEXT",
+    "ALTER TABLE products MODIFY COLUMN massSpecUrl TEXT",
+  ];
+
+  for (const statement of statements) {
+    try {
+      await conn.execute(statement);
+    } catch (error) {
+      console.warn("[DB init] Could not normalize product column type:", statement, error);
+    }
+  }
+}
+
 async function addColumnIfMissing(conn: mysql.Connection, table: string, column: string, definition: string) {
   const [rows] = await conn.execute<RowDataPacket[]>(
     `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
@@ -815,6 +839,7 @@ export async function ensureDatabaseReady() {
       for (const [table, column, definition] of REQUIRED_COLUMNS) {
         await addColumnIfMissing(conn, table, column, definition);
       }
+      await ensureProductColumnTypes(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
       await ensureNihResearchDescriptions(conn);
