@@ -136,168 +136,86 @@ function drawWrappedText(
  * with product-specific text overlaid on the black label area
  */
 async function drawVialWithLabel(productName: string): Promise<Buffer> {
-  // Generate a transparent HD-style blank vial from vector/canvas pieces, then
-  // render the admin-entered product name and dose onto the empty label. This
-  // avoids using a pre-labeled Manus asset as the base, which caused label-on-label
-  // artifacts for new products without an existing Manus image.
-  const outW = 1248;
-  const outH = 1248;
+  // Use the real Manus/RVR HD vial artwork as the visual base, but repaint the
+  // label area before adding dynamic product text. This keeps the HD transparent
+  // vial style and prevents drawing a new label on top of an already-labeled vial.
+  const base = await loadImage(firstExisting(HD_VIAL_BASE_PATHS));
+  const outW = base.width;
+  const outH = base.height;
   const canvas = createCanvas(outW, outH);
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, outW, outH);
+  ctx.drawImage(base, 0, 0, outW, outH);
 
   const centerX = outW / 2;
-  const vialX = 418;
-  const vialY = 118;
-  const vialW = 412;
-  const vialH = 1010;
-  const capH = 88;
-  const neckH = 138;
-  const bodyY = vialY + capH + neckH - 28;
-  const bodyH = vialH - capH - neckH + 24;
-  const bodyX = vialX + 28;
-  const bodyW = vialW - 56;
 
-  // Soft transparent base shadow only; the background remains transparent.
-  const shadow = ctx.createRadialGradient(centerX, vialY + vialH - 28, 30, centerX, vialY + vialH - 18, 280);
-  shadow.addColorStop(0, 'rgba(20, 42, 70, 0.22)');
-  shadow.addColorStop(0.55, 'rgba(20, 42, 70, 0.10)');
-  shadow.addColorStop(1, 'rgba(20, 42, 70, 0)');
-  ctx.fillStyle = shadow;
-  ctx.beginPath();
-  ctx.ellipse(centerX, vialY + vialH - 15, 260, 58, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Coordinates tuned to the Manus HD vial assets in client/public/assets.
+  // The rectangle fully covers existing Manus product text/logo while preserving
+  // the glass, cap, transparent background, and overall visual design.
+  const labelX = Math.round(outW * 0.305);
+  const labelY = Math.round(outH * 0.405);
+  const labelW = Math.round(outW * 0.390);
+  const labelH = Math.round(outH * 0.390);
+  const labelR = Math.round(outW * 0.020);
 
-  // Glass body outer shape.
-  const bodyGrad = ctx.createLinearGradient(bodyX, 0, bodyX + bodyW, 0);
-  bodyGrad.addColorStop(0, 'rgba(35,150,255,0.32)');
-  bodyGrad.addColorStop(0.10, 'rgba(235,250,255,0.62)');
-  bodyGrad.addColorStop(0.27, 'rgba(255,255,255,0.24)');
-  bodyGrad.addColorStop(0.50, 'rgba(155,210,255,0.12)');
-  bodyGrad.addColorStop(0.73, 'rgba(255,255,255,0.28)');
-  bodyGrad.addColorStop(0.90, 'rgba(86,185,255,0.48)');
-  bodyGrad.addColorStop(1, 'rgba(0,94,190,0.34)');
-  ctx.fillStyle = bodyGrad;
-  roundRect(ctx, bodyX, bodyY, bodyW, bodyH, 76);
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(80, 174, 255, 0.60)';
-  ctx.lineWidth = 4;
-  roundRect(ctx, bodyX + 2, bodyY + 2, bodyW - 4, bodyH - 4, 74);
-  ctx.stroke();
-
-  // Inner transparent glass fill.
-  const innerGrad = ctx.createLinearGradient(bodyX + 34, 0, bodyX + bodyW - 34, 0);
-  innerGrad.addColorStop(0, 'rgba(255,255,255,0.32)');
-  innerGrad.addColorStop(0.22, 'rgba(255,255,255,0.10)');
-  innerGrad.addColorStop(0.50, 'rgba(135,210,255,0.08)');
-  innerGrad.addColorStop(0.82, 'rgba(255,255,255,0.16)');
-  innerGrad.addColorStop(1, 'rgba(28,154,255,0.24)');
-  ctx.fillStyle = innerGrad;
-  roundRect(ctx, bodyX + 20, bodyY + 18, bodyW - 40, bodyH - 36, 60);
-  ctx.fill();
-
-  // Blue liquid/base at bottom.
-  const liquidY = bodyY + bodyH - 155;
-  const liquidGrad = ctx.createLinearGradient(bodyX + 40, liquidY, bodyX + bodyW - 40, liquidY);
-  liquidGrad.addColorStop(0, 'rgba(25, 124, 210, 0.28)');
-  liquidGrad.addColorStop(0.5, 'rgba(185, 232, 255, 0.24)');
-  liquidGrad.addColorStop(1, 'rgba(20, 128, 220, 0.28)');
-  ctx.fillStyle = liquidGrad;
-  roundRect(ctx, bodyX + 34, liquidY, bodyW - 68, 105, 30);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(85,190,255,0.38)';
-  ctx.lineWidth = 3;
-  roundRect(ctx, bodyX + 34, liquidY, bodyW - 68, 105, 30);
-  ctx.stroke();
-
-  // Neck and shoulder glass.
-  const neckX = centerX - 92;
-  const neckY = vialY + capH - 6;
-  const neckGrad = ctx.createLinearGradient(neckX, 0, neckX + 184, 0);
-  neckGrad.addColorStop(0, 'rgba(255,255,255,0.26)');
-  neckGrad.addColorStop(0.5, 'rgba(145,215,255,0.14)');
-  neckGrad.addColorStop(1, 'rgba(255,255,255,0.30)');
-  ctx.fillStyle = neckGrad;
-  roundRect(ctx, neckX, neckY, 184, 180, 40);
-  ctx.fill();
-
-  const shoulderGrad = ctx.createLinearGradient(bodyX, 0, bodyX + bodyW, 0);
-  shoulderGrad.addColorStop(0, 'rgba(35,160,255,0.22)');
-  shoulderGrad.addColorStop(0.50, 'rgba(255,255,255,0.18)');
-  shoulderGrad.addColorStop(1, 'rgba(35,160,255,0.22)');
-  ctx.fillStyle = shoulderGrad;
-  roundRect(ctx, bodyX + 8, bodyY - 52, bodyW - 16, 92, 60);
-  ctx.fill();
-
-  // Metallic cap.
-  const capX = centerX - 160;
-  const capY = vialY;
-  const capW = 320;
-  const capGrad = ctx.createLinearGradient(capX, 0, capX + capW, 0);
-  capGrad.addColorStop(0, '#5e6872');
-  capGrad.addColorStop(0.13, '#d9e0e7');
-  capGrad.addColorStop(0.30, '#f9fbfd');
-  capGrad.addColorStop(0.50, '#707984');
-  capGrad.addColorStop(0.68, '#f4f7fa');
-  capGrad.addColorStop(0.86, '#a9b1ba');
-  capGrad.addColorStop(1, '#46515b');
-  ctx.fillStyle = capGrad;
-  roundRect(ctx, capX, capY, capW, capH, 38);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(40,50,60,0.35)';
-  ctx.lineWidth = 3;
-  roundRect(ctx, capX, capY, capW, capH, 38);
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.40)';
-  roundRect(ctx, capX + 42, capY + 12, capW - 84, 16, 10);
-  ctx.fill();
-
-  // Blank label, fully empty before dynamic text is rendered.
-  const labelX = bodyX + 42;
-  const labelY = bodyY + 235;
-  const labelW = bodyW - 84;
-  const labelH = 405;
-  const labelR = 10;
+  // Repaint a clean, blank curved black label over the pre-labeled asset.
   const labelGrad = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
-  labelGrad.addColorStop(0, '#020612');
-  labelGrad.addColorStop(0.18, '#1d222b');
-  labelGrad.addColorStop(0.50, '#05070c');
-  labelGrad.addColorStop(0.82, '#1d222b');
-  labelGrad.addColorStop(1, '#020612');
+  labelGrad.addColorStop(0, '#02050b');
+  labelGrad.addColorStop(0.12, '#141922');
+  labelGrad.addColorStop(0.30, '#070b12');
+  labelGrad.addColorStop(0.50, '#020409');
+  labelGrad.addColorStop(0.70, '#070b12');
+  labelGrad.addColorStop(0.88, '#151a22');
+  labelGrad.addColorStop(1, '#02050b');
   ctx.fillStyle = labelGrad;
   roundRect(ctx, labelX, labelY, labelW, labelH, labelR);
   ctx.fill();
 
+  // Blue foil bands matching the Manus vial style.
   const bandGrad = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
-  bandGrad.addColorStop(0, '#004872');
-  bandGrad.addColorStop(0.5, '#2fbaff');
-  bandGrad.addColorStop(1, '#004872');
+  bandGrad.addColorStop(0, '#003d65');
+  bandGrad.addColorStop(0.18, '#0b78b8');
+  bandGrad.addColorStop(0.50, '#55d0ff');
+  bandGrad.addColorStop(0.82, '#0b78b8');
+  bandGrad.addColorStop(1, '#003d65');
   ctx.fillStyle = bandGrad;
-  roundRect(ctx, labelX, labelY, labelW, 14, 7);
+  roundRect(ctx, labelX, labelY, labelW, Math.max(12, Math.round(outH * 0.012)), 8);
   ctx.fill();
-  roundRect(ctx, labelX, labelY + labelH - 14, labelW, 14, 7);
+  roundRect(ctx, labelX, labelY + labelH - Math.max(12, Math.round(outH * 0.012)), labelW, Math.max(12, Math.round(outH * 0.012)), 8);
+  ctx.fill();
+
+  // Subtle cylindrical label highlights so the covered label still looks like it
+  // belongs on the HD vial artwork.
+  const labelShine = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
+  labelShine.addColorStop(0, 'rgba(255,255,255,0.00)');
+  labelShine.addColorStop(0.18, 'rgba(255,255,255,0.13)');
+  labelShine.addColorStop(0.35, 'rgba(255,255,255,0.03)');
+  labelShine.addColorStop(0.77, 'rgba(255,255,255,0.09)');
+  labelShine.addColorStop(1, 'rgba(255,255,255,0.00)');
+  ctx.fillStyle = labelShine;
+  roundRect(ctx, labelX, labelY, labelW, labelH, labelR);
   ctx.fill();
 
   const combined = productName.trim();
   const peptideName = extractPeptideName(combined) || 'PRODUCT';
   const dosage = extractDosage(combined);
 
+  // Logo text; drawn dynamically instead of keeping the old product asset label.
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#d9dde2';
-  ctx.font = `900 72px Inter, sans-serif`;
-  ctx.fillText('RVR', centerX, labelY + 92);
-  ctx.font = `700 16px Inter, sans-serif`;
-  ctx.fillStyle = '#909aa7';
-  ctx.fillText('RIVER VALLEY RESEARCH', centerX, labelY + 142);
+  ctx.fillStyle = '#d7dbe0';
+  ctx.font = `900 ${Math.round(outW * 0.095)}px Inter, Arial, sans-serif`;
+  ctx.fillText('RVR', centerX, labelY + labelH * 0.19);
+  ctx.font = `700 ${Math.round(outW * 0.018)}px Inter, Arial, sans-serif`;
+  ctx.fillStyle = '#a4acb7';
+  ctx.fillText('RIVER VALLEY RESEARCH', centerX, labelY + labelH * 0.31);
 
   const maxNameW = labelW * 0.86;
-  let nameFontSize = 54;
+  let nameFontSize = Math.round(outW * 0.070);
   const words = peptideName.split(/\s+/).filter(Boolean);
   let lines: string[] = [];
-  while (nameFontSize >= 28) {
-    ctx.font = `900 ${nameFontSize}px Inter, sans-serif`;
+  while (nameFontSize >= Math.round(outW * 0.035)) {
+    ctx.font = `900 ${nameFontSize}px Inter, Arial, sans-serif`;
     lines = [];
     let line = '';
     for (const word of words) {
@@ -315,45 +233,23 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
   }
 
   ctx.fillStyle = '#ffffff';
-  const nameCenterY = labelY + 250;
-  const lineGap = nameFontSize * 1.05;
-  const firstY = nameCenterY - ((lines.length - 1) * lineGap) / 2;
+  const nameCenterY = labelY + labelH * 0.58;
+  const lineGap = nameFontSize * 1.03;
+  const firstY = nameCenterY - ((Math.min(lines.length, 2) - 1) * lineGap) / 2;
   lines.slice(0, 2).forEach((line, i) => {
-    ctx.font = `900 ${nameFontSize}px Inter, sans-serif`;
-    ctx.fillText(line, centerX, firstY + i * lineGap);
+    ctx.font = `900 ${nameFontSize}px Inter, Arial, sans-serif`;
+    ctx.fillText(line.toUpperCase(), centerX, firstY + i * lineGap);
   });
 
   if (dosage) {
-    ctx.font = `900 44px Inter, sans-serif`;
-    ctx.fillStyle = '#f4f7fb';
-    ctx.fillText(dosage, centerX, labelY + 322);
+    ctx.font = `900 ${Math.round(outW * 0.052)}px Inter, Arial, sans-serif`;
+    ctx.fillStyle = '#f7f9fb';
+    ctx.fillText(dosage, centerX, labelY + labelH * 0.74);
   }
 
-  ctx.font = `700 20px Inter, sans-serif`;
-  ctx.fillStyle = '#d7dbe0';
-  ctx.fillText('Research Use Only', centerX, labelY + 372);
-
-  // Glass shine over the printed label.
-  const shine = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
-  shine.addColorStop(0, 'rgba(255,255,255,0)');
-  shine.addColorStop(0.18, 'rgba(255,255,255,0.16)');
-  shine.addColorStop(0.32, 'rgba(255,255,255,0.04)');
-  shine.addColorStop(0.78, 'rgba(255,255,255,0.10)');
-  shine.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = shine;
-  roundRect(ctx, labelX, labelY, labelW, labelH, labelR);
-  ctx.fill();
-
-  // Tall side highlights over glass.
-  const glassShine = ctx.createLinearGradient(bodyX, 0, bodyX + bodyW, 0);
-  glassShine.addColorStop(0, 'rgba(255,255,255,0)');
-  glassShine.addColorStop(0.18, 'rgba(255,255,255,0.22)');
-  glassShine.addColorStop(0.25, 'rgba(255,255,255,0.05)');
-  glassShine.addColorStop(0.74, 'rgba(255,255,255,0.12)');
-  glassShine.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = glassShine;
-  roundRect(ctx, bodyX + 10, bodyY + 10, bodyW - 20, bodyH - 20, 68);
-  ctx.fill();
+  ctx.font = `700 ${Math.round(outW * 0.026)}px Inter, Arial, sans-serif`;
+  ctx.fillStyle = '#d8dde3';
+  ctx.fillText('Research Use Only', centerX, labelY + labelH * 0.88);
 
   return Buffer.from(canvas.toBuffer('image/png'));
 }
