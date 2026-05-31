@@ -5,11 +5,13 @@ import { nanoid } from "nanoid";
 import path from "path";
 
 export async function setupVite(app: Express, server: Server) {
-  // Keep all Vite/dev-server dependencies out of the production bundle.
-  // Do not import ../../vite.config here: esbuild can pull that file and its
-  // development-only plugins into dist/index.js, which breaks Railway because
-  // production installs only runtime dependencies.
+  if (process.env.NODE_ENV !== "development") {
+    throw new Error("setupVite must only be used in development");
+  }
+
   const { createServer: createViteServer } = await import("vite");
+  const react = (await import("@vitejs/plugin-react")).default;
+  const tailwindcss = (await import("@tailwindcss/vite")).default;
 
   const serverOptions = {
     middlewareMode: true,
@@ -18,9 +20,15 @@ export async function setupVite(app: Express, server: Server) {
   };
 
   const vite = await createViteServer({
-    // Let Vite load vite.config.ts only when setupVite() is called in development.
-    // Production uses serveStatic() and never calls this function.
-    configFile: path.resolve(import.meta.dirname, "../..", "vite.config.ts"),
+    root: path.resolve(import.meta.dirname, "../..", "client"),
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        "@": path.resolve(import.meta.dirname, "../..", "client", "src"),
+        "@shared": path.resolve(import.meta.dirname, "../..", "shared"),
+      },
+    },
+    configFile: false,
     server: serverOptions,
     appType: "custom",
   });
@@ -37,7 +45,6 @@ export async function setupVite(app: Express, server: Server) {
         "index.html"
       );
 
-      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
@@ -53,10 +60,7 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath =
-    process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
-      : path.resolve(import.meta.dirname, "public");
+  const distPath = path.resolve(import.meta.dirname, "public");
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
@@ -65,7 +69,6 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });

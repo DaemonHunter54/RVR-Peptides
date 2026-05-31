@@ -9,6 +9,7 @@ import { SignJWT, jwtVerify } from "jose";
 import * as db from "./db";
 import { nanoid } from "nanoid";
 import { createPayment, getPaymentStatus, getApiStatus } from "./nowpayments";
+import { generateVialImage, generateHeroVialsImage, generateVialBuffer, generateHeroVialsBuffer } from "./vialGenerator";
 
 const JWT_SECRET_KEY = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret-key");
 
@@ -319,6 +320,15 @@ export const appRouter = router({
         categoryIds: z.array(z.number()).optional(),
       })).mutation(async ({ input }) => {
         const { categoryIds, ...data } = input;
+        // Auto-generate vial image if no imageUrl provided
+        if (!data.imageUrl) {
+          try {
+            const vialUrl = await generateVialImage(data.name, data.slug);
+            data.imageUrl = vialUrl;
+          } catch (e) {
+            console.error('Failed to generate vial image:', e);
+          }
+        }
         const id = await db.createProduct(data as any, categoryIds);
         return { id };
       }),
@@ -331,14 +341,46 @@ export const appRouter = router({
         lowStockThreshold: z.number().optional(), inStock: z.boolean().optional(), isActive: z.boolean().optional(),
         isFeatured: z.boolean().optional(), discountPercent: z.string().optional(), discountActive: z.boolean().optional(),
         sortOrder: z.number().optional(), categoryIds: z.array(z.number()).optional(),
+        regenerateVial: z.boolean().optional(),
       })).mutation(async ({ input }) => {
-        const { id, categoryIds, ...data } = input;
+        const { id, categoryIds, regenerateVial, ...data } = input;
+        // Regenerate vial image if requested or if name changed
+        if (regenerateVial && data.name) {
+          try {
+            const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const vialUrl = await generateVialImage(data.name, slug);
+            data.imageUrl = vialUrl;
+          } catch (e) {
+            console.error('Failed to regenerate vial image:', e);
+          }
+        }
         await db.updateProduct(id, data as any, categoryIds);
         return { success: true };
       }),
       delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
         await db.deleteProduct(input.id);
         return { success: true };
+      }),
+      generateAllVials: adminProcedure.mutation(async () => {
+        const { products: allProducts } = await db.getAllProducts({});
+        let generated = 0;
+        for (const p of allProducts) {
+          try {
+            const vialUrl = await generateVialImage(p.name, p.slug);
+            await db.updateProduct(p.id, { imageUrl: vialUrl } as any);
+            generated++;
+          } catch (e) {
+            console.error(`Failed to generate vial for ${p.name}:`, e);
+          }
+        }
+        return { success: true, generated, total: allProducts.length };
+      }),
+      generateHero: adminProcedure.mutation(async () => {
+        const { products: allProducts } = await db.getAllProducts({});
+        const featured = allProducts.filter((p: any) => p.isFeatured).slice(0, 3);
+        const heroProducts = featured.length >= 3 ? featured : allProducts.slice(0, 3);
+        const heroUrl = await generateHeroVialsImage(heroProducts.map((p: any) => ({ name: p.name })));
+        return { success: true, url: heroUrl };
       }),
     }),
 

@@ -1,5 +1,4 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-export const getLoginUrl = () => {
-  return "/login";
-};
+// Local email/password auth uses the in-app login route.
+export const getLoginUrl = () => "/login";

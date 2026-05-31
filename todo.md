@@ -44,3 +44,23 @@
 - [x] Add option to save shipping information for faster checkout
 - [x] Offer account creation during checkout flow (link order to new account)
 - [x] Require email address for guest checkout (for receipt, tracking, thank you emails)
+- [x] Hero vials: remove background entirely, arrange like corepeptides (staggered/overlapping)
+- [x] Product list vials: add product name and mg on each individual vial label
+- [x] Remove colored separator lines from product list
+- [x] Add logo large/proportionate behind the "Highest Quality Peptides For Sale" section to fill white space
+- [x] Include all generated images in a folder for external hosting
+- [x] Fix product-vial label rendering for long names and multi-dosage products
+- [x] Create exported assets folder with all generated images for non-Manus hosting
+- [x] Build server-side vial image generator (Canvas) replicating RVR vial style
+- [x] Auto-generate vial image per product: RVR logo, company name, product name, dosage, random color strip, "Research Use Only"
+- [x] Create API endpoint to generate vial images on product creation
+- [x] Update hero section to use 3 generated vials in the RVR style
+- [x] Update product cards to display individual auto-generated vial images
+- [x] Replace generated vial template with user's actual HD vial photo as base
+- [x] Overlay product text on real vial photo: logo on top, "River Valley Research", peptide name, mg, "Research Use Only"
+- [x] Make text appear wrapped/curved around the vial label area
+- [x] Use the 3-vial HD photo directly for the hero section
+- [x] Update product cards to use the new real-vial-based generated images
+- [x] Make product vial images have transparent backgrounds (no dark box)
+- [x] Hero vials float on hero section background without image square
+- [x] Product grid vials display on white background seamlessly

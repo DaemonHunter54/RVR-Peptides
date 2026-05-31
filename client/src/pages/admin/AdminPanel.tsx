@@ -211,6 +211,11 @@ function ProductsSection() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const generateAllVials = trpc.admin.products.generateAllVials.useMutation({
+    onSuccess: (data: any) => { toast.success(`Generated ${data.generated}/${data.total} vial images!`); productsQuery.refetch(); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const products = productsQuery.data?.products ?? (Array.isArray(productsQuery.data) ? productsQuery.data : []);
 
   if (showForm) {
@@ -235,9 +240,20 @@ function ProductsSection() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Products</h1>
-        <Button onClick={() => { setEditingProduct(null); setShowForm(true); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
-          <Plus className="h-4 w-4" /> Add Product
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => { if (confirm('Generate vial images for ALL products? This may take a minute.')) generateAllVials.mutate(); }}
+            variant="outline"
+            className="gap-2 border-slate-300"
+            disabled={generateAllVials.isPending}
+          >
+            <Sparkles className="h-4 w-4" />
+            {generateAllVials.isPending ? 'Generating...' : 'Generate All Vials'}
+          </Button>
+          <Button onClick={() => { setEditingProduct(null); setShowForm(true); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+            <Plus className="h-4 w-4" /> Add Product
+          </Button>
+        </div>
       </div>
       <div className="mb-4">
         <div className="relative max-w-sm">

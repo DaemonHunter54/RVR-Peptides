@@ -25,6 +25,7 @@ export default function ProductDetail() {
     onError: (err) => toast.error(err.message),
   });
   const utils = trpc.useUtils();
+  const guestCart = useGuestCart();
 
   const product = productQuery.data;
 
@@ -68,8 +69,6 @@ export default function ProductDetail() {
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
 
-  const guestCart = useGuestCart();
-
   const handleAddToCart = () => {
     if (!isAuthenticated) {
       // Add to guest cart (localStorage)
@@ -110,9 +109,9 @@ export default function ProductDetail() {
         {/* Product Main Section */}
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
           {/* Image */}
-          <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl p-8 lg:p-12 flex items-center justify-center">
+          <div className="rounded-2xl p-8 lg:p-12 flex items-center justify-center">
             <img
-              src={product.imageUrl || ASSETS.peptideVial}
+              src={product.imageUrl || `/api/vial/${product.slug}.png`}
               alt={product.name}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
               className="w-full max-w-md object-contain"

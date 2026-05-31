@@ -5,6 +5,7 @@ import { Plane, ShieldCheck, Headphones } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ASSETS } from "@/lib/assets";
 
 export default function Home() {
   const allProductsQuery = trpc.products.list.useQuery({ limit: 100 });
@@ -47,12 +48,12 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Right side - 3 Vials image (transparent bg, larger) */}
+            {/* Right side - 3 Vials HD product photo */}
             <div className="flex justify-center lg:justify-end">
               <img
-                src="https://d2xsxph8kpxj0f.cloudfront.net/310519663676993362/LxShBu2HV8xnNRdhLxHVuV/rvr-hero-vials-nobg-J2FQYwCYYdycbnfWhhvWxA.png"
+                src={ASSETS.heroVials}
                 alt="River Valley Research Peptide Vials - BPC-157, TB-500, GHK-Cu"
-                className="w-full max-w-2xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-110"
+                className="w-full max-w-2xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-105"
               />
             </div>
           </div>
@@ -106,7 +107,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* AVAILABLE RESEARCH PEPTIDES - White background, 4-column product grid */}
+      {/* AVAILABLE RESEARCH PEPTIDES - White background, 4-column product grid, NO color lines */}
       <section className="bg-white py-16 lg:py-20">
         <div className="container mx-auto px-6 lg:px-12">
           {allProductsQuery.isLoading ? (
@@ -135,24 +136,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BOTTOM SECTION - White bg with decorative RVR logo, "Highest Quality Peptides For Sale" heading, paragraph, SHOP NOW button */}
+      {/* BOTTOM SECTION - "Highest Quality Peptides For Sale" with LARGE logo filling the background */}
       <section className="bg-white py-20 lg:py-28 relative overflow-hidden border-t border-gray-100">
-        {/* Decorative logo watermark in background - like the swirl in corepeptides */}
+        {/* Large RVR logo filling the space behind text and button */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <img src="/manus-storage/rvr-logo_19fbf80f.png" alt="" className="w-[700px] h-[700px] object-contain opacity-[0.04]" />
-        </div>
-
-        {/* Decorative curved lines - mimicking the corepeptides swirl design */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <svg className="absolute top-10 left-1/4 w-[600px] h-[600px] opacity-[0.08]" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="200" cy="200" r="180" stroke="#94a3b8" strokeWidth="1" fill="none" />
-            <circle cx="200" cy="200" r="140" stroke="#94a3b8" strokeWidth="0.8" fill="none" />
-            <circle cx="200" cy="200" r="100" stroke="#94a3b8" strokeWidth="0.6" fill="none" />
-          </svg>
-          <svg className="absolute top-20 right-1/4 w-[500px] h-[500px] opacity-[0.06]" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="200" cy="200" r="160" stroke="#94a3b8" strokeWidth="1" fill="none" />
-            <circle cx="200" cy="200" r="120" stroke="#94a3b8" strokeWidth="0.8" fill="none" />
-          </svg>
+          <img
+            src={ASSETS.logo}
+            alt=""
+            className="w-[600px] md:w-[800px] lg:w-[1000px] h-auto object-contain opacity-[0.08]"
+          />
         </div>
 
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
