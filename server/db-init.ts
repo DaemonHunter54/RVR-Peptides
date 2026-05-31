@@ -1,4 +1,6 @@
 import mysql, { RowDataPacket } from "mysql2/promise";
+import fs from "fs";
+import path from "path";
 
 const TABLES = [
 `CREATE TABLE IF NOT EXISTS users (
@@ -340,8 +342,64 @@ function slugifyValue(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+function stripAssetHash(filename: string) {
+  const base = filename.replace(/\.(png|jpg|jpeg|webp)$/i, "");
+  return base.replace(/_[a-f0-9]{8}$/i, "");
+}
+
+let _assetMap: Map<string, string> | null = null;
+function getLocalAssetMap() {
+  if (_assetMap) return _assetMap;
+  _assetMap = new Map<string, string>();
+
+  // First load the bundled Manus assets from client/public/assets. Railway serves these as /assets/*.
+  const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+  try {
+    for (const file of fs.readdirSync(assetsDir)) {
+      if (!/\.(png|jpg|jpeg|webp)$/i.test(file)) continue;
+      const key = stripAssetHash(file);
+      if (key && !_assetMap.has(key)) _assetMap.set(key, `/assets/${file}`);
+    }
+  } catch {
+    // The assets directory may not exist in local tooling. Fall back to DEFAULT_PRODUCTS below.
+  }
+
+  // Keep DEFAULT_PRODUCTS as a fallback map, but do not let it override real Manus-bundled assets.
+  for (const product of DEFAULT_PRODUCTS) {
+    if (!_assetMap.has(product.slug)) _assetMap.set(product.slug, product.image);
+  }
+
+  return _assetMap;
+}
+
 function assetBySlug(slug: string): string | undefined {
-  return DEFAULT_PRODUCTS.find((p) => p.slug === slug)?.image;
+  const normalized = slugifyValue(slug);
+  return getLocalAssetMap().get(normalized);
+}
+
+function assetByProduct(row: RowDataPacket): string | undefined {
+  const slug = String(row.slug || "");
+  const name = String(row.name || "");
+
+  // Exact slug/name match first. This preserves the specific Manus-generated product vial.
+  const exact = assetBySlug(slug) || assetBySlug(name);
+  if (exact) return exact;
+
+  // If this is a grouped parent like "bpc-157", use the lowest-dose/first matching bundled asset.
+  const normalizedSlug = slugifyValue(slug);
+  const normalizedName = slugifyValue(name);
+  for (const [assetSlug, assetPath] of getLocalAssetMap().entries()) {
+    if (assetSlug === normalizedSlug || assetSlug === normalizedName) return assetPath;
+    if (normalizedSlug && assetSlug.startsWith(`${normalizedSlug}-`)) return assetPath;
+    if (normalizedName && assetSlug.startsWith(`${normalizedName}-`)) return assetPath;
+  }
+  return undefined;
+}
+
+function localAssetExists(image: string) {
+  if (!image.startsWith("/assets/")) return false;
+  const filename = image.replace(/^\/assets\//, "");
+  return fs.existsSync(path.join(process.cwd(), "client", "public", "assets", filename));
 }
 
 function isGeneratedOrFallbackImage(value: unknown) {
@@ -351,7 +409,9 @@ function isGeneratedOrFallbackImage(value: unknown) {
     image.startsWith("/api/vial/") ||
     image.includes("generated-vials/") ||
     image.includes("rvr-vial-template-single") ||
-    image.includes("/vials/")
+    image.includes("/vials/") ||
+    image.includes("placeholder") ||
+    (image.startsWith("/assets/") && !localAssetExists(image))
   );
 }
 
@@ -362,9 +422,10 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
 
   if (!rows.length) return;
 
-  // Repair only missing/generated/fallback images when a matching Manus-created local asset exists.
+  // Repair only images that are missing, generated, generic fallback, or pointing at missing local files.
+  // This preserves valid Manus/CloudFront/custom URLs, but fixes the old generic-background vial rows.
   for (const row of rows) {
-    const expectedAsset = assetBySlug(String(row.slug));
+    const expectedAsset = assetByProduct(row);
     if (expectedAsset && isGeneratedOrFallbackImage(row.imageUrl)) {
       await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [expectedAsset, row.id]);
       row.imageUrl = expectedAsset;
@@ -386,7 +447,7 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
     const baseName = normalizeVariantGroupName(String(group[0].name)).base;
     const sorted = [...group].sort((a, b) => Number(a.price) - Number(b.price));
     const canonical = sorted[0];
-    const canonicalAsset = assetBySlug(String(canonical.slug)) || String(canonical.imageUrl || "");
+    const canonicalAsset = assetByProduct(canonical) || String(canonical.imageUrl || "");
 
     // Use one visible parent product and turn sibling dose rows into variants.
     await conn.execute(
@@ -398,7 +459,7 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
       const row = sorted[i];
       const { label } = normalizeVariantGroupName(String(row.name));
       if (!label) continue;
-      const variantImage = assetBySlug(String(row.slug)) || row.imageUrl || canonicalAsset || null;
+      const variantImage = assetByProduct(row) || row.imageUrl || canonicalAsset || null;
       await conn.execute(
         `INSERT INTO product_variants (productId, label, price, imageUrl, stockQuantity, inStock, sortOrder)
          SELECT ?, ?, ?, ?, 100, true, ? FROM DUAL
