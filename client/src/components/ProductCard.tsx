@@ -1,6 +1,5 @@
 import { ASSETS } from "@/lib/assets";
 import { cn } from "@/lib/utils";
-import { ShoppingCart } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "./ui/badge";
 
@@ -29,19 +28,19 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Link href={`/product/${product.slug}`}>
-      <div className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all duration-300 h-full flex flex-col">
-        {/* Image */}
-        <div className="relative aspect-square bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden">
+      <div className="group bg-white rounded-lg border border-slate-200/80 overflow-hidden hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-200 transition-all duration-300 h-full flex flex-col cursor-pointer">
+        {/* Image - White background, centered vial */}
+        <div className="relative aspect-square bg-white overflow-hidden p-4">
           <img
             src={product.imageUrl || ASSETS.peptideVial}
             alt={product.name}
             onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
-            className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
           />
           {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+          <div className="absolute top-2 left-2 flex flex-col gap-1.5">
             {hasDiscount && (
-              <Badge className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5">
+              <Badge className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 shadow-sm">
                 {Number(product.discountPercent)}% OFF
               </Badge>
             )}
@@ -53,45 +52,21 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
 
-        {/* Info */}
-        <div className="p-4 flex flex-col flex-1">
-          {/* Product details */}
-          {(product.form || product.purity) && (
-            <div className="flex items-center gap-2 mb-1.5">
-              {product.purity && (
-                <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">
-                  {product.purity} Purity
-                </span>
-              )}
-            </div>
-          )}
-
-          <h3 className="font-semibold text-slate-800 text-sm leading-snug mb-1.5 group-hover:text-blue-700 transition-colors line-clamp-2">
+        {/* Info - Product name and price like corepeptides */}
+        <div className="p-3 lg:p-4 flex flex-col flex-1 border-t border-slate-100">
+          <h3 className="font-semibold text-slate-800 text-sm leading-snug mb-2 group-hover:text-blue-700 transition-colors line-clamp-2">
             {product.name}
           </h3>
 
-          {product.shortDescription && (
-            <p className="text-xs text-slate-500 line-clamp-2 mb-3 flex-1">
-              {product.shortDescription}
-            </p>
-          )}
-
           {/* Price */}
-          <div className="mt-auto flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <span className={cn("font-bold text-lg", hasDiscount ? "text-red-600" : "text-slate-900")}>
-                ${discountedPrice.toFixed(2)}
+          <div className="mt-auto flex items-baseline gap-2">
+            <span className={cn("font-bold text-base lg:text-lg", hasDiscount ? "text-red-600" : "text-slate-900")}>
+              ${discountedPrice.toFixed(2)}
+            </span>
+            {hasDiscount && (
+              <span className="text-sm text-slate-400 line-through">
+                ${price.toFixed(2)}
               </span>
-              {hasDiscount && (
-                <span className="text-sm text-slate-400 line-through">
-                  ${price.toFixed(2)}
-                </span>
-              )}
-            </div>
-            {product.inStock && (
-              <div className="p-2 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <ShoppingCart className="h-4 w-4" />
-              </div>
             )}
           </div>
         </div>

@@ -6,14 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useSearch } from "wouter";
+import { useCallback, useMemo, useState } from "react";
+import { useSearch } from "wouter";
 import { cn } from "@/lib/utils";
 
 export default function Shop() {
   const searchParams = useSearch();
   const params = useMemo(() => new URLSearchParams(searchParams), [searchParams]);
-  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState(params.get("search") || "");
   const [activeCategory, setActiveCategory] = useState(params.get("category") || "");
   const [showFilters, setShowFilters] = useState(false);
@@ -45,11 +44,11 @@ export default function Shop() {
     <div className="min-h-screen flex flex-col bg-white">
       <Navbar />
 
-      {/* Page Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 py-12 lg:py-16">
-        <div className="container">
-          <h1 className="text-3xl lg:text-4xl font-bold text-white">Shop All Products</h1>
-          <p className="text-slate-300 mt-2">Browse our complete catalog of research peptides and compounds</p>
+      {/* Page Header - Dark blue matching navbar */}
+      <div className="bg-gradient-to-b from-[#0d2147] to-[#1a3a6b] py-10 lg:py-14">
+        <div className="container text-center">
+          <h1 className="text-3xl lg:text-4xl font-bold text-white">Research Peptides</h1>
+          <p className="text-blue-200 mt-2 text-sm lg:text-base">Browse our complete catalog of premium research compounds</p>
         </div>
       </div>
 
@@ -57,7 +56,7 @@ export default function Shop() {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Filters */}
           <aside className={cn(
-            "lg:w-64 shrink-0",
+            "lg:w-56 shrink-0",
             showFilters ? "block" : "hidden lg:block"
           )}>
             {/* Search */}
@@ -75,8 +74,8 @@ export default function Shop() {
 
             {/* Categories */}
             <div className="mb-6">
-              <h3 className="font-semibold text-slate-800 text-sm uppercase tracking-wider mb-3">Categories</h3>
-              <div className="space-y-1">
+              <h3 className="font-semibold text-slate-800 text-xs uppercase tracking-wider mb-3">Categories</h3>
+              <div className="space-y-0.5">
                 <button
                   onClick={() => setActiveCategory("")}
                   className={cn(
@@ -135,13 +134,12 @@ export default function Shop() {
             </div>
 
             {productsQuery.isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div key={i} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                     <Skeleton className="aspect-square" />
                     <div className="p-4 space-y-2">
                       <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
                       <Skeleton className="h-6 w-1/3" />
                     </div>
                   </div>
@@ -156,7 +154,7 @@ export default function Shop() {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
                 {products.map((product: any) => (
                   <ProductCard key={product.id} product={product} />
                 ))}

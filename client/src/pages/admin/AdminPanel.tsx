@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Settings, Tag,
   Plus, Pencil, Trash2, Search, Truck, Save, ArrowLeft,
-  DollarSign, AlertCircle, CreditCard, Eye, EyeOff, CheckCircle2, XCircle
+  DollarSign, AlertCircle, CreditCard, Eye, EyeOff, CheckCircle2, XCircle,
+  Paintbrush, RotateCcw, Sparkles
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
@@ -51,6 +52,7 @@ export default function AdminPanel() {
     { id: "discounts", label: "Discounts", icon: Tag },
     { id: "payments", label: "Payments", icon: CreditCard },
     { id: "customers", label: "Customers", icon: Users },
+    { id: "customization", label: "Website Customization", icon: Paintbrush },
     { id: "settings", label: "Site Settings", icon: Settings },
   ];
 
@@ -103,6 +105,7 @@ export default function AdminPanel() {
           {activeSection === "discounts" && <DiscountsSection />}
           {activeSection === "customers" && <CustomersSection />}
           {activeSection === "payments" && <PaymentsSection />}
+          {activeSection === "customization" && <CustomizationSection />}
           {activeSection === "settings" && <SettingsSection />}
         </div>
       </main>
@@ -939,6 +942,358 @@ function PaymentsSection() {
           <Switch checked={sandboxMode} onCheckedChange={(v) => { setSandboxMode(v); updateSetting.mutate({ key: "nowpayments_sandbox_mode", value: v ? "true" : "false" }); }} />
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Website Customization (Visual Builder + Holiday Templates) ─────
+function CustomizationSection() {
+  const settingsQuery = trpc.settings.public.useQuery();
+  const updateSetting = trpc.admin.settings.update.useMutation({
+    onSuccess: () => { toast.success("Customization saved!"); settingsQuery.refetch(); },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const settings = settingsQuery.data || {};
+  const [activeTab, setActiveTab] = useState<"builder" | "templates">("builder");
+  const [previewKey, setPreviewKey] = useState(0);
+  const [unsavedChanges, setUnsavedChanges] = useState<Record<string, string>>({});
+  const [revertState, setRevertState] = useState<Record<string, string> | null>(null);
+
+  // Editable fields for the visual builder
+  const builderFields = [
+    { key: "site_tagline", label: "Hero Tagline", type: "text", placeholder: "Premium Research Peptides" },
+    { key: "site_description", label: "Hero Description", type: "textarea", placeholder: "We are proud to carry the highest quality peptides..." },
+    { key: "hero_bg_color", label: "Hero Background Color", type: "color", placeholder: "#0d2147" },
+    { key: "hero_text_color", label: "Hero Text Color", type: "color", placeholder: "#ffffff" },
+    { key: "accent_color", label: "Accent / Button Color", type: "color", placeholder: "#2563eb" },
+    { key: "banner_enabled", label: "Show Announcement Banner", type: "toggle", placeholder: "" },
+    { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Free shipping on orders over $200!" },
+    { key: "banner_bg_color", label: "Banner Background Color", type: "color", placeholder: "#0a1628" },
+    { key: "banner_text_color", label: "Banner Text Color", type: "color", placeholder: "#94a3b8" },
+    { key: "logo_url", label: "Logo Image URL", type: "text", placeholder: "/images/rvr-logo.png" },
+    { key: "footer_disclaimer", label: "Footer Disclaimer", type: "textarea", placeholder: "All products are sold for research purposes only..." },
+  ];
+
+  // Holiday templates
+  const holidayTemplates = [
+    {
+      id: "default",
+      name: "Default (Blue & Silver)",
+      icon: "🧪",
+      description: "Standard River Valley Research branding",
+      settings: {
+        hero_bg_color: "#0d2147",
+        hero_text_color: "#ffffff",
+        accent_color: "#2563eb",
+        banner_enabled: "false",
+        banner_text: "",
+        banner_bg_color: "#0a1628",
+        banner_text_color: "#94a3b8",
+      },
+    },
+    {
+      id: "christmas",
+      name: "Christmas",
+      icon: "🎄",
+      description: "Festive red & green with holiday banner",
+      settings: {
+        hero_bg_color: "#1a2e1a",
+        hero_text_color: "#ffffff",
+        accent_color: "#dc2626",
+        banner_enabled: "true",
+        banner_text: "🎄 Holiday Sale! Use code HOLIDAY25 for 25% off all peptides! 🎁",
+        banner_bg_color: "#7f1d1d",
+        banner_text_color: "#fecaca",
+      },
+    },
+    {
+      id: "halloween",
+      name: "Halloween",
+      icon: "🎃",
+      description: "Spooky orange & purple theme",
+      settings: {
+        hero_bg_color: "#1a0a2e",
+        hero_text_color: "#f97316",
+        accent_color: "#a855f7",
+        banner_enabled: "true",
+        banner_text: "🎃 Spooky Savings! 20% off site-wide this Halloween! 👻",
+        banner_bg_color: "#431407",
+        banner_text_color: "#fed7aa",
+      },
+    },
+    {
+      id: "easter",
+      name: "Easter",
+      icon: "🐰",
+      description: "Pastel spring colors with Easter banner",
+      settings: {
+        hero_bg_color: "#1e293b",
+        hero_text_color: "#e9d5ff",
+        accent_color: "#a78bfa",
+        banner_enabled: "true",
+        banner_text: "🐰 Spring Sale! Hop into savings with code SPRING20! 🌸",
+        banner_bg_color: "#4c1d95",
+        banner_text_color: "#e9d5ff",
+      },
+    },
+    {
+      id: "valentines",
+      name: "Valentine's Day",
+      icon: "💕",
+      description: "Romantic reds and pinks",
+      settings: {
+        hero_bg_color: "#1c1017",
+        hero_text_color: "#fda4af",
+        accent_color: "#e11d48",
+        banner_enabled: "true",
+        banner_text: "💕 Valentine's Special! 15% off with code LOVE15 💕",
+        banner_bg_color: "#881337",
+        banner_text_color: "#fecdd3",
+      },
+    },
+    {
+      id: "4thofjuly",
+      name: "4th of July",
+      icon: "🇺🇸",
+      description: "Patriotic red, white, and blue",
+      settings: {
+        hero_bg_color: "#0c1a3d",
+        hero_text_color: "#ffffff",
+        accent_color: "#dc2626",
+        banner_enabled: "true",
+        banner_text: "🇺🇸 Independence Day Sale! 20% off with code FREEDOM20 🎆",
+        banner_bg_color: "#1e3a5f",
+        banner_text_color: "#ffffff",
+      },
+    },
+    {
+      id: "blackfriday",
+      name: "Black Friday",
+      icon: "🏷️",
+      description: "Bold black and gold for maximum sales",
+      settings: {
+        hero_bg_color: "#0a0a0a",
+        hero_text_color: "#fbbf24",
+        accent_color: "#f59e0b",
+        banner_enabled: "true",
+        banner_text: "🏷️ BLACK FRIDAY! Biggest sale of the year - up to 40% off! 🏷️",
+        banner_bg_color: "#000000",
+        banner_text_color: "#fbbf24",
+      },
+    },
+  ];
+
+  const handleFieldChange = (key: string, value: string) => {
+    setUnsavedChanges((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const getFieldValue = (key: string) => {
+    return unsavedChanges[key] !== undefined ? unsavedChanges[key] : (settings[key] || "");
+  };
+
+  const applyTemplate = async (template: typeof holidayTemplates[0]) => {
+    // Save current state for revert
+    const currentState: Record<string, string> = {};
+    Object.keys(template.settings).forEach((key) => {
+      currentState[key] = settings[key] || "";
+    });
+    setRevertState(currentState);
+
+    // Apply all template settings
+    for (const [key, value] of Object.entries(template.settings)) {
+      await updateSetting.mutateAsync({ key, value });
+    }
+    setUnsavedChanges({});
+    setPreviewKey((k) => k + 1);
+    toast.success(`${template.name} template applied!`);
+  };
+
+  const revertChanges = async () => {
+    if (!revertState) {
+      toast.error("No previous state to revert to");
+      return;
+    }
+    for (const [key, value] of Object.entries(revertState)) {
+      await updateSetting.mutateAsync({ key, value });
+    }
+    setRevertState(null);
+    setUnsavedChanges({});
+    setPreviewKey((k) => k + 1);
+    toast.success("Reverted to previous state!");
+  };
+
+  const saveAllChanges = async () => {
+    if (Object.keys(unsavedChanges).length === 0) {
+      toast("No changes to save");
+      return;
+    }
+    // Save revert state
+    const currentState: Record<string, string> = {};
+    Object.keys(unsavedChanges).forEach((key) => {
+      currentState[key] = settings[key] || "";
+    });
+    setRevertState(currentState);
+
+    for (const [key, value] of Object.entries(unsavedChanges)) {
+      await updateSetting.mutateAsync({ key, value });
+    }
+    setUnsavedChanges({});
+    setPreviewKey((k) => k + 1);
+    toast.success("All changes saved!");
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Paintbrush className="h-6 w-6 text-blue-600" /> Website Customization
+          </h2>
+          <p className="text-sm text-slate-500 mt-1">Customize your website's look and feel without touching code</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {revertState && (
+            <Button variant="outline" size="sm" onClick={revertChanges} className="gap-1.5 text-orange-600 border-orange-200 hover:bg-orange-50">
+              <RotateCcw className="h-3.5 w-3.5" /> Revert
+            </Button>
+          )}
+          {Object.keys(unsavedChanges).length > 0 && (
+            <Button size="sm" onClick={saveAllChanges} className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white">
+              <Save className="h-3.5 w-3.5" /> Save All Changes
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab("builder")}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "builder" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Paintbrush className="h-4 w-4 inline mr-1.5" /> Visual Builder
+        </button>
+        <button
+          onClick={() => setActiveTab("templates")}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "templates" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Sparkles className="h-4 w-4 inline mr-1.5" /> Holiday Templates
+        </button>
+      </div>
+
+      {activeTab === "builder" && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Builder Controls */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <h3 className="font-semibold text-slate-800 mb-4">Customize Your Website</h3>
+              <div className="space-y-4">
+                {builderFields.map((field) => (
+                  <div key={field.key}>
+                    <Label className="text-sm text-slate-600 mb-1.5 block">{field.label}</Label>
+                    {field.type === "toggle" ? (
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={getFieldValue(field.key) === "true"}
+                          onCheckedChange={(checked) => handleFieldChange(field.key, checked ? "true" : "false")}
+                        />
+                        <span className="text-sm text-slate-500">{getFieldValue(field.key) === "true" ? "Enabled" : "Disabled"}</span>
+                      </div>
+                    ) : field.type === "color" ? (
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={getFieldValue(field.key) || field.placeholder}
+                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                          className="h-9 w-14 rounded border border-slate-200 cursor-pointer"
+                        />
+                        <Input
+                          value={getFieldValue(field.key)}
+                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                          placeholder={field.placeholder}
+                          className="flex-1"
+                        />
+                      </div>
+                    ) : field.type === "textarea" ? (
+                      <Textarea
+                        value={getFieldValue(field.key)}
+                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                        rows={3}
+                      />
+                    ) : (
+                      <Input
+                        value={getFieldValue(field.key)}
+                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Live Preview */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+              <span className="text-sm font-medium text-slate-700">Live Preview</span>
+              <Button variant="ghost" size="sm" onClick={() => setPreviewKey((k) => k + 1)} className="text-xs">
+                Refresh
+              </Button>
+            </div>
+            <div className="h-[500px] overflow-hidden">
+              <iframe
+                key={previewKey}
+                src="/?preview=true"
+                className="w-full h-full border-0 transform scale-[0.6] origin-top-left"
+                style={{ width: "166.67%", height: "166.67%" }}
+                title="Website Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "templates" && (
+        <div>
+          <p className="text-sm text-slate-500 mb-4">
+            Click a template to instantly apply it to your website. You can always revert back using the Revert button above.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {holidayTemplates.map((template) => (
+              <div
+                key={template.id}
+                className="bg-white rounded-xl border border-slate-200 p-5 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
+                onClick={() => applyTemplate(template)}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-3xl">{template.icon}</span>
+                  <div>
+                    <h4 className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">{template.name}</h4>
+                    <p className="text-xs text-slate-500">{template.description}</p>
+                  </div>
+                </div>
+                {/* Color preview swatches */}
+                <div className="flex gap-1.5 mt-3">
+                  <div className="h-6 w-6 rounded-full border border-slate-200" style={{ backgroundColor: template.settings.hero_bg_color }} title="Hero BG" />
+                  <div className="h-6 w-6 rounded-full border border-slate-200" style={{ backgroundColor: template.settings.hero_text_color }} title="Hero Text" />
+                  <div className="h-6 w-6 rounded-full border border-slate-200" style={{ backgroundColor: template.settings.accent_color }} title="Accent" />
+                  <div className="h-6 w-6 rounded-full border border-slate-200" style={{ backgroundColor: template.settings.banner_bg_color }} title="Banner BG" />
+                </div>
+                <Button variant="outline" size="sm" className="w-full mt-4 group-hover:bg-blue-50 group-hover:border-blue-200 group-hover:text-blue-700">
+                  Apply Template
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

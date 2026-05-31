@@ -8,7 +8,7 @@ export default function Footer() {
   const settings = settingsQuery.data || {};
 
   return (
-    <footer className="bg-slate-900 text-slate-300">
+    <footer className="bg-[#0a1628] text-slate-300">
       {/* Main Footer */}
       <div className="container py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
@@ -17,7 +17,7 @@ export default function Footer() {
             <img
               src={ASSETS.logo}
               alt="River Valley Research Peptides"
-              className="h-14 w-auto mb-4 rounded-md bg-white object-contain"
+              className="h-12 w-auto mb-4"
             />
             <p className="text-sm text-slate-400 leading-relaxed">
               {settings.site_description || "We are proud to carry the highest quality peptides and peptide blends in the research industry."}
@@ -86,7 +86,7 @@ export default function Footer() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="border-t border-slate-800">
+      <div className="border-t border-white/10">
         <div className="container py-6">
           <p className="text-xs text-slate-500 leading-relaxed mb-3">
             {settings.footer_disclaimer || "All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption."}

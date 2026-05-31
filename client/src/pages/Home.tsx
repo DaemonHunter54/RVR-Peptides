@@ -12,88 +12,72 @@ export default function Home() {
   const settingsQuery = trpc.settings.public.useQuery();
   const settings = settingsQuery.data || {};
   const featuredQuery = trpc.products.featured.useQuery();
+  const allProductsQuery = trpc.products.list.useQuery({ limit: 100 });
   const categoriesQuery = trpc.categories.list.useQuery();
 
+  const allProducts = allProductsQuery.data?.products || [];
+
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: "radial-gradient(circle at 25% 25%, rgba(59,130,246,0.3) 0%, transparent 50%), radial-gradient(circle at 75% 75%, rgba(148,163,184,0.2) 0%, transparent 50%)"
-          }} />
-        </div>
-        <div className="absolute top-0 right-0 w-1/2 h-full opacity-5">
-          <svg viewBox="0 0 200 200" className="w-full h-full">
-            <defs>
-              <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="200" height="200" fill="url(#grid)" />
-          </svg>
-        </div>
+      {/* Hero Section - Dark blue gradient matching navbar, with 3 branded vials */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#0a1628] via-[#0d2147] to-[#102a5a]">
+        {/* Subtle grid pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")"
+        }} />
 
-        <div className="container relative py-20 lg:py-32">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5">
-                <FlaskConical className="h-4 w-4 text-blue-400" />
-                <span className="text-blue-300 text-sm font-medium">Research Grade Quality</span>
-              </div>
-              <h1 className="text-4xl lg:text-6xl font-bold text-white leading-tight">
-                {settings.site_tagline || "Highest Quality Research Peptides"}
-              </h1>
-              <p className="text-lg text-slate-300 leading-relaxed max-w-lg">
-                {settings.site_description || "We are proud to carry the highest quality peptides and peptide blends in the research industry."}
-              </p>
-              <div className="flex flex-wrap gap-3 pt-2">
-                <Link href="/shop">
-                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-8 h-12 text-base">
-                    Shop Now <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link href="/about">
-                  <Button size="lg" variant="outline" className="border-slate-500 text-slate-200 hover:bg-white/10 gap-2 h-12 text-base bg-transparent">
-                    Learn More
-                  </Button>
-                </Link>
-              </div>
+        <div className="container relative py-16 lg:py-24">
+          <div className="text-center mb-10 lg:mb-14">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight mb-4">
+              {settings.site_tagline || "Premium Research Peptides"}
+            </h1>
+            <p className="text-base lg:text-lg text-slate-300 max-w-2xl mx-auto mb-8">
+              {settings.site_description || "We are proud to carry the highest quality peptides and peptide blends in the research industry. Third-party tested, 99%+ purity guaranteed."}
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link href="/shop">
+                <Button size="lg" className="bg-blue-600 hover:bg-blue-500 text-white gap-2 px-8 h-12 text-base font-semibold shadow-lg shadow-blue-600/30">
+                  Shop All Peptides <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Link href="/about">
+                <Button size="lg" variant="outline" className="border-slate-400/40 text-slate-200 hover:bg-white/10 hover:border-slate-300/60 gap-2 h-12 text-base bg-transparent">
+                  Learn More
+                </Button>
+              </Link>
             </div>
-            <div className="hidden lg:flex justify-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-3xl" />
-                <img
-                  src={ASSETS.peptideVial}
-                  alt="Research Peptide Vial"
-                  className="relative w-80 h-80 object-contain drop-shadow-2xl"
-                />
-              </div>
-            </div>
+          </div>
+
+          {/* 3 Branded Vials Hero Image */}
+          <div className="flex justify-center">
+            <img
+              src={ASSETS.heroVials}
+              alt="River Valley Research Peptides - BPC-157, TB-500, GHK-Cu"
+              className="w-full max-w-4xl h-auto object-contain rounded-lg"
+            />
           </div>
         </div>
       </section>
 
-      {/* Trust Badges */}
-      <section className="bg-white border-b border-slate-100">
-        <div className="container py-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Trust Badges - Light blue background with silver text */}
+      <section className="bg-gradient-to-b from-[#e8f0fa] to-[#dce8f5] py-10 lg:py-14">
+        <div className="container">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             {[
-              { icon: Shield, title: "99%+ Purity", desc: "Third-party tested" },
+              { icon: Shield, title: "99%+ Purity", desc: "Third-party verified" },
               { icon: Truck, title: "Fast Shipping", desc: "Same-day processing" },
-              { icon: FlaskConical, title: "Lab Tested", desc: "COA available" },
-              { icon: Award, title: "Premium Quality", desc: "Research grade" },
+              { icon: FlaskConical, title: "Lab Tested", desc: "COA with every order" },
+              { icon: Award, title: "Research Grade", desc: "Premium quality assured" },
             ].map((badge, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
-                  <badge.icon className="h-5 w-5" />
+              <div key={i} className="flex flex-col items-center text-center gap-3">
+                <div className="p-3 rounded-full bg-white/80 text-blue-700 shadow-sm">
+                  <badge.icon className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800 text-sm">{badge.title}</p>
-                  <p className="text-xs text-slate-500">{badge.desc}</p>
+                  <p className="font-bold text-slate-700 text-sm lg:text-base">{badge.title}</p>
+                  <p className="text-xs lg:text-sm text-slate-500">{badge.desc}</p>
                 </div>
               </div>
             ))}
@@ -101,19 +85,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Products */}
-      <section className="py-16 lg:py-20 bg-slate-50/50">
+      {/* Featured Products Section - Slightly lighter blue bg with silver/white text */}
+      <section className="py-14 lg:py-20 bg-gradient-to-b from-[#dce8f5] to-[#f0f4f9]">
         <div className="container">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl lg:text-3xl font-bold text-slate-900">Featured Products</h2>
-              <p className="text-slate-500 mt-1">Our most popular research peptides</p>
-            </div>
-            <Link href="/shop">
-              <Button variant="ghost" className="text-blue-600 hover:text-blue-700 gap-1">
-                View All <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
+          <div className="text-center mb-10">
+            <h2 className="text-2xl lg:text-3xl font-bold text-slate-800">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-700">Featured</span>{" "}
+              Research Peptides
+            </h2>
+            <p className="text-slate-500 mt-2 text-sm lg:text-base">Our most popular compounds for advanced research</p>
           </div>
 
           {featuredQuery.isLoading ? (
@@ -131,7 +111,63 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
-              {(featuredQuery.data || []).map((product: any) => (
+              {(featuredQuery.data || []).slice(0, 8).map((product: any) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <div className="text-center mt-8">
+            <Link href="/shop">
+              <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-2 px-6">
+                View All Products <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* All Available Peptides - White background, matching corepeptides catalog section */}
+      <section className="py-14 lg:py-20 bg-white">
+        <div className="container">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl lg:text-3xl font-bold text-slate-900">All Available Peptides</h2>
+            <p className="text-slate-500 mt-2">Browse our complete catalog of research compounds</p>
+          </div>
+
+          {/* Category filter pills */}
+          {categoriesQuery.data && categoriesQuery.data.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 mb-8">
+              <Link href="/shop">
+                <span className="inline-block px-4 py-2 rounded-full text-sm font-medium bg-blue-600 text-white cursor-pointer">
+                  All
+                </span>
+              </Link>
+              {categoriesQuery.data.slice(0, 6).map((cat: any) => (
+                <Link key={cat.id} href={`/shop?category=${cat.slug}`}>
+                  <span className="inline-block px-4 py-2 rounded-full text-sm font-medium bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition-colors">
+                    {cat.name}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {allProductsQuery.isLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-5">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <Skeleton className="aspect-square" />
+                  <div className="p-4 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-6 w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-5">
+              {allProducts.map((product: any) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
@@ -139,44 +175,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Categories */}
-      {categoriesQuery.data && categoriesQuery.data.length > 0 && (
-        <section className="py-16 lg:py-20">
-          <div className="container">
-            <div className="text-center mb-10">
-              <h2 className="text-2xl lg:text-3xl font-bold text-slate-900">Shop by Category</h2>
-              <p className="text-slate-500 mt-1">Browse our complete selection of research compounds</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {categoriesQuery.data.map((cat: any) => (
-                <Link key={cat.id} href={`/shop?category=${cat.slug}`}>
-                  <div className="group relative bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl p-6 text-white overflow-hidden hover:shadow-lg transition-all duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <h3 className="font-semibold text-base relative z-10">{cat.name}</h3>
-                    {cat.description && (
-                      <p className="text-blue-200 text-xs mt-1 relative z-10 line-clamp-2">{cat.description}</p>
-                    )}
-                    <ChevronRight className="h-5 w-5 absolute bottom-4 right-4 text-blue-300 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Research CTA */}
-      <section className="py-16 lg:py-20 bg-gradient-to-r from-blue-600 to-blue-800">
+      {/* Research CTA Section */}
+      <section className="py-14 lg:py-20 bg-gradient-to-r from-[#0d2147] to-[#1a3a6b]">
         <div className="container text-center">
           <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">
             Backed by Research
           </h2>
-          <p className="text-blue-100 max-w-2xl mx-auto mb-8">
+          <p className="text-blue-200 max-w-2xl mx-auto mb-8 text-sm lg:text-base">
             Every product in our catalog includes detailed research citations and scientific sources.
             We believe in transparency and providing researchers with the information they need.
           </p>
           <Link href="/shop">
-            <Button size="lg" className="bg-white text-blue-700 hover:bg-blue-50 gap-2 px-8 h-12">
+            <Button size="lg" className="bg-white text-blue-800 hover:bg-blue-50 gap-2 px-8 h-12 font-semibold">
               Explore Our Catalog <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>

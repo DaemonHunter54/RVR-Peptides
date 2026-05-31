@@ -2,8 +2,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { Menu, Search, ShoppingCart, User, X, ChevronDown, LogOut, Package, Settings } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Menu, ShoppingCart, User, X, ChevronDown, LogOut, Package, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
 import {
@@ -29,7 +29,7 @@ export default function Navbar() {
   }, []);
 
   const cartQuery = trpc.cart.get.useQuery(undefined, { enabled: isAuthenticated });
-  const cartCount = cartQuery.data?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const cartCount = cartQuery.data?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -41,6 +41,9 @@ export default function Navbar() {
   const bannerEnabled = settings.banner_enabled === "true";
   const bannerText = settings.banner_text || "";
 
+  // Determine if we're on the homepage for transparent navbar
+  const isHome = location === "/";
+
   return (
     <>
       {/* Announcement Banner */}
@@ -48,21 +51,23 @@ export default function Navbar() {
         <div
           className="text-center py-2 px-4 text-sm font-medium"
           style={{
-            backgroundColor: settings.banner_bg_color || "#1E3A5F",
-            color: settings.banner_text_color || "#FFFFFF",
+            backgroundColor: settings.banner_bg_color || "#0a1628",
+            color: settings.banner_text_color || "#94a3b8",
           }}
         >
           {bannerText}
         </div>
       )}
 
-      {/* Main Navbar */}
+      {/* Main Navbar - Dark blue that blends into hero */}
       <header
         className={cn(
           "sticky top-0 z-50 transition-all duration-300",
           scrolled
-            ? "bg-white/95 backdrop-blur-md shadow-md border-b border-slate-200/60"
-            : "bg-white border-b border-slate-100"
+            ? "bg-[#0a1628]/98 backdrop-blur-md shadow-lg shadow-black/20"
+            : isHome
+              ? "bg-[#0a1628]"
+              : "bg-[#0a1628]"
         )}
       >
         <div className="container">
@@ -85,8 +90,8 @@ export default function Navbar() {
                   className={cn(
                     "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
                     location === link.href
-                      ? "text-blue-700 bg-blue-50"
-                      : "text-slate-600 hover:text-blue-700 hover:bg-slate-50"
+                      ? "text-white bg-white/10"
+                      : "text-slate-300 hover:text-white hover:bg-white/5"
                   )}
                 >
                   {link.label}
@@ -97,10 +102,10 @@ export default function Navbar() {
             {/* Right Actions */}
             <div className="flex items-center gap-2">
               {/* Cart */}
-              <Link href="/cart" className="relative p-2 text-slate-600 hover:text-blue-700 transition-colors">
+              <Link href="/cart" className="relative p-2 text-slate-300 hover:text-white transition-colors">
                 <ShoppingCart className="h-5 w-5" />
                 {cartCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-full h-4.5 w-4.5 flex items-center justify-center min-w-[18px]">
+                  <span className="absolute -top-0.5 -right-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full h-4.5 w-4.5 flex items-center justify-center min-w-[18px]">
                     {cartCount}
                   </span>
                 )}
@@ -110,7 +115,7 @@ export default function Navbar() {
               {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-1.5 text-slate-600 hover:text-blue-700">
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-slate-300 hover:text-white hover:bg-white/10">
                       <User className="h-4 w-4" />
                       <span className="hidden sm:inline text-sm">{user?.name || user?.username || "Account"}</span>
                       <ChevronDown className="h-3 w-3" />
@@ -146,12 +151,12 @@ export default function Navbar() {
               ) : (
                 <div className="hidden sm:flex items-center gap-2">
                   <Link href="/login">
-                    <Button variant="ghost" size="sm" className="text-slate-600 hover:text-blue-700">
+                    <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white hover:bg-white/10">
                       Sign In
                     </Button>
                   </Link>
                   <Link href="/register">
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white">
                       Register
                     </Button>
                   </Link>
@@ -160,7 +165,7 @@ export default function Navbar() {
 
               {/* Mobile Menu Toggle */}
               <button
-                className="lg:hidden p-2 text-slate-600 hover:text-blue-700"
+                className="lg:hidden p-2 text-slate-300 hover:text-white"
                 onClick={() => setMobileOpen(!mobileOpen)}
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -171,7 +176,7 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="lg:hidden border-t border-slate-100 bg-white">
+          <div className="lg:hidden border-t border-white/10 bg-[#0a1628]">
             <nav className="container py-4 space-y-1">
               {navLinks.map((link) => (
                 <Link
@@ -181,20 +186,20 @@ export default function Navbar() {
                   className={cn(
                     "block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
                     location === link.href
-                      ? "text-blue-700 bg-blue-50"
-                      : "text-slate-600 hover:bg-slate-50"
+                      ? "text-white bg-white/10"
+                      : "text-slate-300 hover:bg-white/5 hover:text-white"
                   )}
                 >
                   {link.label}
                 </Link>
               ))}
               {!isAuthenticated && (
-                <div className="pt-3 border-t border-slate-100 space-y-2 px-4">
+                <div className="pt-3 border-t border-white/10 space-y-2 px-4">
                   <Link href="/login" onClick={() => setMobileOpen(false)}>
-                    <Button variant="outline" className="w-full">Sign In</Button>
+                    <Button variant="outline" className="w-full border-slate-500 text-slate-200 bg-transparent hover:bg-white/10">Sign In</Button>
                   </Link>
                   <Link href="/register" onClick={() => setMobileOpen(false)}>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">Register</Button>
+                    <Button className="w-full bg-blue-600 hover:bg-blue-500 text-white">Register</Button>
                   </Link>
                 </div>
               )}
