@@ -23,9 +23,8 @@ const VIAL_TEMPLATE_PATHS = [
 ];
 
 const HD_VIAL_BASE_PATHS = [
-  path.join(process.cwd(), 'client/public/assets/bpc-157-5mg_1e10350a.png'),
-  path.join(process.cwd(), 'client/public/assets/bpc-157-10mg_358b8e1b.png'),
-  path.join(process.cwd(), 'client/public/assets/sermorelin-10mg_92bb2dc6.png'),
+  path.join(process.cwd(), 'client/public/assets/rvr-company-blank-vial.png'),
+  path.join(process.cwd(), 'client/public/assets/rvr-vial-template-single_c7ba8797.png'),
 ];
 
 const HERO_IMAGE_PATHS = [
@@ -149,72 +148,23 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
 
   const centerX = outW / 2;
 
-  // Coordinates tuned to the Manus HD vial assets in client/public/assets.
-  // The rectangle fully covers existing Manus product text/logo while preserving
-  // the glass, cap, transparent background, and overall visual design.
-  const labelX = Math.round(outW * 0.305);
-  const labelY = Math.round(outH * 0.365);
-  const labelW = Math.round(outW * 0.390);
-  const labelH = Math.round(outH * 0.445);
-  const labelR = Math.round(outW * 0.020);
-
-  // Repaint a clean, blank curved black label over the pre-labeled asset.
-  const labelGrad = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
-  labelGrad.addColorStop(0, '#02050b');
-  labelGrad.addColorStop(0.12, '#141922');
-  labelGrad.addColorStop(0.30, '#070b12');
-  labelGrad.addColorStop(0.50, '#020409');
-  labelGrad.addColorStop(0.70, '#070b12');
-  labelGrad.addColorStop(0.88, '#151a22');
-  labelGrad.addColorStop(1, '#02050b');
-  ctx.fillStyle = labelGrad;
-  roundRect(ctx, labelX, labelY, labelW, labelH, labelR);
-  ctx.fill();
-
-  // Blue foil bands matching the Manus vial style.
-  const bandGrad = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
-  bandGrad.addColorStop(0, '#003d65');
-  bandGrad.addColorStop(0.18, '#0b78b8');
-  bandGrad.addColorStop(0.50, '#55d0ff');
-  bandGrad.addColorStop(0.82, '#0b78b8');
-  bandGrad.addColorStop(1, '#003d65');
-  ctx.fillStyle = bandGrad;
-  roundRect(ctx, labelX, labelY, labelW, Math.max(12, Math.round(outH * 0.012)), 8);
-  ctx.fill();
-  roundRect(ctx, labelX, labelY + labelH - Math.max(12, Math.round(outH * 0.012)), labelW, Math.max(12, Math.round(outH * 0.012)), 8);
-  ctx.fill();
-
-  // Subtle cylindrical label highlights so the covered label still looks like it
-  // belongs on the HD vial artwork.
-  const labelShine = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
-  labelShine.addColorStop(0, 'rgba(255,255,255,0.00)');
-  labelShine.addColorStop(0.18, 'rgba(255,255,255,0.13)');
-  labelShine.addColorStop(0.35, 'rgba(255,255,255,0.03)');
-  labelShine.addColorStop(0.77, 'rgba(255,255,255,0.09)');
-  labelShine.addColorStop(1, 'rgba(255,255,255,0.00)');
-  ctx.fillStyle = labelShine;
-  roundRect(ctx, labelX, labelY, labelW, labelH, labelR);
-  ctx.fill();
-
   const combined = productName.trim();
   const peptideName = extractPeptideName(combined) || 'PRODUCT';
   const dosage = extractDosage(combined);
 
-  // Logo text; drawn dynamically instead of keeping the old product asset label.
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#d7dbe0';
-  ctx.font = `900 ${Math.round(outW * 0.095)}px Inter, Arial, sans-serif`;
-  ctx.fillText('RVR', centerX, labelY + labelH * 0.19);
-  ctx.font = `700 ${Math.round(outW * 0.018)}px Inter, Arial, sans-serif`;
-  ctx.fillStyle = '#a4acb7';
-  ctx.fillText('RIVER VALLEY RESEARCH', centerX, labelY + labelH * 0.31);
+  // Coordinates are tuned for the company blank vial artwork. The provided
+  // blank already includes the correct glass, label, logo, and transparent
+  // background, so we only add editable product information below the logo.
+  const labelX = Math.round(outW * 0.315);
+  const labelY = Math.round(outH * 0.420);
+  const labelW = Math.round(outW * 0.370);
+  const maxNameW = labelW * 0.94;
 
-  const maxNameW = labelW * 0.86;
-  let nameFontSize = Math.round(outW * 0.070);
+  const productTextY = Math.round(outH * 0.710);
+  let nameFontSize = Math.round(outW * 0.044);
   const words = peptideName.split(/\s+/).filter(Boolean);
   let lines: string[] = [];
-  while (nameFontSize >= Math.round(outW * 0.035)) {
+  while (nameFontSize >= Math.round(outW * 0.024)) {
     ctx.font = `900 ${nameFontSize}px Inter, Arial, sans-serif`;
     lines = [];
     let line = '';
@@ -229,27 +179,28 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
     }
     if (line) lines.push(line);
     if (lines.length <= 2 && lines.every(l => ctx.measureText(l).width <= maxNameW)) break;
-    nameFontSize -= 3;
+    nameFontSize -= 2;
   }
 
-  ctx.fillStyle = '#ffffff';
-  const nameCenterY = labelY + labelH * 0.58;
-  const lineGap = nameFontSize * 1.03;
-  const firstY = nameCenterY - ((Math.min(lines.length, 2) - 1) * lineGap) / 2;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#0b3767';
+  const lineGap = nameFontSize * 1.02;
+  const firstY = productTextY - ((Math.min(lines.length, 2) - 1) * lineGap) / 2;
   lines.slice(0, 2).forEach((line, i) => {
     ctx.font = `900 ${nameFontSize}px Inter, Arial, sans-serif`;
     ctx.fillText(line.toUpperCase(), centerX, firstY + i * lineGap);
   });
 
   if (dosage) {
-    ctx.font = `900 ${Math.round(outW * 0.052)}px Inter, Arial, sans-serif`;
-    ctx.fillStyle = '#f7f9fb';
-    ctx.fillText(dosage, centerX, labelY + labelH * 0.74);
+    ctx.font = `900 ${Math.round(outW * 0.036)}px Inter, Arial, sans-serif`;
+    ctx.fillStyle = '#0b3767';
+    ctx.fillText(dosage, centerX, Math.round(outH * 0.765));
   }
 
-  ctx.font = `700 ${Math.round(outW * 0.026)}px Inter, Arial, sans-serif`;
-  ctx.fillStyle = '#d8dde3';
-  ctx.fillText('Research Use Only', centerX, labelY + labelH * 0.88);
+  ctx.font = `700 ${Math.round(outW * 0.014)}px Inter, Arial, sans-serif`;
+  ctx.fillStyle = '#657487';
+  ctx.fillText('Research Use Only', centerX, Math.round(outH * 0.805));
 
   return Buffer.from(canvas.toBuffer('image/png'));
 }

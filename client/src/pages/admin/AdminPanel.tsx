@@ -317,10 +317,8 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
 function ProductVialPreview({ name, slug, size }: { name: string; slug: string; size?: string }) {
-  // Client-side live preview so typing updates instantly and never depends on a
-  // cached /api/vial image. The backend still saves /api/vial/<slug>.png for
-  // generated product images, but this preview uses the HD Manus vial art with a
-  // freshly painted blank label.
+  // Live preview uses the company blank vial asset and overlays the typed
+  // product details without depending on a cached generated image.
   const cleanName = String(name || "").trim();
   const cleanSize = String(size || "").trim();
   const displayName = cleanName.toUpperCase();
@@ -333,58 +331,35 @@ function ProductVialPreview({ name, slug, size }: { name: string; slug: string; 
           <h3 className="font-semibold text-slate-800 text-sm">Live Vial Preview</h3>
           <p className="text-xs text-slate-500">Auto-updates from product name and size.</p>
         </div>
-        <Badge variant="outline">Generated HD vial</Badge>
+        <Badge variant="outline">Company blank vial</Badge>
       </div>
       <div className="flex justify-center rounded-lg bg-white p-4 min-h-[300px] overflow-hidden">
         <div className="relative w-[300px] h-[300px]">
           <img
-            src="/assets/bpc-157-5mg_1e10350a.png"
+            src={ASSETS.vialTemplate}
             alt="Live vial preview"
             className="absolute inset-0 h-full w-full object-contain"
           />
 
-          {/* Fresh blank label painted over the pre-labeled Manus vial. */}
-          <div
-            className="absolute overflow-hidden rounded-[8px] shadow-inner"
-            style={{
-              left: "30.5%",
-              top: "36.5%",
-              width: "39%",
-              height: "44.5%",
-              background:
-                "linear-gradient(90deg, #02050b 0%, #151a22 12%, #060a11 30%, #020409 50%, #060a11 70%, #151a22 88%, #02050b 100%)",
-            }}
-          >
-            <div className="absolute left-0 top-0 h-[5%] w-full bg-gradient-to-r from-[#003d65] via-[#55d0ff] to-[#003d65]" />
-            <div className="absolute left-0 bottom-0 h-[5%] w-full bg-gradient-to-r from-[#003d65] via-[#55d0ff] to-[#003d65]" />
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-
-            <div className="absolute inset-x-[8%] top-[13%] text-center">
-              <div className="text-[24px] font-black tracking-tight leading-none text-slate-200">RVR</div>
-              <div className="mt-1 text-[5px] font-bold tracking-[0.13em] text-slate-400">
-                RIVER VALLEY RESEARCH
+          <div className="absolute left-[25%] top-[58%] w-[50%] text-center pointer-events-none">
+            {displayName ? (
+              <div
+                className="font-black leading-tight text-[#0b3767] break-words drop-shadow-sm"
+                style={{ fontSize: displayName.length > 20 ? 10 : displayName.length > 13 ? 12 : 15 }}
+              >
+                {displayName}
               </div>
-            </div>
-
-            <div className="absolute inset-x-[8%] top-[43%] text-center">
-              {displayName ? (
-                <div
-                  className="font-black leading-tight text-white break-words"
-                  style={{ fontSize: displayName.length > 18 ? 12 : displayName.length > 11 ? 15 : 18 }}
-                >
-                  {displayName}
-                </div>
-              ) : null}
-              {displaySize ? (
-                <div className="mt-1 text-[15px] font-black leading-none text-white">
-                  {displaySize}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="absolute inset-x-[8%] bottom-[9%] text-center text-[7px] font-bold text-slate-200">
-              Research Use Only
-            </div>
+            ) : null}
+            {displaySize ? (
+              <div className="mt-1 text-[13px] font-black leading-none text-[#0b3767] drop-shadow-sm">
+                {displaySize}
+              </div>
+            ) : null}
+            {(displayName || displaySize) ? (
+              <div className="mt-1 text-[6px] font-bold tracking-[0.08em] text-slate-500 uppercase">
+                Research Use Only
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -501,7 +476,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
             <div><Label>URL Slug *</Label><Input value={form.slug} onChange={(e) => updateField("slug", e.target.value)} className="mt-1.5" /></div>
             <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => updateField("sku", e.target.value)} className="mt-1.5" /></div>
             <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
-            <div><Label>Image URL</Label><Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} className="mt-1.5" placeholder="Auto-filled from Manus asset or generated HD vial" /></div>
+            <div><Label>Image URL</Label><Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} className="mt-1.5" placeholder="Auto-filled from bundled company asset or generated company vial" /></div>
             <div className="md:col-span-2"><Label>Short Description</Label><Input value={form.shortDescription} onChange={(e) => updateField("shortDescription", e.target.value)} className="mt-1.5" /></div>
             <div className="md:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
           </div>
@@ -1177,7 +1152,7 @@ function CustomizationSection() {
     { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Free shipping on orders over $200!" },
     { key: "banner_bg_color", label: "Banner Background Color", type: "color", placeholder: "#0a1628" },
     { key: "banner_text_color", label: "Banner Text Color", type: "color", placeholder: "#94a3b8" },
-    { key: "logo_url", label: "Logo Image URL", type: "text", placeholder: "/manus-storage/rvr-logo_19fbf80f.png" },
+    { key: "logo_url", label: "Logo Image URL", type: "text", placeholder: "/assets/rvr-company-logo-large.png" },
     { key: "footer_disclaimer", label: "Footer Disclaimer", type: "textarea", placeholder: "All products are sold for research purposes only..." },
   ];
 

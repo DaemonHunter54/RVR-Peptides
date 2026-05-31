@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
+import { ASSETS } from "@/lib/assets";
 
 export default function Footer() {
   const settingsQuery = trpc.settings.public.useQuery();
@@ -51,7 +52,7 @@ export default function Footer() {
             {/* Left - Logo and disclaimer */}
             <div className="lg:col-span-1">
               <img
-                src="/manus-storage/rvr-logo_19fbf80f.png"
+                src={ASSETS.logo}
                 alt="River Valley Research Peptides"
                 className="h-14 w-auto mb-6"
               />
