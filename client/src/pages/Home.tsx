@@ -143,7 +143,7 @@ export default function Home() {
           <img
             src={ASSETS.logo}
             alt=""
-            className="w-[600px] md:w-[800px] lg:w-[1000px] h-auto object-contain opacity-[0.08]"
+            className="w-[600px] md:w-[800px] lg:w-[1000px] h-auto object-contain opacity-[0.18]"
           />
         </div>
 
