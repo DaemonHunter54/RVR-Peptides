@@ -2,31 +2,32 @@ FROM node:22-slim AS base
 RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
 WORKDIR /app
 
-# Harden pnpm network behavior for Railway builders
-RUN pnpm config set registry https://registry.npmjs.org/ \
-  && pnpm config set fetch-retries 6 \
-  && pnpm config set fetch-retry-factor 2 \
-  && pnpm config set fetch-retry-mintimeout 20000 \
-  && pnpm config set fetch-retry-maxtimeout 180000 \
-  && pnpm config set network-timeout 600000
-
+# Install dependencies
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
-RUN pnpm fetch --frozen-lockfile
+RUN pnpm install --frozen-lockfile --prod=false
 
+# Copy source
 COPY . .
-RUN pnpm install --offline --frozen-lockfile && pnpm run build
 
+# Build
+RUN pnpm run build
+
+# Production
 FROM node:22-slim AS production
+RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
 WORKDIR /app
-ENV NODE_ENV=production
 
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/dist ./dist
-COPY drizzle/ ./drizzle/
-COPY seed-products.mjs ./seed-products.mjs
+RUN pnpm install --frozen-lockfile --prod
 
+COPY --from=base /app/dist ./dist
+# Copy local assets for storageProxy fallback (Railway has no Manus Forge API)
+COPY --from=base /app/client/public/assets ./client/public/assets
+COPY drizzle/ ./drizzle/
+
+ENV NODE_ENV=production
 EXPOSE 3000
+
 CMD ["node", "dist/index.js"]

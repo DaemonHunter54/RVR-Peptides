@@ -12,6 +12,7 @@ import {
   discountCodes, InsertDiscountCode,
   siteSettings,
   cartItems,
+  productVariants,
 } from "../drizzle/schema";
 import { ensureDatabaseReady } from "./db-init";
 
@@ -200,7 +201,6 @@ export async function getProductBySlug(slug: string) {
   const result = await db.select().from(products).where(eq(products.slug, slug)).limit(1);
   return result[0];
 }
-
 export async function getProductById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -215,6 +215,61 @@ export async function getProductCategories(productId: number) {
   if (rows.length === 0) return [];
   const catIds = rows.map(r => r.categoryId);
   return db.select().from(categories).where(inArray(categories.id, catIds));
+}
+
+// ─── Product Variants ────────────────────────────────────────────────
+export async function getProductVariants(productId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(productVariants).where(eq(productVariants.productId, productId)).orderBy(asc(productVariants.sortOrder));
+}
+
+export async function getVariantById(variantId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(productVariants).where(eq(productVariants.id, variantId)).limit(1);
+  return result[0];
+}
+
+export async function createProductVariant(data: { productId: number; label: string; price: string; compareAtPrice?: string; sku?: string; stockQuantity?: number; imageUrl?: string; sortOrder?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(productVariants).values(data as any);
+  return Number(result[0].insertId);
+}
+
+export async function updateProductVariant(id: number, data: Partial<{ label: string; price: string; compareAtPrice: string; sku: string; stockQuantity: number; inStock: boolean; imageUrl: string; sortOrder: number }>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(productVariants).set(data as any).where(eq(productVariants.id, id));
+}
+
+export async function deleteProductVariant(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(productVariants).where(eq(productVariants.id, id));
+}
+
+export async function getAllProductsWithVariantCount(opts?: { activeOnly?: boolean; categorySlug?: string; search?: string; limit?: number; offset?: number }) {
+  const { products: prods, total } = await getAllProducts(opts);
+  const db = await getDb();
+  if (!db) return { products: prods.map((p: any) => ({ ...p, hasVariants: false, variantCount: 0 })), total };
+  
+  // Get variant counts for all products
+  const variantCounts = await db.select({
+    productId: productVariants.productId,
+    count: sql<number>`count(*)`
+  }).from(productVariants).groupBy(productVariants.productId);
+  
+  const countMap = new Map(variantCounts.map(vc => [vc.productId, Number(vc.count)]));
+  
+  const enriched = prods.map((p: any) => ({
+    ...p,
+    hasVariants: (countMap.get(p.id) || 0) > 1,
+    variantCount: countMap.get(p.id) || 0,
+  }));
+  
+  return { products: enriched, total };
 }
 
 export async function createProduct(data: InsertProduct, categoryIds?: number[]) {
@@ -299,7 +354,7 @@ export async function deleteCitation(id: number) {
 }
 
 // ─── Orders ──────────────────────────────────────────────────────────
-export async function createOrder(data: InsertOrder, items: { productId: number; productName: string; quantity: number; unitPrice: string; totalPrice: string }[]) {
+export async function createOrder(data: InsertOrder, items: { productId: number; productName: string; variantId?: number | null; variantLabel?: string | null; quantity: number; unitPrice: string; totalPrice: string }[]) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.insert(orders).values(data);
@@ -446,14 +501,19 @@ export async function getCartItems(userId: number) {
   return db.select().from(cartItems).where(eq(cartItems.userId, userId));
 }
 
-export async function addToCart(userId: number, productId: number, quantity: number) {
+export async function addToCart(userId: number, productId: number, quantity: number, variantId?: number, variantLabel?: string) {
   const db = await getDb();
   if (!db) return;
-  const existing = await db.select().from(cartItems).where(and(eq(cartItems.userId, userId), eq(cartItems.productId, productId))).limit(1);
+  // Match on productId + variantId combination
+  const conditions = [eq(cartItems.userId, userId), eq(cartItems.productId, productId)];
+  if (variantId) {
+    conditions.push(eq(cartItems.variantId, variantId));
+  }
+  const existing = await db.select().from(cartItems).where(and(...conditions)).limit(1);
   if (existing.length > 0) {
     await db.update(cartItems).set({ quantity: sql`${cartItems.quantity} + ${quantity}` }).where(eq(cartItems.id, existing[0].id));
   } else {
-    await db.insert(cartItems).values({ userId, productId, quantity });
+    await db.insert(cartItems).values({ userId, productId, quantity, variantId: variantId || null, variantLabel: variantLabel || null });
   }
 }
 

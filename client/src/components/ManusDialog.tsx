@@ -1,4 +1,3 @@
-import { ASSET_FALLBACKS } from "@/lib/assets";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -60,7 +59,6 @@ export function ManusDialog({
                 src={logo}
                 alt="Dialog graphic"
                 className="w-10 h-10 rounded-md"
-                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.logoIcon; }}
               />
             </div>
           ) : null}

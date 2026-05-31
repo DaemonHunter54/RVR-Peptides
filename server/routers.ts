@@ -85,7 +85,7 @@ export const appRouter = router({
       limit: z.number().optional(),
       offset: z.number().optional(),
     }).optional()).query(async ({ input }) => {
-      return db.getAllProducts({ activeOnly: true, categorySlug: input?.category, search: input?.search, limit: input?.limit, offset: input?.offset });
+      return db.getAllProductsWithVariantCount({ activeOnly: true, categorySlug: input?.category, search: input?.search, limit: input?.limit, offset: input?.offset });
     }),
     featured: publicProcedure.query(async () => {
       return db.getFeaturedProducts();
@@ -96,7 +96,11 @@ export const appRouter = router({
       const cats = await db.getProductCategories(product.id);
       const research = await db.getProductResearch(product.id);
       const citations = await db.getProductCitations(product.id);
-      return { ...product, categories: cats, research, citations };
+      const variants = await db.getProductVariants(product.id);
+      return { ...product, categories: cats, research, citations, variants };
+    }),
+    variants: publicProcedure.input(z.object({ productId: z.number() })).query(async ({ input }) => {
+      return db.getProductVariants(input.productId);
     }),
   }),
 
@@ -120,8 +124,8 @@ export const appRouter = router({
       }
       return enriched;
     }),
-    add: protectedProcedure.input(z.object({ productId: z.number(), quantity: z.number().min(1).default(1) })).mutation(async ({ input, ctx }) => {
-      await db.addToCart(ctx.user.id, input.productId, input.quantity);
+    add: protectedProcedure.input(z.object({ productId: z.number(), quantity: z.number().min(1).default(1), variantId: z.number().optional(), variantLabel: z.string().optional() })).mutation(async ({ input, ctx }) => {
+      await db.addToCart(ctx.user.id, input.productId, input.quantity, input.variantId, input.variantLabel);
       return { success: true };
     }),
     update: protectedProcedure.input(z.object({ productId: z.number(), quantity: z.number() })).mutation(async ({ input, ctx }) => {
@@ -164,6 +168,8 @@ export const appRouter = router({
       items: z.array(z.object({
         productId: z.number(),
         quantity: z.number().min(1),
+        variantId: z.number().optional(),
+        variantLabel: z.string().optional(),
       })),
       notes: z.string().optional(),
     })).mutation(async ({ input }) => {
@@ -181,7 +187,8 @@ export const appRouter = router({
         }
         const totalPrice = unitPrice * item.quantity;
         subtotal += totalPrice;
-        orderItems.push({ productId: item.productId, productName: product.name, quantity: item.quantity, unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2) });
+        const displayName = item.variantLabel ? `${product.name} (${item.variantLabel})` : product.name;
+        orderItems.push({ productId: item.productId, productName: displayName, variantId: item.variantId || null, variantLabel: item.variantLabel || null, quantity: item.quantity, unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2) });
       }
 
       // Apply discount code
@@ -317,6 +324,7 @@ export const appRouter = router({
         molecularFormula: z.string().optional(), molecularWeight: z.string().optional(), otherNames: z.string().optional(),
         stockQuantity: z.number().optional(), inStock: z.boolean().optional(), isActive: z.boolean().optional(), isFeatured: z.boolean().optional(),
         discountPercent: z.string().optional(), discountActive: z.boolean().optional(),
+        coaUrl: z.string().optional(), hplcUrl: z.string().optional(), massSpecUrl: z.string().optional(),
         categoryIds: z.array(z.number()).optional(),
       })).mutation(async ({ input }) => {
         const { categoryIds, ...data } = input;
@@ -340,6 +348,7 @@ export const appRouter = router({
         molecularWeight: z.string().optional(), otherNames: z.string().optional(), stockQuantity: z.number().optional(),
         lowStockThreshold: z.number().optional(), inStock: z.boolean().optional(), isActive: z.boolean().optional(),
         isFeatured: z.boolean().optional(), discountPercent: z.string().optional(), discountActive: z.boolean().optional(),
+        coaUrl: z.string().optional(), hplcUrl: z.string().optional(), massSpecUrl: z.string().optional(),
         sortOrder: z.number().optional(), categoryIds: z.array(z.number()).optional(),
         regenerateVial: z.boolean().optional(),
       })).mutation(async ({ input }) => {

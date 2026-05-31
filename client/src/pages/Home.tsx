@@ -5,7 +5,7 @@ import { Plane, ShieldCheck, Headphones } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 
 export default function Home() {
   const allProductsQuery = trpc.products.list.useQuery({ limit: 100 });
@@ -54,7 +54,6 @@ export default function Home() {
                 src={ASSETS.heroVials}
                 alt="River Valley Research Peptide Vials - BPC-157, TB-500, GHK-Cu"
                 className="w-full max-w-2xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-105"
-                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.heroVials; }}
               />
             </div>
           </div>
@@ -145,7 +144,6 @@ export default function Home() {
             src={ASSETS.logo}
             alt=""
             className="w-[600px] md:w-[800px] lg:w-[1000px] h-auto object-contain opacity-[0.08]"
-            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.logo; }}
           />
         </div>
 

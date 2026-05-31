@@ -64,3 +64,27 @@
 - [x] Make product vial images have transparent backgrounds (no dark box)
 - [x] Hero vials float on hero section background without image square
 - [x] Product grid vials display on white background seamlessly
+- [x] Identify products with multiple doses (same base name, different mg)
+- [x] Add product_variants table to store dose options per product
+- [x] Consolidate duplicate products into single listings with variants
+- [x] Add dose selector dropdown on product detail page
+- [x] Show "Multiple doses available" on product cards for multi-dose products
+- [x] Update cart/checkout to track selected variant/dose
+- [x] Fix: product detail page should scroll to top when navigated to
+- [x] Study corepeptides.com product page layout
+- [x] Add Description, CoA, HPLC, Mass Spectrometry fields to products table
+- [x] Update admin panel product form with 4 new tab fields
+- [x] Redesign product detail page to match corepeptides.com style with conditional tabs
+- [x] Populate all product descriptions from corepeptides.com for matching products
+- [x] Populate research sources for all matching products
+- [x] Fix product_variants table name mismatch causing endpoint errors
+- [x] Fix Chemical Makeup section formatting (line-by-line rendering in styled box)
+- [x] Normalize citation numbering per product (fix duplicate citation numbers)
+- [x] Populate remaining 15 products without research data (products not on corepeptides.com get generic descriptions)
+- [x] Audit all /manus-storage/ references in codebase
+- [x] Download and bundle all Manus-hosted assets into project
+- [x] Update all image references to use local static paths
+- [x] Configure static file serving for Railway deployment
+- [x] Verify build runs correctly with local assets
+- [x] Normalize product/variant imageUrl in API responses to /assets/ paths
+- [x] Browser-verified: all pages use /assets/ paths, no /manus-storage/ in rendered HTML

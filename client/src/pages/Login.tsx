@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,7 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
             <div className="text-center mb-8">
-              <img src={ASSETS.logoIcon} alt="RVR" className="h-12 w-12 mx-auto mb-4" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.logoIcon; }} />
+              <img src={ASSETS.logoIcon} alt="RVR" className="h-12 w-12 mx-auto mb-4" />
               <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
               <p className="text-slate-500 text-sm mt-1">Sign in to your account</p>
             </div>

@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useGuestCart } from "@/hooks/useGuestCart";
@@ -63,6 +63,8 @@ export default function Checkout() {
     productId: gi.productId,
     quantity: gi.quantity,
     product: gi.product,
+    variantId: gi.variantId,
+    variantLabel: gi.variantLabel,
   }));
 
   const subtotal = items.reduce((sum, item) => {
@@ -130,7 +132,7 @@ export default function Checkout() {
         shippingZip: form.shippingZip,
         shippingCountry: form.shippingCountry,
         discountCode: discountCode || undefined,
-        items: items.map(item => ({ productId: item.productId, quantity: item.quantity })),
+        items: items.map(item => ({ productId: item.productId, quantity: item.quantity, variantId: (item as any).variantId, variantLabel: (item as any).variantLabel })),
         notes: form.notes || undefined,
       });
 
@@ -314,7 +316,7 @@ export default function Checkout() {
                     const unitPrice = hasDisc ? price * (1 - Number(item.product.discountPercent) / 100) : price;
                     return (
                       <div key={item.id} className="flex items-center gap-3">
-                        <img src={item.product.imageUrl || ASSETS.peptideVial} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
+                        <img src={item.product.imageUrl || ASSETS.peptideVial} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                         className="w-10 h-10 object-contain bg-slate-50 rounded" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-800 truncate">{item.product.name}</p>

@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,7 @@ export default function OrderDetail() {
                     <img
                       src={item.product?.imageUrl || ASSETS.peptideVial}
                       alt={item.productName}
-                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-16 h-16 object-contain bg-slate-50 rounded-lg"
                     />
                     <div className="flex-1">

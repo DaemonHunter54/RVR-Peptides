@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 import { Shield, FlaskConical, Award, Truck } from "lucide-react";
 
 export default function About() {
@@ -41,7 +41,7 @@ export default function About() {
             <div className="flex justify-center">
               <div className="relative">
                 <div className="absolute inset-0 bg-blue-500/10 rounded-3xl blur-2xl" />
-                <img src={ASSETS.peptideVial} alt="Research Peptide" className="relative w-72 h-72 object-contain" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }} />
+                <img src={ASSETS.peptideVial} alt="Research Peptide" className="relative w-72 h-72 object-contain" />
               </div>
             </div>
           </div>

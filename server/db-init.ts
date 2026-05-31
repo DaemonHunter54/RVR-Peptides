@@ -12,7 +12,6 @@ const TABLES = [
   username varchar(100),
   phone varchar(20),
   shippingAddress text,
-  savedPaymentInfo text,
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   lastSignedIn timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -168,6 +167,21 @@ const TABLES = [
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
+)`,
+`CREATE TABLE IF NOT EXISTS productVariants (
+  id int AUTO_INCREMENT NOT NULL,
+  productId int NOT NULL,
+  label varchar(255) NOT NULL,
+  price decimal(10,2) NOT NULL,
+  compareAtPrice decimal(10,2),
+  sku varchar(50),
+  stockQuantity int NOT NULL DEFAULT 100,
+  inStock boolean NOT NULL DEFAULT true,
+  imageUrl text,
+  sortOrder int NOT NULL DEFAULT 0,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_product_variants_productId (productId)
 )`
 ];
 
@@ -181,7 +195,6 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
   ["users", "username", "varchar(100)"],
   ["users", "phone", "varchar(20)"],
   ["users", "shippingAddress", "text"],
-  ["users", "savedPaymentInfo", "text"],
   ["users", "createdAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],
   ["users", "updatedAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
   ["users", "lastSignedIn", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],

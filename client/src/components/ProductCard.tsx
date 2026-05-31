@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 
 interface ProductCardProps {
   product: {
@@ -17,6 +17,8 @@ interface ProductCardProps {
     isFeatured?: boolean | null;
     form?: string | null;
     purity?: string | null;
+    hasVariants?: boolean;
+    variantCount?: number;
   };
 }
 
@@ -28,14 +30,14 @@ export default function ProductCard({ product }: ProductCardProps) {
   return (
     <Link href={`/product/${product.slug}`}>
       <div className="group flex flex-col items-center cursor-pointer h-full">
-        {/* Vial Image - server-generated with product name, dosage, logo baked in */}
+        {/* Vial Image */}
         <div className="relative w-full aspect-[3/4] flex items-center justify-center mb-3 overflow-hidden">
           <div className="relative w-full h-full flex items-center justify-center p-2">
             <img
-              src={product.imageUrl || `/api/vial/${product.slug}.png`}
+              src={product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
               alt={product.name}
               className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />
           </div>
 
@@ -59,15 +61,30 @@ export default function ProductCard({ product }: ProductCardProps) {
           {product.name}
         </h3>
 
+        {/* Multiple doses available indicator */}
+        {product.hasVariants && (
+          <p className="text-center text-xs text-gray-500 italic mb-1">
+            Multiple doses available
+          </p>
+        )}
+
         {/* Price */}
         <div className="flex items-baseline gap-2 justify-center">
-          <span className={cn("font-bold text-base", hasDiscount ? "text-red-600" : "text-[#4a9eff]")}>
-            ${discountedPrice.toFixed(2)}
-          </span>
-          {hasDiscount && (
-            <span className="text-sm text-gray-400 line-through">
-              ${price.toFixed(2)}
+          {product.hasVariants ? (
+            <span className="font-bold text-base text-[#4a9eff]">
+              From ${price.toFixed(2)}
             </span>
+          ) : (
+            <>
+              <span className={cn("font-bold text-base", hasDiscount ? "text-red-600" : "text-[#4a9eff]")}>
+                ${discountedPrice.toFixed(2)}
+              </span>
+              {hasDiscount && (
+                <span className="text-sm text-gray-400 line-through">
+                  ${price.toFixed(2)}
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,7 +62,7 @@ export default function AdminPanel() {
       <aside className="w-64 bg-white border-r border-slate-200 fixed h-full overflow-y-auto hidden lg:block">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.logoIcon; }} />
+            <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
             <span className="font-bold text-slate-800 text-sm">Admin Panel</span>
           </Link>
           <button onClick={() => toast.info("Email platform coming soon. This will link to your email management dashboard once configured.")} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
@@ -89,7 +89,7 @@ export default function AdminPanel() {
         <div className="lg:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2">
-              <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.logoIcon; }} />
+              <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
               <span className="font-bold text-slate-800 text-sm">Admin</span>
             </Link>
             <button onClick={() => toast.info("Email platform coming soon. This will link to your email management dashboard once configured.")} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
@@ -278,7 +278,7 @@ function ProductsSection() {
                 <tr key={product.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img src={product.imageUrl || ASSETS.peptideVial} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
+                      <img src={product.imageUrl || ASSETS.peptideVial} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-10 h-10 object-contain bg-slate-50 rounded" />
                       <div>
                         <p className="font-medium text-slate-800">{product.name}</p>
@@ -338,6 +338,9 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     discountPercent: product?.discountPercent ? String(product.discountPercent) : "",
     discountActive: product?.discountActive ?? false,
     categoryIds: product?.categories?.map((c: any) => c.id) || [],
+    coaUrl: product?.coaUrl || "",
+    hplcUrl: product?.hplcUrl || "",
+    massSpecUrl: product?.massSpecUrl || "",
   });
 
   const updateField = (field: string, value: any) => {
@@ -400,6 +403,17 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Testing Documents */}
+        <div className="bg-white rounded-xl p-6 border border-slate-200">
+          <h2 className="font-semibold text-slate-800 mb-4">Testing Documents</h2>
+          <p className="text-sm text-slate-500 mb-4">Leave blank if not available — the tab won't show on the product page.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div><Label>CoA URL</Label><Input value={form.coaUrl} onChange={(e) => updateField("coaUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
+            <div><Label>HPLC URL</Label><Input value={form.hplcUrl} onChange={(e) => updateField("hplcUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
+            <div><Label>Mass Spectrometry URL</Label><Input value={form.massSpecUrl} onChange={(e) => updateField("massSpecUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
           </div>
         </div>
 

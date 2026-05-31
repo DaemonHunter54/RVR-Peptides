@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -35,42 +36,25 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
+  registerOAuthRoutes(app);
 
-  // Dynamic hero vials image endpoint (must be before :slug.png to avoid matching)
-  app.get("/api/vial/hero.png", async (req, res) => {
-    try {
-      const { generateHeroVialsBuffer } = await import("../vialGenerator");
-      const { getAllProducts } = await import("../db");
-      const { products } = await getAllProducts({});
-      const featured = products.filter((p: any) => p.isFeatured).slice(0, 3);
-      const heroProducts = featured.length >= 3 ? featured : products.slice(0, 3);
-      const buffer = generateHeroVialsBuffer(heroProducts.map((p: any) => ({ name: p.name })));
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.send(buffer);
-    } catch (err: any) {
-      console.error('[Hero Vial Gen Error]', err.message);
-      res.status(500).send('Error generating hero image');
-    }
+  // Vial image endpoints - redirect to pre-generated HD images stored in S3
+  app.get("/api/vial/hero.png", (req, res) => {
+    res.redirect('/manus-storage/rvr-hero-3vials-composed_5511eda3.png');
   });
 
-  // Dynamic vial image generation endpoint
   app.get("/api/vial/:slug.png", async (req, res) => {
     try {
-      const { generateVialBuffer } = await import("../vialGenerator");
       const { getProductBySlug } = await import("../db");
       const product = await getProductBySlug(req.params.slug);
-      if (!product) {
+      if (!product || !product.imageUrl) {
         res.status(404).send('Product not found');
         return;
       }
-      const buffer = await generateVialBuffer(product.name);
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      res.send(buffer);
+      res.redirect(product.imageUrl);
     } catch (err: any) {
-      console.error('[Vial Gen Error]', err.message);
-      res.status(500).send('Error generating vial image');
+      console.error('[Vial Redirect Error]', err.message);
+      res.status(500).send('Error');
     }
   });
 

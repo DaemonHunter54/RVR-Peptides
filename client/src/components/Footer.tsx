@@ -1,7 +1,6 @@
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
-import { ASSET_FALLBACKS } from "@/lib/assets";
 
 export default function Footer() {
   const settingsQuery = trpc.settings.public.useQuery();
@@ -55,7 +54,6 @@ export default function Footer() {
                 src="/manus-storage/rvr-logo_19fbf80f.png"
                 alt="River Valley Research Peptides"
                 className="h-14 w-auto mb-6"
-                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.logo; }}
               />
               <p className="text-[#4a9eff] text-sm italic font-medium mb-4">
                 All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption.

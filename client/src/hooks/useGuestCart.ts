@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from "react";
 export interface GuestCartItem {
   productId: number;
   quantity: number;
+  variantId?: number;
+  variantLabel?: string;
   product: {
     id: number;
     name: string;
@@ -10,6 +12,8 @@ export interface GuestCartItem {
     imageUrl: string | null;
     discountActive: boolean;
     discountPercent: string | null;
+    variantId?: number;
+    variantLabel?: string;
   };
 }
 
@@ -37,24 +41,25 @@ export function useGuestCart() {
 
   const addItem = useCallback((product: GuestCartItem["product"], quantity = 1) => {
     setItems(prev => {
-      const existing = prev.find(i => i.productId === product.id);
+      // Match on productId + variantId combination
+      const existing = prev.find(i => i.productId === product.id && i.variantId === product.variantId);
       if (existing) {
-        return prev.map(i => i.productId === product.id ? { ...i, quantity: i.quantity + quantity } : i);
+        return prev.map(i => (i.productId === product.id && i.variantId === product.variantId) ? { ...i, quantity: i.quantity + quantity } : i);
       }
-      return [...prev, { productId: product.id, quantity, product }];
+      return [...prev, { productId: product.id, quantity, variantId: product.variantId, variantLabel: product.variantLabel, product }];
     });
   }, []);
 
-  const updateQuantity = useCallback((productId: number, quantity: number) => {
+  const updateQuantity = useCallback((productId: number, quantity: number, variantId?: number) => {
     if (quantity <= 0) {
-      setItems(prev => prev.filter(i => i.productId !== productId));
+      setItems(prev => prev.filter(i => !(i.productId === productId && i.variantId === variantId)));
     } else {
-      setItems(prev => prev.map(i => i.productId === productId ? { ...i, quantity } : i));
+      setItems(prev => prev.map(i => (i.productId === productId && i.variantId === variantId) ? { ...i, quantity } : i));
     }
   }, []);
 
-  const removeItem = useCallback((productId: number) => {
-    setItems(prev => prev.filter(i => i.productId !== productId));
+  const removeItem = useCallback((productId: number, variantId?: number) => {
+    setItems(prev => prev.filter(i => !(i.productId === productId && i.variantId === variantId)));
   }, []);
 
   const clearCart = useCallback(() => {

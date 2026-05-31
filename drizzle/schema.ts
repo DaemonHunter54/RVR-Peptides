@@ -71,6 +71,10 @@ export const products = mysqlTable("products", {
   // Discount
   discountPercent: decimal("discountPercent", { precision: 5, scale: 2 }),
   discountActive: boolean("discountActive").default(false).notNull(),
+  // Document URLs (for tabs)
+  coaUrl: text("coaUrl"),
+  hplcUrl: text("hplcUrl"),
+  massSpecUrl: text("massSpecUrl"),
   // Status
   isActive: boolean("isActive").default(true).notNull(),
   isFeatured: boolean("isFeatured").default(false).notNull(),
@@ -172,6 +176,8 @@ export const orderItems = mysqlTable("orderItems", {
   orderId: int("orderId").notNull(),
   productId: int("productId").notNull(),
   productName: varchar("productName", { length: 255 }).notNull(),
+  variantId: int("variantId"),
+  variantLabel: varchar("variantLabel", { length: 255 }),
   quantity: int("quantity").notNull(),
   unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).notNull(),
   totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
@@ -221,9 +227,29 @@ export const cartItems = mysqlTable("cartItems", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   productId: int("productId").notNull(),
+  variantId: int("variantId"),
+  variantLabel: varchar("variantLabel", { length: 255 }),
   quantity: int("quantity").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type CartItem = typeof cartItems.$inferSelect;
+
+// ─── Product Variants (multiple doses per product) ──────────────────
+export const productVariants = mysqlTable("product_variants", {
+  id: int("id").autoincrement().primaryKey(),
+  productId: int("productId").notNull(),
+  label: varchar("label", { length: 255 }).notNull(), // e.g. "5mg", "10mg"
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compareAtPrice", { precision: 10, scale: 2 }),
+  sku: varchar("sku", { length: 50 }),
+  stockQuantity: int("stockQuantity").default(100).notNull(),
+  inStock: boolean("inStock").default(true).notNull(),
+  imageUrl: text("imageUrl"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProductVariant = typeof productVariants.$inferSelect;
+export type InsertProductVariant = typeof productVariants.$inferInsert;

@@ -1,26 +1,12 @@
 import type { Express } from "express";
 import { ENV } from "./env";
 import path from "path";
-
-const LOCAL_STORAGE_FALLBACKS: Record<string, string> = {
-  "rvr-logo_19fbf80f.png": "/rvr-logo-fallback.svg",
-  "rvr-logo-icon_1e565e30.png": "/rvr-logo-icon-fallback.svg",
-  "rvr-hero-3vials-transparent_af6612a1.png": "/rvr-hero-3vials-transparent_af6612a1.png",
-  "rvr-vial-template-single_c7ba8797.png": "/rvr-vial-template-single_c7ba8797.png",
-};
-
-function redirectToLocalFallback(key: string, res: any) {
-  const filename = path.basename(key);
-  const fallback = LOCAL_STORAGE_FALLBACKS[filename];
-  if (fallback) {
-    res.set("Cache-Control", "public, max-age=3600");
-    res.redirect(302, fallback);
-    return true;
-  }
-  return false;
-}
+import fs from "fs";
 
 export function registerStorageProxy(app: Express) {
+  // Serve /manus-storage/* requests
+  // In Railway/self-hosted mode: redirect to local /assets/ files
+  // In Manus mode: proxy through forge API
   app.get("/manus-storage/*", async (req, res) => {
     const key = (req.params as Record<string, string>)[0];
     if (!key) {
@@ -28,9 +14,17 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
+    // First try local assets (for Railway/self-hosted deployment)
+    const localPath = path.join(process.cwd(), 'client', 'public', 'assets', key);
+    if (fs.existsSync(localPath)) {
+      res.set("Cache-Control", "public, max-age=31536000, immutable");
+      res.redirect(301, `/assets/${key}`);
+      return;
+    }
+
+    // Fallback to Manus forge proxy (for Manus-hosted mode)
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      if (redirectToLocalFallback(key, res)) return;
-      res.status(404).send("Storage asset not available");
+      res.status(404).send("Asset not found");
       return;
     }
 
@@ -48,14 +42,12 @@ export function registerStorageProxy(app: Express) {
       if (!forgeResp.ok) {
         const body = await forgeResp.text().catch(() => "");
         console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
-        if (redirectToLocalFallback(key, res)) return;
         res.status(502).send("Storage backend error");
         return;
       }
 
       const { url } = (await forgeResp.json()) as { url: string };
       if (!url) {
-        if (redirectToLocalFallback(key, res)) return;
         res.status(502).send("Empty signed URL from backend");
         return;
       }
@@ -64,7 +56,6 @@ export function registerStorageProxy(app: Express) {
       res.redirect(307, url);
     } catch (err) {
       console.error("[StorageProxy] failed:", err);
-      if (redirectToLocalFallback(key, res)) return;
       res.status(502).send("Storage proxy error");
     }
   });

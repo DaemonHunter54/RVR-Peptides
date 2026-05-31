@@ -1,22 +1,27 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ASSETS, ASSET_FALLBACKS } from "@/lib/assets";
+import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShoppingCart, Minus, Plus, ArrowLeft, ExternalLink, FlaskConical, Shield, Check } from "lucide-react";
-import { useState } from "react";
+import { ShoppingCart, Minus, Plus, ExternalLink, FlaskConical, Shield, Check } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { useGuestCart } from "@/hooks/useGuestCart";
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [slug]);
   const { isAuthenticated } = useAuth();
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("description");
   const productQuery = trpc.products.bySlug.useQuery({ slug: slug || "" });
   const addToCart = trpc.cart.add.useMutation({
     onSuccess: () => {
@@ -28,6 +33,33 @@ export default function ProductDetail() {
   const guestCart = useGuestCart();
 
   const product = productQuery.data;
+
+  // Determine which tabs to show based on available data
+  const availableTabs = useMemo(() => {
+    if (!product) return [];
+    const tabs: { id: string; label: string }[] = [];
+    // Description tab always shows if there's description or research content
+    if (product.description || product.research?.overview || product.research?.researchContent) {
+      tabs.push({ id: "description", label: "Description" });
+    }
+    if (product.coaUrl) {
+      tabs.push({ id: "coa", label: "CoA" });
+    }
+    if (product.hplcUrl) {
+      tabs.push({ id: "hplc", label: "HPLC" });
+    }
+    if (product.massSpecUrl) {
+      tabs.push({ id: "massspec", label: "Mass Spectrometry" });
+    }
+    return tabs;
+  }, [product]);
+
+  // Set default active tab to first available
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.find(t => t.id === activeTab)) {
+      setActiveTab(availableTabs[0].id);
+    }
+  }, [availableTabs]);
 
   if (productQuery.isLoading) {
     return (
@@ -65,25 +97,37 @@ export default function ProductDetail() {
     );
   }
 
-  const price = Number(product.price);
+  const variants = product.variants || [];
+  const hasVariants = variants.length > 1;
+  
+  const activeVariant = hasVariants
+    ? variants.find((v: any) => v.id === selectedVariantId) || variants[0]
+    : null;
+  
+  const price = activeVariant ? Number(activeVariant.price) : Number(product.price);
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
 
   const handleAddToCart = () => {
+    const cartPrice = activeVariant ? activeVariant.price : product.price;
+    const cartName = activeVariant ? `${product.name} (${activeVariant.label})` : product.name;
+    const cartImage = activeVariant?.imageUrl || product.imageUrl;
+    
     if (!isAuthenticated) {
-      // Add to guest cart (localStorage)
       guestCart.addItem({
         id: product.id,
-        name: product.name,
-        price: product.price,
-        imageUrl: product.imageUrl,
+        name: cartName,
+        price: cartPrice,
+        imageUrl: cartImage,
         discountActive: product.discountActive || false,
         discountPercent: product.discountPercent || null,
+        variantId: activeVariant?.id,
+        variantLabel: activeVariant?.label,
       }, quantity);
       toast.success("Added to cart!");
       return;
     }
-    addToCart.mutate({ productId: product.id, quantity }, {
+    addToCart.mutate({ productId: product.id, quantity, variantId: activeVariant?.id, variantLabel: activeVariant?.label }, {
       onSuccess: () => utils.cart.get.invalidate(),
     });
   };
@@ -111,9 +155,9 @@ export default function ProductDetail() {
           {/* Image */}
           <div className="rounded-2xl p-8 lg:p-12 flex items-center justify-center">
             <img
-              src={product.imageUrl || `/api/vial/${product.slug}.png`}
+              src={product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
               alt={product.name}
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSET_FALLBACKS.peptideVial; }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
               className="w-full max-w-md object-contain"
             />
           </div>
@@ -133,6 +177,33 @@ export default function ProductDetail() {
 
             <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">{product.name}</h1>
 
+            {/* Quick specs inline */}
+            <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+              {product.size && <span><strong>Size:</strong> {product.size}</span>}
+              {product.contents && <span><strong>Contents:</strong> {product.contents}</span>}
+              {product.form && <span><strong>Form:</strong> {product.form}</span>}
+              {product.purity && <span><strong>Purity:</strong> {product.purity}</span>}
+              {product.sku && <span><strong>SKU:</strong> {product.sku}</span>}
+            </div>
+
+            {/* Dose Selector Dropdown */}
+            {hasVariants && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Select Dose:</label>
+                <select
+                  value={activeVariant?.id || ""}
+                  onChange={(e) => setSelectedVariantId(Number(e.target.value))}
+                  className="w-full border border-slate-200 rounded-lg px-4 py-3 text-slate-800 font-medium bg-white hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
+                >
+                  {variants.map((v: any) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label} — ${Number(v.price).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Price */}
             <div className="flex items-baseline gap-3">
               <span className={`text-3xl font-bold ${hasDiscount ? "text-red-600" : "text-slate-900"}`}>
@@ -146,37 +217,8 @@ export default function ProductDetail() {
               )}
             </div>
 
-            {/* Quick specs */}
-            <div className="grid grid-cols-2 gap-3">
-              {product.purity && (
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Purity</p>
-                  <p className="font-semibold text-slate-800">{product.purity}</p>
-                </div>
-              )}
-              {product.size && (
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Size</p>
-                  <p className="font-semibold text-slate-800">{product.size}</p>
-                </div>
-              )}
-              {product.form && (
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Form</p>
-                  <p className="font-semibold text-slate-800">{product.form}</p>
-                </div>
-              )}
-              {product.molecularWeight && (
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Mol. Weight</p>
-                  <p className="font-semibold text-slate-800">{product.molecularWeight}</p>
-                </div>
-              )}
-            </div>
-
-            {product.description && (
-              <p className="text-slate-600 leading-relaxed">{product.description}</p>
-            )}
+            {/* Free shipping notice */}
+            <p className="text-sm text-green-600 font-medium">FREE Shipping on $200+ orders</p>
 
             {/* Stock Status */}
             <div className="flex items-center gap-2">
@@ -234,119 +276,205 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {/* Tabs: Description, Research, Citations */}
-        <Tabs defaultValue="description" className="mb-12">
-          <TabsList className="bg-slate-100 p-1 rounded-lg">
-            <TabsTrigger value="description" className="rounded-md">Description</TabsTrigger>
-            <TabsTrigger value="research" className="rounded-md">Research</TabsTrigger>
-            <TabsTrigger value="citations" className="rounded-md">Citations</TabsTrigger>
-            <TabsTrigger value="specs" className="rounded-md">Specifications</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="description" className="mt-6">
-            <div className="prose prose-slate max-w-none">
-              <p className="text-slate-600 leading-relaxed">{product.description || "No description available."}</p>
-              {product.shortDescription && product.shortDescription !== product.description && (
-                <p className="text-slate-600 leading-relaxed mt-4">{product.shortDescription}</p>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="research" className="mt-6">
-            {product.research ? (
-              <div className="space-y-6">
-                {product.research.overview && (
-                  <div>
-                    <h3 className="font-semibold text-slate-800 text-lg mb-2">Overview</h3>
-                    <p className="text-slate-600 leading-relaxed">{product.research.overview}</p>
-                  </div>
-                )}
-                {product.research.chemicalMakeup && (
-                  <div>
-                    <h3 className="font-semibold text-slate-800 text-lg mb-2">Chemical Makeup</h3>
-                    <p className="text-slate-600 leading-relaxed">{product.research.chemicalMakeup}</p>
-                  </div>
-                )}
-                {product.research.researchContent && (
-                  <div>
-                    <h3 className="font-semibold text-slate-800 text-lg mb-2">Research Findings</h3>
-                    <p className="text-slate-600 leading-relaxed">{product.research.researchContent}</p>
-                  </div>
-                )}
+        {/* Conditional Tabs: Description, CoA, HPLC, Mass Spectrometry */}
+        {availableTabs.length > 0 && (
+          <div className="mb-12">
+            {/* Tab Navigation */}
+            <div className="border-b border-slate-200">
+              <div className="flex gap-0">
+                {availableTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === tab.id
+                        ? "border-blue-600 text-blue-600"
+                        : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <p className="text-slate-500">Research information coming soon.</p>
-            )}
-          </TabsContent>
+            </div>
 
-          <TabsContent value="citations" className="mt-6">
-            {product.citations && product.citations.length > 0 ? (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-500 mb-4">
-                  The following research citations support the scientific study of this compound.
-                </p>
-                {product.citations.map((citation: any, idx: number) => (
-                  <div key={citation.id} className="bg-slate-50 rounded-lg p-4 border border-slate-100">
-                    <div className="flex items-start gap-3">
-                      <span className="bg-blue-100 text-blue-700 text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shrink-0 mt-0.5">
-                        {citation.citationNumber || idx + 1}
-                      </span>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-slate-800 text-sm">{citation.title}</h4>
-                        {citation.authors && (
-                          <p className="text-xs text-slate-500 mt-1">{citation.authors}</p>
+            {/* Tab Content */}
+            <div className="pt-8">
+              {/* Description Tab */}
+              {activeTab === "description" && (
+                <div className="prose prose-slate max-w-none">
+                  {/* Overview */}
+                  {product.research?.overview && (
+                    <div className="mb-8">
+                      <h2 className="text-xl font-bold text-slate-900 mb-4">{product.name} Peptide</h2>
+                      <div className="text-slate-600 leading-relaxed whitespace-pre-line">
+                        {product.research.overview}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* If no research overview, show the basic description */}
+                  {!product.research?.overview && product.description && (
+                    <div className="mb-8">
+                      <h2 className="text-xl font-bold text-slate-900 mb-4">Overview</h2>
+                      <p className="text-slate-600 leading-relaxed">{product.description}</p>
+                    </div>
+                  )}
+
+                  {/* Chemical Makeup */}
+                  {(product.molecularFormula || product.molecularWeight || product.otherNames || product.research?.chemicalMakeup) && (
+                    <div className="mb-8">
+                      <h3 className="text-lg font-bold text-slate-900 mb-3">Chemical Makeup</h3>
+                      <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                        {product.research?.chemicalMakeup && product.research.chemicalMakeup.split('\n').map((line: string, i: number) => {
+                          const parts = line.split(':');
+                          if (parts.length >= 2) {
+                            return (
+                              <p key={i} className="text-sm text-slate-700">
+                                <strong>{parts[0].trim()}:</strong> {parts.slice(1).join(':').trim()}
+                              </p>
+                            );
+                          }
+                          return <p key={i} className="text-sm text-slate-700">{line}</p>;
+                        })}
+                        {product.molecularFormula && (
+                          <p className="text-sm text-slate-700"><strong>Molecular Formula:</strong> {product.molecularFormula}</p>
                         )}
-                        <div className="flex items-center gap-3 mt-1.5">
-                          {citation.journal && (
-                            <span className="text-xs text-slate-500 italic">{citation.journal}</span>
-                          )}
-                          {citation.year && (
-                            <span className="text-xs text-slate-400">({citation.year})</span>
-                          )}
-                        </div>
-                        {citation.summary && (
-                          <p className="text-sm text-slate-600 mt-2">{citation.summary}</p>
+                        {product.molecularWeight && (
+                          <p className="text-sm text-slate-700"><strong>Molecular Weight:</strong> {product.molecularWeight}</p>
                         )}
-                        {citation.url && (
-                          <a
-                            href={citation.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-2"
-                          >
-                            View Source <ExternalLink className="h-3 w-3" />
-                          </a>
+                        {product.otherNames && (
+                          <p className="text-sm text-slate-700"><strong>Other Known Titles:</strong> {product.otherNames}</p>
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-slate-500">No research citations available yet.</p>
-            )}
-          </TabsContent>
+                  )}
 
-          <TabsContent value="specs" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { label: "SKU", value: product.sku },
-                { label: "Size", value: product.size },
-                { label: "Form", value: product.form },
-                { label: "Purity", value: product.purity },
-                { label: "Contents", value: product.contents },
-                { label: "Molecular Formula", value: product.molecularFormula },
-                { label: "Molecular Weight", value: product.molecularWeight },
-                { label: "Other Names", value: product.otherNames },
-              ].filter(s => s.value).map((spec) => (
-                <div key={spec.label} className="flex justify-between py-3 border-b border-slate-100">
-                  <span className="text-sm font-medium text-slate-500">{spec.label}</span>
-                  <span className="text-sm text-slate-800">{spec.value}</span>
+                  {/* Research Content */}
+                  {product.research?.researchContent && (
+                    <div className="mb-8">
+                      <h3 className="text-lg font-bold text-slate-900 mb-3">Research and Clinical Studies</h3>
+                      <div className="text-slate-600 leading-relaxed whitespace-pre-line">
+                        {product.research.researchContent}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Citations / Sources */}
+                  {product.citations && product.citations.length > 0 && (
+                    <div className="mt-10 pt-6 border-t border-slate-200">
+                      <h3 className="text-lg font-bold text-slate-900 mb-4">Sources</h3>
+                      <ol className="space-y-2">
+                        {product.citations.map((citation: any, idx: number) => (
+                          <li key={citation.id} className="text-sm text-slate-600 flex gap-2">
+                            <span className="text-slate-400 font-medium shrink-0">[{citation.citationNumber || idx + 1}]</span>
+                            <span>
+                              {citation.title}
+                              {citation.authors && <span className="text-slate-400"> — {citation.authors}</span>}
+                              {citation.journal && <span className="text-slate-400 italic"> {citation.journal}</span>}
+                              {citation.year && <span className="text-slate-400"> ({citation.year})</span>}
+                              {citation.url && (
+                                <a
+                                  href={citation.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 ml-1"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
+
+              {/* CoA Tab */}
+              {activeTab === "coa" && product.coaUrl && (
+                <div className="flex flex-col items-center">
+                  <div className="w-full max-w-3xl">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">Certificate of Analysis</h3>
+                    <p className="text-slate-600 mb-6">
+                      The Certificate of Analysis (CoA) verifies the identity, purity, and quality of this product.
+                    </p>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <iframe
+                        src={product.coaUrl}
+                        className="w-full h-[600px]"
+                        title="Certificate of Analysis"
+                      />
+                    </div>
+                    <a
+                      href={product.coaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
+                      Open in new tab <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* HPLC Tab */}
+              {activeTab === "hplc" && product.hplcUrl && (
+                <div className="flex flex-col items-center">
+                  <div className="w-full max-w-3xl">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">HPLC Analysis</h3>
+                    <p className="text-slate-600 mb-6">
+                      High-Performance Liquid Chromatography (HPLC) analysis confirms the purity and composition of this compound.
+                    </p>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <iframe
+                        src={product.hplcUrl}
+                        className="w-full h-[600px]"
+                        title="HPLC Analysis"
+                      />
+                    </div>
+                    <a
+                      href={product.hplcUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
+                      Open in new tab <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Mass Spectrometry Tab */}
+              {activeTab === "massspec" && product.massSpecUrl && (
+                <div className="flex flex-col items-center">
+                  <div className="w-full max-w-3xl">
+                    <h3 className="text-lg font-bold text-slate-900 mb-4">Mass Spectrometry</h3>
+                    <p className="text-slate-600 mb-6">
+                      Mass spectrometry analysis confirms the molecular weight and structural integrity of this compound.
+                    </p>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <iframe
+                        src={product.massSpecUrl}
+                        className="w-full h-[600px]"
+                        title="Mass Spectrometry"
+                      />
+                    </div>
+                    <a
+                      href={product.massSpecUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
+                      Open in new tab <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
 
       <Footer />
