@@ -85,8 +85,8 @@ function buildPhotorealVialSvg(name?: string, size?: string): string {
 
   const nameLines = splitLines(peptideName, peptideName.length > 22 ? 13 : 16, 3);
   const doseLines = splitLines(dosage, 15, 2);
-  const nameFont = nameLines.length >= 3 ? 36 : peptideName.length > 24 ? 40 : peptideName.length > 15 ? 48 : 60;
-  const doseFont = doseLines.length > 1 || dosage.length > 14 ? 42 : 58;
+  const nameFont = nameLines.length >= 3 ? 43 : peptideName.length > 24 ? 48 : peptideName.length > 15 ? 58 : 72;
+  const doseFont = doseLines.length > 1 || dosage.length > 14 ? 50 : 70;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -104,9 +104,9 @@ function buildPhotorealVialSvg(name?: string, size?: string): string {
   <g clip-path="url(#labelClip)">
     <rect x="318" y="452" width="480" height="660" rx="72" fill="#fff" opacity="1"/>
     <rect x="330" y="470" width="456" height="620" rx="66" fill="url(#sheen)"/>
-    ${textBlock(nameLines, cx, 640, Math.round(nameFont * 1.15), Math.round(nameFont * 1.05))}
-    <image href="/assets/rvr-company-logo-large.png" x="340" y="720" width="440" height="232" preserveAspectRatio="xMidYMid meet"/>
-    ${doseLines.length ? textBlock(doseLines, cx, 1025, Math.round(doseFont * 1.18), Math.round(doseFont * 1.08)) : ""}
+    ${textBlock(nameLines, cx, 645, nameFont, Math.round(nameFont * 1.02))}
+    <image href="/assets/rvr-company-logo-large.png" x="328" y="725" width="460" height="242" preserveAspectRatio="xMidYMid meet"/>
+    ${doseLines.length ? textBlock(doseLines, cx, 1042, doseFont, Math.round(doseFont * 1.06)) : ""}
   </g>
 </svg>`;
 }
@@ -116,7 +116,7 @@ export function generatedVialUrl(slug: string, name?: string, size?: string): st
   const params = new URLSearchParams();
   if (name) params.set("name", name);
   if (size) params.set("size", size);
-  params.set("v", "rvr-photoreal-svg-final-2");
+  params.set("v", "rvr-photoreal-svg-layout-3");
   return `/api/vial/${safeSlug}.png?${params.toString()}`;
 }
 

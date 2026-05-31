@@ -1796,8 +1796,8 @@ async function generateVialSvgBuffer(productName) {
   const blue = "#005AA4";
   const nameLines = splitSvgLines(peptideName.replace(/\s*\/\s*/g, " / "), peptideName.length > 24 ? 13 : 16, 3);
   const doseLines = splitSvgLines(dosage.replace(/\s*\/\s*/g, " / "), 15, 2);
-  const nameFont = nameLines.length >= 3 ? 36 : peptideName.length > 24 ? 40 : peptideName.length > 15 ? 48 : 60;
-  const doseFont = doseLines.length > 1 || dosage.length > 14 ? 42 : 58;
+  const nameFont = nameLines.length >= 3 ? 43 : peptideName.length > 24 ? 48 : peptideName.length > 15 ? 58 : 72;
+  const doseFont = doseLines.length > 1 || dosage.length > 14 ? 50 : 70;
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <image href="${templateUri}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>
@@ -1814,9 +1814,9 @@ async function generateVialSvgBuffer(productName) {
   <g clip-path="url(#labelClip)">
     <rect x="318" y="452" width="480" height="660" rx="72" fill="#ffffff" opacity="1"/>
     <rect x="330" y="470" width="456" height="620" rx="66" fill="url(#glassSheen)"/>
-    ${svgTextBlock(nameLines, cx, 575, nameFont, Math.round(nameFont * 0.98), blue)}
-    <image href="${logoUri}" x="378" y="668" width="360" height="190" preserveAspectRatio="xMidYMid meet"/>
-    ${doseLines.length ? svgTextBlock(doseLines, cx, 935, doseFont, Math.round(doseFont * 1.03), blue) : ""}
+    ${svgTextBlock(nameLines, cx, 645, nameFont, Math.round(nameFont * 1.02), blue)}
+    <image href="${logoUri}" x="328" y="725" width="460" height="242" preserveAspectRatio="xMidYMid meet"/>
+    ${doseLines.length ? svgTextBlock(doseLines, cx, 1042, doseFont, Math.round(doseFont * 1.06), blue) : ""}
   </g>
 </svg>`;
   return Buffer.from(svg, "utf8");
@@ -1850,21 +1850,21 @@ async function drawVialWithLabel(productName) {
   ctx.textBaseline = "middle";
   ctx.fillStyle = blue;
   const labelName = peptideName.replace(/\s*\/\s*/g, " / ");
-  const nameFit = fitLines(ctx, labelName, 335, 3, 40, 20);
+  const nameFit = fitLines(ctx, labelName, 380, 3, 50, 24);
   ctx.font = `900 ${nameFit.size}px Inter, Arial, sans-serif`;
   const nameLineGap = nameFit.size * 0.95;
-  const nameStartY = 585 - (nameFit.lines.length - 1) * nameLineGap / 2;
+  const nameStartY = 645 - (nameFit.lines.length - 1) * nameLineGap / 2;
   for (let i = 0; i < nameFit.lines.length; i++) {
     ctx.fillText(nameFit.lines[i], cx, nameStartY + i * nameLineGap);
   }
   try {
     const logo = await getLogo();
-    const maxLogoW = 310;
-    const maxLogoH = 145;
+    const maxLogoW = 440;
+    const maxLogoH = 225;
     const scale = Math.min(maxLogoW / logo.width, maxLogoH / logo.height);
     const lw = logo.width * scale;
     const lh = logo.height * scale;
-    ctx.drawImage(logo, cx - lw / 2, 735 - lh / 2, lw, lh);
+    ctx.drawImage(logo, cx - lw / 2, 850 - lh / 2, lw, lh);
   } catch {
     ctx.font = "900 46px Inter, Arial, sans-serif";
     ctx.fillStyle = "#8c939b";
@@ -1875,10 +1875,10 @@ async function drawVialWithLabel(productName) {
   }
   if (dosage) {
     ctx.fillStyle = blue;
-    const doseFit = fitLines(ctx, dosage.replace(/\s*\/\s*/g, " / "), 335, 2, 42, 22);
+    const doseFit = fitLines(ctx, dosage.replace(/\s*\/\s*/g, " / "), 380, 2, 52, 26);
     ctx.font = `900 ${doseFit.size}px Inter, Arial, sans-serif`;
     const doseLineGap = doseFit.size * 1.02;
-    const doseStartY = 910 - (doseFit.lines.length - 1) * doseLineGap / 2;
+    const doseStartY = 1042 - (doseFit.lines.length - 1) * doseLineGap / 2;
     for (let i = 0; i < doseFit.lines.length; i++) {
       ctx.fillText(doseFit.lines[i], cx, doseStartY + i * doseLineGap);
     }
