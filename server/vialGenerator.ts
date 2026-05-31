@@ -87,7 +87,7 @@ function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: numb
 }
 
 function fitLines(ctx: any, text: string, maxWidth: number, maxLines: number, startSize: number, minSize: number) {
-  const words = text.split(/\s+/).filter(Boolean);
+  const words = text.replace(/\s*\/\s*/g, ' / ').split(/\s+/).filter(Boolean);
   for (let size = startSize; size >= minSize; size -= 2) {
     ctx.font = `900 ${size}px Inter, Arial, sans-serif`;
     const lines: string[] = [];
@@ -214,7 +214,7 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
   // Fully clear the old sample text from the approved template. This area is
   // clipped to the vial body so the HD cap, glass edges, bottom, and shadow remain.
   ctx.fillStyle = 'rgba(255,255,255,1.0)';
-  roundRect(ctx, 238, 420, 640, 665, 76);
+  roundRect(ctx, 275, 455, 566, 660, 70);
   ctx.fill();
 
   // Restore subtle glass vertical highlights over the clean label zone.
@@ -225,7 +225,7 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
   glass.addColorStop(0.80, 'rgba(245,250,255,0.18)');
   glass.addColorStop(1.00, 'rgba(255,255,255,0.00)');
   ctx.fillStyle = glass;
-  roundRect(ctx, 255, 440, 606, 625, 70);
+  roundRect(ctx, 292, 475, 532, 620, 64);
   ctx.fill();
 
   const blue = '#005AA4';
@@ -234,10 +234,11 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
   ctx.fillStyle = blue;
 
   // Product name at the top. Long blend names wrap and shrink instead of overflowing.
-  const nameFit = fitLines(ctx, peptideName, 430, 2, 58, 30);
+  const labelName = peptideName.replace(/\s*\/\s*/g, ' / ');
+  const nameFit = fitLines(ctx, labelName, 335, 3, 40, 20);
   ctx.font = `900 ${nameFit.size}px Inter, Arial, sans-serif`;
-  const nameLineGap = nameFit.size * 0.98;
-  const nameStartY = 555 - ((nameFit.lines.length - 1) * nameLineGap) / 2;
+  const nameLineGap = nameFit.size * 0.95;
+  const nameStartY = 585 - ((nameFit.lines.length - 1) * nameLineGap) / 2;
   for (let i = 0; i < nameFit.lines.length; i++) {
     ctx.fillText(nameFit.lines[i], cx, nameStartY + i * nameLineGap);
   }
@@ -245,12 +246,12 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
   // Company logo in the middle, sized close to the approved sample.
   try {
     const logo = await getLogo();
-    const maxLogoW = 300;
-    const maxLogoH = 130;
+    const maxLogoW = 310;
+    const maxLogoH = 145;
     const scale = Math.min(maxLogoW / logo.width, maxLogoH / logo.height);
     const lw = logo.width * scale;
     const lh = logo.height * scale;
-    ctx.drawImage(logo, cx - lw / 2, 710 - lh / 2, lw, lh);
+    ctx.drawImage(logo, cx - lw / 2, 735 - lh / 2, lw, lh);
   } catch {
     ctx.font = '900 46px Inter, Arial, sans-serif';
     ctx.fillStyle = '#8c939b';
@@ -263,10 +264,10 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
   // Dose at the bottom. If there is no dose, leave the lower glass clean.
   if (dosage) {
     ctx.fillStyle = blue;
-    const doseFit = fitLines(ctx, dosage, 400, 2, 56, 30);
+    const doseFit = fitLines(ctx, dosage.replace(/\s*\/\s*/g, ' / '), 335, 2, 42, 22);
     ctx.font = `900 ${doseFit.size}px Inter, Arial, sans-serif`;
     const doseLineGap = doseFit.size * 1.02;
-    const doseStartY = 895 - ((doseFit.lines.length - 1) * doseLineGap) / 2;
+    const doseStartY = 910 - ((doseFit.lines.length - 1) * doseLineGap) / 2;
     for (let i = 0; i < doseFit.lines.length; i++) {
       ctx.fillText(doseFit.lines[i], cx, doseStartY + i * doseLineGap);
     }

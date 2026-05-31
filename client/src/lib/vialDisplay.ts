@@ -20,7 +20,7 @@ export function generatedVialUrl(slug: string, name?: string, size?: string): st
   const params = new URLSearchParams();
   if (name) params.set("name", name);
   if (size) params.set("size", size);
-  params.set("v", "rvr-photoreal-template-v6");
+  params.set("v", "rvr-photoreal-template-v7");
   return `/api/vial/${safeSlug}.png?${params.toString()}`;
 }
 
