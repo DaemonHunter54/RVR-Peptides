@@ -113,7 +113,7 @@ export async function updateUserPassword(userId: number, passwordHash: string) {
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
 }
 
-export async function updateUserProfile(userId: number, data: Partial<{ name: string; email: string; phone: string; shippingAddress: string }>) {
+export async function updateUserProfile(userId: number, data: Partial<{ name: string; username: string; email: string; phone: string; shippingAddress: string; savedPaymentInfo: string }>) {
   const db = await getDb();
   if (!db) return;
   await db.update(users).set(data).where(eq(users.id, userId));

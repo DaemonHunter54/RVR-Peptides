@@ -11,6 +11,7 @@ import { ShoppingCart, Minus, Plus, ArrowLeft, ExternalLink, FlaskConical, Shiel
 import { useState } from "react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
+import { useGuestCart } from "@/hooks/useGuestCart";
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -67,11 +68,20 @@ export default function ProductDetail() {
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
 
+  const guestCart = useGuestCart();
+
   const handleAddToCart = () => {
     if (!isAuthenticated) {
-      toast.info("Please sign in to add items to your cart", {
-        action: { label: "Sign In", onClick: () => window.location.href = "/login" },
-      });
+      // Add to guest cart (localStorage)
+      guestCart.addItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        imageUrl: product.imageUrl,
+        discountActive: product.discountActive || false,
+        discountPercent: product.discountPercent || null,
+      }, quantity);
+      toast.success("Added to cart!");
       return;
     }
     addToCart.mutate({ productId: product.id, quantity }, {

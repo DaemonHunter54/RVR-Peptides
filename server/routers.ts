@@ -65,9 +65,11 @@ export const appRouter = router({
     }),
     updateProfile: protectedProcedure.input(z.object({
       name: z.string().optional(),
+      username: z.string().min(3).max(50).optional(),
       email: z.string().email().optional(),
       phone: z.string().optional(),
       shippingAddress: z.string().optional(),
+      savedPaymentInfo: z.string().optional(),
     })).mutation(async ({ input, ctx }) => {
       await db.updateUserProfile(ctx.user.id, input);
       return { success: true };

@@ -9,13 +9,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function Home() {
   const allProductsQuery = trpc.products.list.useQuery({ limit: 100 });
   const allProducts = allProductsQuery.data?.products || [];
+  const settingsQuery = trpc.settings.public.useQuery();
+  const settings = settingsQuery.data || {};
+
+  // Template-driven colors (fall back to defaults)
+  const heroBg = settings.hero_bg_color || "#0d2147";
+  const heroText = settings.hero_text_color || "#ffffff";
+  const accentColor = settings.accent_color || "#2563eb";
+
+  // Generate gradient from hero bg color
+  const heroGradient = `linear-gradient(135deg, ${heroBg} 0%, ${adjustBrightness(heroBg, 15)} 50%, ${adjustBrightness(heroBg, 30)} 100%)`;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      {/* HERO SECTION - Dark blue/navy background with diagonal white cut at bottom */}
-      <section className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0a1628 0%, #0f2044 50%, #162d5a 100%)" }}>
+      {/* HERO SECTION - Colors driven by template settings */}
+      <section className="relative overflow-hidden" style={{ background: heroGradient }}>
         {/* Subtle wave pattern overlay */}
         <div className="absolute inset-0 opacity-[0.06]" style={{
           backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,0.04) 35px, rgba(255,255,255,0.04) 70px)`
@@ -25,14 +35,14 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[500px] py-16 lg:py-0">
             {/* Left side - Text content */}
             <div className="space-y-6">
-              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.1] tracking-tight">
+              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] tracking-tight" style={{ color: heroText }}>
                 HIGHEST QUALITY<br />
                 PEPTIDES FOR SALE
               </h1>
-              <p className="text-gray-300 text-lg max-w-md leading-relaxed">
+              <p className="text-lg max-w-md leading-relaxed" style={{ color: `${heroText}cc` }}>
                 We are proud to carry the highest quality peptides and peptide blends in the research industry.
               </p>
-              <Link href="/shop" className="inline-block border-2 border-[#4a9eff] text-[#4a9eff] px-8 py-3 text-sm font-bold tracking-widest hover:bg-[#4a9eff] hover:text-white transition-all duration-300">
+              <Link href="/shop" className="inline-block border-2 px-8 py-3 text-sm font-bold tracking-widest transition-all duration-300 hover:text-white" style={{ borderColor: accentColor, color: accentColor }}>
                   BUY PEPTIDES
               </Link>
             </div>
@@ -170,4 +180,13 @@ export default function Home() {
       <Footer />
     </div>
   );
+}
+
+// Helper to adjust hex color brightness
+function adjustBrightness(hex: string, percent: number): string {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + percent));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + percent));
+  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + percent));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }

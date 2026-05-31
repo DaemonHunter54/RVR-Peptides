@@ -986,11 +986,12 @@ function CustomizationSection() {
   // Holiday templates
   const holidayTemplates = [
     {
-      id: "default",
-      name: "Default (Blue & Silver)",
+      id: "main",
+      name: "Main (Blue & Silver)",
       icon: "🧪",
-      description: "Standard River Valley Research branding",
+      description: "Standard River Valley Research branding - no decorations",
       settings: {
+        holiday_theme: "default",
         hero_bg_color: "#0d2147",
         hero_text_color: "#ffffff",
         accent_color: "#2563eb",
@@ -1004,8 +1005,9 @@ function CustomizationSection() {
       id: "christmas",
       name: "Christmas",
       icon: "🎄",
-      description: "Festive red & green with holiday banner",
+      description: "Festive red & green with snowflakes, Christmas trees & lights",
       settings: {
+        holiday_theme: "christmas",
         hero_bg_color: "#1a2e1a",
         hero_text_color: "#ffffff",
         accent_color: "#dc2626",
@@ -1019,8 +1021,9 @@ function CustomizationSection() {
       id: "halloween",
       name: "Halloween",
       icon: "🎃",
-      description: "Spooky orange & purple theme",
+      description: "Spooky pumpkins, bats, ghosts & spider webs",
       settings: {
+        holiday_theme: "halloween",
         hero_bg_color: "#1a0a2e",
         hero_text_color: "#f97316",
         accent_color: "#a855f7",
@@ -1034,8 +1037,9 @@ function CustomizationSection() {
       id: "easter",
       name: "Easter",
       icon: "🐰",
-      description: "Pastel spring colors with Easter banner",
+      description: "Easter bunnies, eggs, spring flowers & butterflies",
       settings: {
+        holiday_theme: "easter",
         hero_bg_color: "#1e293b",
         hero_text_color: "#e9d5ff",
         accent_color: "#a78bfa",
@@ -1049,8 +1053,9 @@ function CustomizationSection() {
       id: "valentines",
       name: "Valentine's Day",
       icon: "💕",
-      description: "Romantic reds and pinks",
+      description: "Floating hearts, roses & romantic decorations",
       settings: {
+        holiday_theme: "valentines",
         hero_bg_color: "#1c1017",
         hero_text_color: "#fda4af",
         accent_color: "#e11d48",
@@ -1064,8 +1069,9 @@ function CustomizationSection() {
       id: "4thofjuly",
       name: "4th of July",
       icon: "🇺🇸",
-      description: "Patriotic red, white, and blue",
+      description: "Fireworks, flags & patriotic stars",
       settings: {
+        holiday_theme: "4thofjuly",
         hero_bg_color: "#0c1a3d",
         hero_text_color: "#ffffff",
         accent_color: "#dc2626",
@@ -1079,8 +1085,9 @@ function CustomizationSection() {
       id: "blackfriday",
       name: "Black Friday",
       icon: "🏷️",
-      description: "Bold black and gold for maximum sales",
+      description: "Sale tags, shopping bags & golden sparkles",
       settings: {
+        holiday_theme: "blackfriday",
         hero_bg_color: "#0a0a0a",
         hero_text_color: "#fbbf24",
         accent_color: "#f59e0b",

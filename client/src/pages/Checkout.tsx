@@ -3,12 +3,14 @@ import Footer from "@/components/Footer";
 import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useGuestCart } from "@/hooks/useGuestCart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Lock, CreditCard, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, CreditCard, Loader2, UserPlus, Mail } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
@@ -22,13 +24,24 @@ export default function Checkout() {
   const params = useMemo(() => new URLSearchParams(searchParams), [searchParams]);
   const discountCode = params.get("discount") || "";
   const [isProcessing, setIsProcessing] = useState(false);
+  const [createAccount, setCreateAccount] = useState(false);
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountUsername, setAccountUsername] = useState("");
 
+  // Authenticated cart
   const cartQuery = trpc.cart.get.useQuery(undefined, { enabled: isAuthenticated });
+
+  // Guest cart
+  const guestCart = useGuestCart();
+
   const createOrder = trpc.orders.create.useMutation({
     onError: (err) => { toast.error(err.message); setIsProcessing(false); },
   });
   const createInvoice = trpc.payments.createInvoice.useMutation({
     onError: (err) => { toast.error("Payment error: " + err.message); setIsProcessing(false); },
+  });
+  const registerMutation = trpc.auth.register.useMutation({
+    onError: (err) => { toast.error("Account creation failed: " + err.message); },
   });
 
   const [form, setForm] = useState({
@@ -43,7 +56,15 @@ export default function Checkout() {
     notes: "",
   });
 
-  const items = cartQuery.data || [];
+  // Unified items
+  const authItems = cartQuery.data || [];
+  const items = isAuthenticated ? authItems : guestCart.items.map((gi, idx) => ({
+    id: idx,
+    productId: gi.productId,
+    quantity: gi.quantity,
+    product: gi.product,
+  }));
+
   const subtotal = items.reduce((sum, item) => {
     const price = Number(item.product.price);
     const disc = item.product.discountActive && item.product.discountPercent
@@ -53,18 +74,55 @@ export default function Checkout() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0 && isAuthenticated) {
+    if (items.length === 0) {
       toast.error("Your cart is empty");
       return;
     }
+
+    // Validate guest email is provided for guest checkout
+    if (!isAuthenticated && !form.guestEmail) {
+      toast.error("Email address is required for order updates and tracking information.");
+      return;
+    }
+
+    // Validate account creation fields if opted in
+    if (!isAuthenticated && createAccount) {
+      if (!accountPassword || accountPassword.length < 6) {
+        toast.error("Password must be at least 6 characters to create an account.");
+        return;
+      }
+      if (!accountUsername || accountUsername.length < 3) {
+        toast.error("Username must be at least 3 characters.");
+        return;
+      }
+    }
+
     setIsProcessing(true);
 
     try {
+      // If guest wants to create an account, do it first
+      let newUserId: number | undefined;
+      if (!isAuthenticated && createAccount && accountPassword && accountUsername) {
+        try {
+          const regResult = await registerMutation.mutateAsync({
+            email: form.guestEmail,
+            username: accountUsername,
+            password: accountPassword,
+            name: form.guestName || undefined,
+          });
+          newUserId = regResult.user.id;
+          toast.success("Account created! Your order will be linked to your new account.");
+        } catch {
+          // Account creation failed but we can still proceed with guest checkout
+          toast.info("Could not create account, proceeding as guest.");
+        }
+      }
+
       // Step 1: Create the order
       const orderData = await createOrder.mutateAsync({
-        userId: isAuthenticated ? user?.id : undefined,
-        guestEmail: !isAuthenticated ? form.guestEmail : undefined,
-        guestName: !isAuthenticated ? form.guestName : undefined,
+        userId: isAuthenticated ? user?.id : newUserId,
+        guestEmail: (!isAuthenticated && !newUserId) ? form.guestEmail : undefined,
+        guestName: (!isAuthenticated && !newUserId) ? form.guestName : undefined,
         shippingName: form.shippingName,
         shippingAddress: form.shippingAddress,
         shippingCity: form.shippingCity,
@@ -75,6 +133,11 @@ export default function Checkout() {
         items: items.map(item => ({ productId: item.productId, quantity: item.quantity })),
         notes: form.notes || undefined,
       });
+
+      // Clear guest cart after successful order
+      if (!isAuthenticated) {
+        guestCart.clearCart();
+      }
 
       // Step 2: Create NowPayments invoice
       try {
@@ -116,20 +179,72 @@ export default function Checkout() {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Form */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Guest Info */}
+              {/* Guest Info - Required email for receipts/tracking */}
               {!isAuthenticated && (
                 <div className="bg-white rounded-xl p-6 border border-slate-200">
-                  <h2 className="font-semibold text-slate-800 mb-4">Contact Information</h2>
-                  <p className="text-sm text-slate-500 mb-4">Checking out as a guest. <a href="/login" className="text-blue-600 hover:underline">Sign in</a> to track your orders.</p>
+                  <h2 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-blue-600" /> Contact Information
+                  </h2>
+                  <p className="text-sm text-slate-500 mb-4">
+                    Already have an account? <a href="/login" className="text-blue-600 hover:underline font-medium">Sign in</a> to track your orders.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Full Name</Label>
                       <Input value={form.guestName} onChange={(e) => updateField("guestName", e.target.value)} required className="mt-1.5" placeholder="John Doe" />
                     </div>
                     <div>
-                      <Label>Email</Label>
+                      <Label>Email Address <span className="text-red-500">*</span></Label>
                       <Input type="email" value={form.guestEmail} onChange={(e) => updateField("guestEmail", e.target.value)} required className="mt-1.5" placeholder="john@example.com" />
+                      <p className="text-xs text-slate-400 mt-1">Required for order receipt, tracking updates, and shipping notifications.</p>
                     </div>
+                  </div>
+
+                  {/* Account Creation Option */}
+                  <div className="mt-5 pt-5 border-t border-slate-100">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="create-account"
+                        checked={createAccount}
+                        onCheckedChange={(checked) => setCreateAccount(checked === true)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="create-account" className="text-sm font-medium text-slate-800 cursor-pointer flex items-center gap-2">
+                          <UserPlus className="h-4 w-4 text-blue-600" />
+                          Create an account for faster future checkouts
+                        </label>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Track orders, save shipping info, and get exclusive member discounts.
+                        </p>
+                      </div>
+                    </div>
+
+                    {createAccount && (
+                      <div className="mt-4 ml-7 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                        <div>
+                          <Label className="text-sm">Username</Label>
+                          <Input
+                            value={accountUsername}
+                            onChange={(e) => setAccountUsername(e.target.value)}
+                            className="mt-1.5 bg-white"
+                            placeholder="Choose a username"
+                            minLength={3}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm">Password</Label>
+                          <Input
+                            type="password"
+                            value={accountPassword}
+                            onChange={(e) => setAccountPassword(e.target.value)}
+                            className="mt-1.5 bg-white"
+                            placeholder="Min 6 characters"
+                            minLength={6}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -209,6 +324,9 @@ export default function Checkout() {
                       </div>
                     );
                   })}
+                  {items.length === 0 && (
+                    <p className="text-sm text-slate-400 text-center py-4">No items in cart. <a href="/shop" className="text-blue-600 underline">Browse products</a></p>
+                  )}
                 </div>
 
                 <div className="border-t border-slate-100 pt-3 space-y-2 text-sm">
@@ -225,7 +343,7 @@ export default function Checkout() {
                 <Button
                   type="submit"
                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11"
-                  disabled={isProcessing}
+                  disabled={isProcessing || items.length === 0}
                 >
                   {isProcessing ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>

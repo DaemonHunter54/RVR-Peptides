@@ -6,6 +6,7 @@ import { Menu, ShoppingCart, User, X, ChevronDown, LogOut, Package, Settings } f
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
+import { useGuestCart } from "@/hooks/useGuestCart";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +30,10 @@ export default function Navbar() {
   }, []);
 
   const cartQuery = trpc.cart.get.useQuery(undefined, { enabled: isAuthenticated });
-  const cartCount = cartQuery.data?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+  const guestCart = useGuestCart();
+  const cartCount = isAuthenticated
+    ? (cartQuery.data?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0)
+    : guestCart.itemCount;
 
   const navLinks = [
     { href: "/", label: "HOME" },

@@ -23,6 +23,7 @@ export const users = mysqlTable("users", {
   username: varchar("username", { length: 100 }),
   phone: varchar("phone", { length: 20 }),
   shippingAddress: text("shippingAddress"),
+  savedPaymentInfo: text("savedPaymentInfo"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
