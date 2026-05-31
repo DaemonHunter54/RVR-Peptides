@@ -309,6 +309,111 @@ function slugify(value: string) {
   return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+
+function normalizeVariantGroupName(name: string): { base: string; label: string | null } {
+  let working = name.trim().replace(/\s+/g, " ");
+  const hasCapsules = /\bcapsules?\b/i.test(working);
+
+  // Keep non-vial products separate from vial variants.
+  const parenMatch = working.match(/\s*\(([^)]*)\)\s*$/);
+  if (parenMatch && !hasCapsules) {
+    working = working.slice(0, parenMatch.index).trim();
+  }
+
+  // Capture common dose/volume suffixes while avoiding product family numbers such as SS-31 or PE-22-28.
+  const doseMatch = working.match(/(?:\s|^)(\d+(?:\.\d+)?\s*(?:mg|mcg|g|iu|ml)(?:\s*\/\s*(?:ml|vial))?)(?:\s*)$/i);
+  if (!doseMatch) return { base: name.trim(), label: null };
+
+  const label = doseMatch[1].replace(/\s+/g, "");
+  let base = working.slice(0, doseMatch.index).trim();
+  if (!base) return { base: name.trim(), label: null };
+
+  // Preserve dosage in the base for capsule products so capsules do not merge with vials.
+  if (hasCapsules) {
+    return { base: name.trim(), label: null };
+  }
+
+  return { base, label };
+}
+
+function slugifyValue(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function assetBySlug(slug: string): string | undefined {
+  return DEFAULT_PRODUCTS.find((p) => p.slug === slug)?.image;
+}
+
+function isGeneratedOrFallbackImage(value: unknown) {
+  const image = String(value || "");
+  if (!image) return true;
+  return (
+    image.startsWith("/api/vial/") ||
+    image.includes("generated-vials/") ||
+    image.includes("rvr-vial-template-single") ||
+    image.includes("/vials/")
+  );
+}
+
+async function ensureProductDisplayData(conn: mysql.Connection) {
+  const [rows] = await conn.execute<RowDataPacket[]>(
+    `SELECT id, name, slug, price, imageUrl, isActive, sortOrder FROM products ORDER BY sortOrder ASC, id ASC`
+  );
+
+  if (!rows.length) return;
+
+  // Repair only missing/generated/fallback images when a matching Manus-created local asset exists.
+  for (const row of rows) {
+    const expectedAsset = assetBySlug(String(row.slug));
+    if (expectedAsset && isGeneratedOrFallbackImage(row.imageUrl)) {
+      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [expectedAsset, row.id]);
+      row.imageUrl = expectedAsset;
+    }
+  }
+
+  const groups = new Map<string, RowDataPacket[]>();
+  for (const row of rows) {
+    const { base, label } = normalizeVariantGroupName(String(row.name));
+    if (!label) continue;
+    const key = slugifyValue(base);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
+  }
+
+  for (const [baseSlug, group] of groups.entries()) {
+    if (group.length < 2) continue;
+
+    const baseName = normalizeVariantGroupName(String(group[0].name)).base;
+    const sorted = [...group].sort((a, b) => Number(a.price) - Number(b.price));
+    const canonical = sorted[0];
+    const canonicalAsset = assetBySlug(String(canonical.slug)) || String(canonical.imageUrl || "");
+
+    // Use one visible parent product and turn sibling dose rows into variants.
+    await conn.execute(
+      `UPDATE products SET name = ?, slug = ?, price = ?, imageUrl = ?, isActive = true WHERE id = ?`,
+      [baseName, baseSlug, canonical.price, canonicalAsset || canonical.imageUrl, canonical.id]
+    );
+
+    for (let i = 0; i < sorted.length; i++) {
+      const row = sorted[i];
+      const { label } = normalizeVariantGroupName(String(row.name));
+      if (!label) continue;
+      const variantImage = assetBySlug(String(row.slug)) || row.imageUrl || canonicalAsset || null;
+      await conn.execute(
+        `INSERT INTO product_variants (productId, label, price, imageUrl, stockQuantity, inStock, sortOrder)
+         SELECT ?, ?, ?, ?, 100, true, ? FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM product_variants WHERE productId = ? AND label = ?)`,
+        [canonical.id, label, row.price, variantImage, i, canonical.id, label]
+      );
+    }
+
+    const duplicateIds = sorted.filter((row) => Number(row.id) !== Number(canonical.id)).map((row) => Number(row.id));
+    if (duplicateIds.length > 0) {
+      await conn.query(`UPDATE products SET isActive = false WHERE id IN (${duplicateIds.map(() => "?").join(",")})`, duplicateIds);
+    }
+  }
+}
+
 async function ensureDefaultCatalog(conn: mysql.Connection) {
   const [productCountRows] = await conn.execute<RowDataPacket[]>(`SELECT COUNT(*) as count FROM products`);
   const productCount = Number(productCountRows[0]?.count || 0);
@@ -401,7 +506,8 @@ export async function ensureDatabaseReady() {
         await addColumnIfMissing(conn, table, column, definition);
       }
       await ensureDefaultCatalog(conn);
-      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified.");
+      await ensureProductDisplayData(conn);
+      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
       initialized = true;
     } finally {
       await conn.end();
