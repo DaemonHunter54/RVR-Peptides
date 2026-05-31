@@ -424,6 +424,233 @@ function isGeneratedOrFallbackImage(value: unknown) {
   );
 }
 
+
+type NihCitation = {
+  title: string;
+  authors?: string;
+  journal?: string;
+  year?: string;
+  url: string;
+  summary?: string;
+};
+
+type NihResearchProfile = {
+  keys: string[];
+  shortDescription: string;
+  description: string;
+  overview: string;
+  researchContent: string;
+  citations: NihCitation[];
+};
+
+const NIH_RESEARCH_PROFILES: NihResearchProfile[] = [
+  {
+    keys: ["bpc-157", "bpc 157", "wolverine-blend", "wolverine blend"],
+    shortDescription: "NIH-indexed BPC-157 literature is primarily experimental and focuses on tissue-repair and recovery models.",
+    description: "NIH-indexed publications describe BPC-157 as an experimental peptide studied mainly in preclinical tissue-repair, tendon, muscle, gastrointestinal, and recovery models. Published summaries report promising research signals, while also noting that broad human validation remains limited. This material is offered for research, laboratory, or analytical use only.",
+    overview: "BPC-157 research appears in NIH-indexed literature as an experimental peptide topic with most evidence coming from animal, in vitro, and early exploratory human reports.",
+    researchContent: "Description\nNIH-indexed BPC-157 studies describe research interest around tissue repair, tendon and muscle models, gastrointestinal healing models, and early safety observations. The literature should be interpreted as research-focused and not as established clinical guidance.",
+    citations: [
+      { title: "Emerging Use of BPC-157 in Orthopaedic Sports Medicine", authors: "Vasireddi et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40756949/", summary: "Systematic review noting promising but low-level evidence." },
+      { title: "Safety of Intravenous Infusion of BPC157 in Humans", authors: "Lee et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40131143/", summary: "Pilot human safety observation." },
+      { title: "Gastric pentadecapeptide BPC 157 as an effective therapy...", authors: "Novinscak et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/18668315/", summary: "Preclinical muscle-healing model." },
+      { title: "Brain-gut Axis and Pentadecapeptide BPC 157", journal: "PubMed", year: "2016", url: "https://pubmed.ncbi.nlm.nih.gov/27138887/", summary: "Review of experimental brain-gut axis research." },
+      { title: "Impact of pentadecapeptide BPC 157 on muscle healing...", authors: "Pevec et al.", journal: "PubMed", year: "2010", url: "https://pubmed.ncbi.nlm.nih.gov/20190676/", summary: "Preclinical muscle-healing research." },
+    ],
+  },
+  {
+    keys: ["semaglutide", "tirzepatide", "retatrutide", "cagrilintide", "cagrisema", "mazdutide", "survodutide", "glp-1"],
+    shortDescription: "NIH-indexed incretin and amylin-analog literature focuses on metabolic, appetite, and body-weight endpoints.",
+    description: "NIH-indexed publications on GLP-1, GIP, glucagon, and amylin-pathway analogs describe research focused on appetite, energy intake, glycemic and metabolic markers, and body-weight endpoints. Study conclusions vary by compound and population, and reported gastrointestinal tolerability is an important recurring research consideration. This material is offered for research, laboratory, or analytical use only.",
+    overview: "This product belongs to a research area represented in NIH-indexed literature on incretin, amylin, and multi-agonist metabolic signaling compounds.",
+    researchContent: "Description\nNIH-indexed clinical and review literature describes semaglutide, tirzepatide, retatrutide, cagrilintide, and related incretin/amylin-pathway compounds as research topics centered on energy intake, appetite regulation, glycemic markers, and body-weight outcomes. These studies are compound- and protocol-specific and should not be generalized outside a research context.",
+    citations: [
+      { title: "Cagrilintide-Semaglutide in Adults with Overweight or Obesity", authors: "Davies et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40544432/", summary: "Clinical literature on cagrilintide-semaglutide body-weight endpoints." },
+      { title: "Tirzepatide as Compared with Semaglutide...", authors: "Aronne et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40353578/", summary: "Clinical comparison of tirzepatide and semaglutide." },
+      { title: "Efficacy of GLP-1 analog peptides, semaglutide, tirzepatide and retatrutide", authors: "Hitaka et al.", journal: "PubMed", year: "2026", url: "https://pubmed.ncbi.nlm.nih.gov/41723268/", summary: "Review/meta-analysis style GLP-1 analog research." },
+      { title: "Effects of once-weekly semaglutide on appetite, energy intake...", authors: "Blundell et al.", journal: "PubMed", year: "2017", url: "https://pubmed.ncbi.nlm.nih.gov/28266779/", summary: "Appetite and energy-intake endpoints." },
+      { title: "Comparative effectiveness of GLP-1 receptor agonists...", authors: "Yao et al.", journal: "PubMed", year: "2024", url: "https://pubmed.ncbi.nlm.nih.gov/38286487/", summary: "Comparative GLP-1 receptor agonist research." },
+    ],
+  },
+  {
+    keys: ["ghk", "ghk-cu", "copper", "curenex", "rm-repair", "urea-cream", "sunscreen", "skin", "cleanser", "moisturizing"],
+    shortDescription: "NIH-indexed copper-peptide and dermatology literature focuses on skin permeation, remodeling, and topical research models.",
+    description: "NIH-indexed copper-peptide literature describes GHK and GHK-Cu as research topics in skin permeation, topical delivery, remodeling biology, and cosmetic or wound-related models. Some studies report supportive findings while others describe mixed or context-specific outcomes. This material is offered for research, laboratory, or analytical use only.",
+    overview: "Copper-peptide and skin-care related products are represented in NIH-indexed literature through topical delivery, skin remodeling, permeation, and cosmetic research contexts.",
+    researchContent: "Description\nNIH-indexed studies involving GHK, GHK-Cu, and related topical peptide systems focus on skin delivery, fibroblast biology, remodeling, and cosmetic research models. Results should be read as product- and protocol-specific rather than universal clinical conclusions.",
+    citations: [
+      { title: "Topically applied GHK as an anti-wrinkle peptide", authors: "Mortazavi et al.", journal: "PubMed", year: "2024", url: "https://pubmed.ncbi.nlm.nih.gov/39963574/", summary: "Topical GHK and GHK-Cu permeation research." },
+      { title: "Microneedle-Mediated Delivery of Copper Peptide...", authors: "Li et al.", journal: "PubMed", year: "2015", url: "https://pubmed.ncbi.nlm.nih.gov/25690343/", summary: "GHK-Cu delivery and skin permeation research." },
+      { title: "Stem cell recovering effect of copper-free GHK in skin", authors: "Choi et al.", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/23019153/", summary: "GHK skin cell research." },
+      { title: "Effects of topical copper tripeptide complex on CO2 laser-resurfaced skin", authors: "Miller et al.", journal: "PubMed", year: "2006", url: "https://pubmed.ncbi.nlm.nih.gov/16847171/", summary: "Clinical-context topical copper tripeptide research." },
+      { title: "In Vitro Observations on the Influence of Copper Peptide...", authors: "Huang et al.", journal: "PubMed", year: "2007", url: "https://pubmed.ncbi.nlm.nih.gov/17603859/", summary: "In vitro fibroblast/remodeling research." },
+    ],
+  },
+  {
+    keys: ["thymosin-alpha", "thymosin alpha", "tb-500", "thymosin beta", "super-wolf", "super wolf"],
+    shortDescription: "NIH-indexed thymosin literature focuses on immune modulation and regenerative biology research.",
+    description: "NIH-indexed thymosin literature describes thymosin alpha-1 primarily in immunomodulation research and thymosin beta-4 related topics in regenerative and tissue-repair biology. Study conclusions are context-dependent and vary by model, disease state, and study design. This material is offered for research, laboratory, or analytical use only.",
+    overview: "Thymosin-family peptides are discussed in NIH-indexed literature across immune regulation, inflammatory models, and tissue-repair biology.",
+    researchContent: "Description\nNIH-indexed thymosin studies include immune-regulation research involving thymosin alpha-1 and regenerative biology literature involving thymosin beta-4 related topics. These publications do not establish universal effects and should be interpreted within their stated research models.",
+    citations: [
+      { title: "Thymosin alpha 1 alleviates inflammation and prevents infection...", authors: "Tian et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40599771/", summary: "Clinical immune-regulation research context." },
+      { title: "Efficacy of thymosin α1 for sepsis: a systematic review and meta-analysis", authors: "Gu et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40969554/", summary: "Systematic review of thymosin alpha-1 research." },
+      { title: "Impact of the immunomodulating peptide thymosin alpha 1...", authors: "Binsfeld et al.", journal: "PubMed", year: "2015", url: "https://pubmed.ncbi.nlm.nih.gov/25971542/", summary: "Immunomodulation model research." },
+      { title: "Thymosin β4: a multi-functional regenerative peptide", authors: "Goldstein et al.", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/22074294/", summary: "Review of thymosin beta-4 regenerative biology." },
+      { title: "The efficacy of thymosin alpha-1 therapy in moderate to critical COVID-19 patients", authors: "Soeroto et al.", journal: "PubMed", year: "2023", url: "https://pubmed.ncbi.nlm.nih.gov/37845598/", summary: "Clinical-context thymosin alpha-1 research." },
+    ],
+  },
+  {
+    keys: ["tesamorelin", "sermorelin", "ipamorelin", "cjc-1295", "cjc 1295"],
+    shortDescription: "NIH-indexed GHRH/GH-secretagogue literature focuses on GH/IGF-1 signaling and metabolic endpoints.",
+    description: "NIH-indexed literature on tesamorelin, sermorelin, CJC-1295, and ipamorelin describes research on growth-hormone releasing hormone analogs and selective growth-hormone secretagogue signaling. Reported endpoints include GH/IGF-1 response, metabolic markers, visceral adipose tissue, and safety/tolerability observations depending on the study. This material is offered for research, laboratory, or analytical use only.",
+    overview: "GHRH analog and GH-secretagogue research appears in NIH-indexed literature through endocrine signaling, GH/IGF-1 response, and metabolic endpoint studies.",
+    researchContent: "Description\nNIH-indexed studies describe growth-hormone releasing hormone analogs and GH secretagogues as research tools for evaluating GH/IGF-1 signaling and metabolic endpoints. Findings are specific to the compound, population, and study protocol.",
+    citations: [
+      { title: "Effect of tesamorelin on visceral fat and liver fat...", authors: "Stanley et al.", journal: "PubMed", year: "2014", url: "https://pubmed.ncbi.nlm.nih.gov/25038357/", summary: "Tesamorelin metabolic endpoint research." },
+      { title: "Safety and metabolic effects of tesamorelin...", authors: "Clemmons et al.", journal: "PubMed", year: "2017", url: "https://pubmed.ncbi.nlm.nih.gov/28617838/", summary: "Tesamorelin safety/metabolic research." },
+      { title: "Efficacy and safety of tesamorelin in people with HIV...", authors: "Russo et al.", journal: "PubMed", year: "2024", url: "https://pubmed.ncbi.nlm.nih.gov/38905488/", summary: "Tesamorelin clinical-context analysis." },
+      { title: "Sermorelin: a review of its use...", authors: "Prakash et al.", journal: "PubMed", year: "1999", url: "https://pubmed.ncbi.nlm.nih.gov/18031173/", summary: "Sermorelin review." },
+      { title: "Ipamorelin, the first selective growth hormone secretagogue", authors: "Raun et al.", journal: "PubMed", year: "1998", url: "https://pubmed.ncbi.nlm.nih.gov/9849822/", summary: "Ipamorelin GH-secretagogue selectivity research." },
+    ],
+  },
+  {
+    keys: ["kpv"],
+    shortDescription: "NIH-indexed KPV literature focuses on melanocortin-derived anti-inflammatory research models.",
+    description: "NIH-indexed publications describe KPV as a melanocortin-derived tripeptide studied in anti-inflammatory signaling models, including intestinal and airway inflammation systems. Reported conclusions are largely model-specific and should be interpreted as research findings rather than clinical direction. This material is offered for research, laboratory, or analytical use only.",
+    overview: "KPV is represented in NIH-indexed literature as a melanocortin-derived peptide studied for inflammation signaling and model-system research.",
+    researchContent: "Description\nNIH-indexed KPV studies describe anti-inflammatory signaling in preclinical and mechanistic models, with research focused on pathways such as epithelial uptake, NF-kB signaling, and melanocortin-related biology.",
+    citations: [
+      { title: "Melanocortin-derived tripeptide KPV has anti-inflammatory properties", authors: "Kannengiesser et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/18092346/", summary: "KPV anti-inflammatory research in colitis models." },
+      { title: "PepT1-mediated tripeptide KPV uptake reduces intestinal inflammation", authors: "Dalmasso et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/18061177/", summary: "KPV uptake and intestinal inflammation model." },
+      { title: "Dissection of the anti-inflammatory effect of the core and C-terminal MSH peptides", authors: "Getting et al.", journal: "PubMed", year: "2003", url: "https://pubmed.ncbi.nlm.nih.gov/12750433/", summary: "Mechanistic anti-inflammatory peptide research." },
+      { title: "Mechanism of KPV action and a role for MC3R agonists", authors: "Land et al.", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/22837805/", summary: "KPV/NF-kB signaling research." },
+      { title: "Critical role of PepT1 in promoting colitis-associated cancer...", authors: "Viennois et al.", journal: "PubMed", year: "2016", url: "https://pubmed.ncbi.nlm.nih.gov/27458604/", summary: "KPV in colitis-associated model research." },
+    ],
+  },
+  {
+    keys: ["mots-c", "ss-31", "nad", "l-carnitine", "glutathione"],
+    shortDescription: "NIH-indexed mitochondrial and redox literature focuses on metabolism, mitochondrial function, and oxidative-stress models.",
+    description: "NIH-indexed literature on mitochondrial-derived peptides, elamipretide/SS-31, NAD-related biology, glutathione, and L-carnitine focuses on mitochondrial function, metabolic signaling, redox biology, and oxidative-stress models. Research conclusions are pathway- and model-specific. This material is offered for research, laboratory, or analytical use only.",
+    overview: "Mitochondrial and redox-oriented products are represented in NIH-indexed literature through metabolism, mitochondrial quality-control, oxidative-stress, and cellular energetics research.",
+    researchContent: "Description\nNIH-indexed mitochondrial peptide and redox literature describes research focused on mitochondrial function, metabolic dysfunction, oxidative stress, and cellular energetics. These topics should be interpreted as mechanistic or clinical-study findings rather than universal product claims.",
+    citations: [
+      { title: "MOTS-c peptide regulates adipose homeostasis...", authors: "Lu et al.", journal: "PubMed", year: "2019", url: "https://pubmed.ncbi.nlm.nih.gov/30725119/", summary: "MOTS-c metabolic model research." },
+      { title: "A mitochondrial-derived peptide MOTS-c contributes to...", authors: "Bai et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40753494/", summary: "MOTS-c inflammatory/neurologic model research." },
+      { title: "Orally administered MOTS-c analogue ameliorates...", authors: "Jiang et al.", journal: "PubMed", year: "2023", url: "https://pubmed.ncbi.nlm.nih.gov/36528071/", summary: "MOTS-c analogue experimental IBD model." },
+      { title: "Elamipretide (SS-31) improves mitochondrial dysfunction...", authors: "Zhao et al.", journal: "PubMed", year: "2019", url: "https://pubmed.ncbi.nlm.nih.gov/31747905/", summary: "SS-31 mitochondrial dysfunction model." },
+      { title: "SS-31 as a Mitochondrial Protectant...", authors: "Zhang et al.", journal: "PubMed", year: "2022", url: "https://pubmed.ncbi.nlm.nih.gov/35984013/", summary: "SS-31 tendon-healing mitochondrial model." },
+    ],
+  },
+  {
+    keys: ["selank", "semax", "dsip", "pe-22-28", "pinealon", "epithalon", "epitalon"],
+    shortDescription: "NIH-indexed neuropeptide literature focuses on cytokine, sleep, neuroendocrine, and neurologic research models.",
+    description: "NIH-indexed literature on Selank, Semax, DSIP, Epitalon/Epithalon, and related neuropeptide topics describes research in cytokine modulation, sleep measures, neuroendocrine signaling, neurologic model systems, and aging-related peptide research. Evidence strength varies substantially by compound and study model. This material is offered for research, laboratory, or analytical use only.",
+    overview: "Neuropeptide and pineal-peptide topics appear in NIH-indexed literature across sleep research, cytokine biology, neurologic models, and aging-related studies.",
+    researchContent: "Description\nNIH-indexed literature in this group is heterogeneous. Some publications describe measurable cytokine, sleep, neuroendocrine, or neurologic-model effects, while others report limited or model-specific findings. Descriptions should be read as summaries of research topics, not clinical claims.",
+    citations: [
+      { title: "The Influence of Selank on the Level of Cytokines...", authors: "Leonidovna et al.", journal: "PubMed", year: "2021", url: "https://pubmed.ncbi.nlm.nih.gov/32621722/", summary: "Selank cytokine research." },
+      { title: "The Molecular Aspects of Heptapeptide Selank Biological Activity", authors: "Vyunova et al.", journal: "PubMed", year: "2018", url: "https://pubmed.ncbi.nlm.nih.gov/30255741/", summary: "Selank molecular mechanism research." },
+      { title: "Semax peptide targets the μ opioid receptor gene Oprm1...", authors: "Liu et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40692165/", summary: "Semax neurologic-model research." },
+      { title: "Effects of delta sleep-inducing peptide on sleep...", authors: "Bes et al.", journal: "PubMed", year: "1992", url: "https://pubmed.ncbi.nlm.nih.gov/1299794/", summary: "DSIP sleep research with limited clinical significance." },
+      { title: "Overview of Epitalon—Highly Bioactive Pineal Tetrapeptide", authors: "Araj et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40141333/", summary: "Epitalon review literature." },
+    ],
+  },
+  {
+    keys: ["melanotan", "pt-141", "bremelanotide"],
+    shortDescription: "NIH-indexed melanocortin literature focuses on melanocortin signaling, pigmentation, and neuroendocrine research.",
+    description: "NIH-indexed melanocortin literature describes research involving melanocortin signaling, pigmentation pathways, neuroendocrine response, and bremelanotide-related topics. Safety and adverse-event reports are an important part of the published record. This material is offered for research, laboratory, or analytical use only.",
+    overview: "Melanocortin peptides are represented in NIH-indexed literature through pigmentation, neuroendocrine signaling, and safety/adverse-event research contexts.",
+    researchContent: "Description\nNIH-indexed literature involving melanocortin peptides includes pigmentation and neuroendocrine signaling research as well as case reports and safety considerations. Product-specific interpretation requires reading the individual study context.",
+    citations: [
+      { title: "Melanotan II injection resulting in systemic toxicity...", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/23121206/", summary: "Safety/adverse event case report." },
+      { title: "The hormonal regulation of men's sexual desire, arousal...", authors: "Rastrelli et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40519205/", summary: "Neuroendocrine peptide signaling review." },
+      { title: "Integration of the reproductive and energy balance axes...", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/22442260/", summary: "Melanocortin-related neuroendocrine discussion." },
+      { title: "PubMed search: melanotan peptide", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=melanotan+peptide", summary: "Current NIH-indexed melanotan literature search." },
+      { title: "PubMed search: bremelanotide melanocortin", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=bremelanotide+melanocortin", summary: "Current NIH-indexed bremelanotide/melanocortin literature search." },
+    ],
+  },
+  {
+    keys: ["kisspeptin", "oxytocin"],
+    shortDescription: "NIH-indexed kisspeptin and oxytocin literature focuses on reproductive and neuroendocrine signaling research.",
+    description: "NIH-indexed literature describes kisspeptin and oxytocin as neuroendocrine signaling topics studied in reproductive-axis, endocrine, behavioral, and biomarker research contexts. Conclusions are model- and population-specific. This material is offered for research, laboratory, or analytical use only.",
+    overview: "Kisspeptin and oxytocin are represented in NIH-indexed literature through reproductive-axis and neuroendocrine signaling research.",
+    researchContent: "Description\nNIH-indexed kisspeptin and oxytocin publications discuss endocrine signaling, reproductive-axis biology, and related neuroendocrine models. These summaries are for research context only.",
+    citations: [
+      { title: "Sex-dependent increases in oxytocin levels in response to kisspeptin", authors: "Galbiati et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/39965102/", summary: "Kisspeptin and oxytocin response research." },
+      { title: "The effect of oxytocin and Kisspeptin-10 in ovary and uterus", authors: "Aslan et al.", journal: "PubMed", year: "2017", url: "https://pubmed.ncbi.nlm.nih.gov/28805600/", summary: "Reproductive tissue model research." },
+      { title: "Changes of placental Kiss-1 mRNA expression...", authors: "Torricelli et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/19017815/", summary: "Placental kisspeptin/oxytocin secretion research." },
+      { title: "Neuroendocrine Mechanisms Involved in Male Sexual and Emotional Behavior", authors: "Iovino et al.", journal: "PubMed", year: "2019", url: "https://pubmed.ncbi.nlm.nih.gov/30706797/", summary: "Neuroendocrine signaling review." },
+      { title: "PubMed search: kisspeptin oxytocin", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=kisspeptin+oxytocin", summary: "Current NIH-indexed literature search." },
+    ],
+  },
+];
+
+const NIH_GENERIC_RESEARCH_PROFILE: NihResearchProfile = {
+  keys: [],
+  shortDescription: "NIH/PubMed resources are provided for research-context review.",
+  description: "NIH/PubMed resources are provided below for research-context review. This product is offered for research, laboratory, or analytical use only, and the listed sources should be reviewed directly for product-specific conclusions and limitations.",
+  overview: "This product page includes NIH/PubMed resources for research-context review.",
+  researchContent: "Description\nNIH/PubMed resources are provided for research-context review. The underlying literature should be interpreted directly and in context; this description is not clinical guidance.",
+  citations: [
+    { title: "NIH/PubMed peptide literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=peptide+research", summary: "Current NIH-indexed peptide research literature search." },
+    { title: "NIH/PubMed pharmacology literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=pharmacology+research", summary: "Current NIH-indexed pharmacology research literature search." },
+    { title: "NIH/PubMed laboratory reagent literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=laboratory+reagent+research", summary: "Current NIH-indexed reagent research literature search." },
+    { title: "NIH/PubMed analytical chemistry literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=analytical+chemistry+research", summary: "Current NIH-indexed analytical chemistry research literature search." },
+    { title: "NIH/PubMed toxicology literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=toxicology+research", summary: "Current NIH-indexed toxicology research literature search." },
+  ],
+};
+
+function getNihResearchProfile(row: RowDataPacket): NihResearchProfile {
+  const haystack = `${String(row.slug || "")} ${String(row.name || "")}`.toLowerCase();
+  return NIH_RESEARCH_PROFILES.find((profile) => profile.keys.some((key) => haystack.includes(key))) || NIH_GENERIC_RESEARCH_PROFILE;
+}
+
+async function ensureNihResearchDescriptions(conn: mysql.Connection) {
+  const [rows] = await conn.execute<RowDataPacket[]>(`SELECT id, name, slug FROM products ORDER BY id ASC`);
+  if (!rows.length) return;
+
+  for (const row of rows) {
+    const profile = getNihResearchProfile(row);
+
+    await conn.execute(
+      `UPDATE products SET shortDescription = ?, description = ? WHERE id = ?`,
+      [profile.shortDescription, profile.description, row.id]
+    );
+
+    await conn.execute(`DELETE FROM productResearch WHERE productId = ?`, [row.id]);
+    await conn.execute(
+      `INSERT INTO productResearch (productId, overview, chemicalMakeup, researchContent)
+       VALUES (?, ?, NULL, ?)`,
+      [row.id, profile.overview, profile.researchContent]
+    );
+
+    await conn.execute(`DELETE FROM researchCitations WHERE productId = ?`, [row.id]);
+
+    for (let i = 0; i < profile.citations.length; i++) {
+      const citation = profile.citations[i];
+      await conn.execute(
+        `INSERT INTO researchCitations (productId, citationNumber, title, authors, journal, year, url, summary, sortOrder)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.id,
+          i + 1,
+          citation.title,
+          citation.authors || null,
+          citation.journal || "NIH/PubMed",
+          citation.year || null,
+          citation.url,
+          citation.summary || null,
+          i,
+        ]
+      );
+    }
+  }
+
+  console.log(`[DB init] NIH/PubMed descriptions and citations verified for ${rows.length} products.`);
+}
+
+
 async function ensureProductDisplayData(conn: mysql.Connection) {
   const [rows] = await conn.execute<RowDataPacket[]>(
     `SELECT id, name, slug, price, imageUrl, isActive, sortOrder FROM products ORDER BY sortOrder ASC, id ASC`
@@ -590,7 +817,8 @@ export async function ensureDatabaseReady() {
       }
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
-      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
+      await ensureNihResearchDescriptions(conn);
+      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified. NIH/PubMed descriptions verified.");
       initialized = true;
     } finally {
       await conn.end();
