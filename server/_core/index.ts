@@ -48,8 +48,13 @@ async function startServer() {
       const { getProductBySlug } = await import("../db");
       const { generateVialBuffer } = await import("../vialGenerator");
       const product = await getProductBySlug(req.params.slug);
-      const productName = product?.name || req.params.slug.replace(/-/g, " ");
-      const buffer = await generateVialBuffer(productName);
+      const queryName = typeof req.query.name === "string" ? req.query.name : "";
+      const querySize = typeof req.query.size === "string" ? req.query.size : "";
+      const productName = (queryName || product?.name || req.params.slug.replace(/-/g, " ")).trim();
+      const displayName = querySize && !productName.toLowerCase().includes(querySize.toLowerCase())
+        ? `${productName} ${querySize}`
+        : productName;
+      const buffer = await generateVialBuffer(displayName);
       res.setHeader("Content-Type", "image/png");
       res.setHeader("Cache-Control", "public, max-age=86400");
       res.send(buffer);

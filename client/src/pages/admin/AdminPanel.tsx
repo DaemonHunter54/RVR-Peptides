@@ -301,8 +301,43 @@ function ProductsSection() {
 
 // ─── Product Form ────────────────────────────────────────────────────
 const makeSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-const imageUrlForSlug = (slug: string) => productAssetForSlug(slug) || "";
+const generatedVialUrl = (slug: string) => slug ? `/api/vial/${slug}.png` : "";
+const generatedVialPreviewUrl = (slug: string, name: string, size?: string) => {
+  const safeSlug = slug || makeSlug(name || "preview-product") || "preview-product";
+  const params = new URLSearchParams();
+  if (name) params.set("name", name);
+  if (size) params.set("size", size);
+  return `/api/vial/${safeSlug}.png${params.toString() ? `?${params.toString()}` : ""}`;
+};
+const imageUrlForSlug = (slug: string) => productAssetForSlug(slug) || generatedVialUrl(slug);
+const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
+  const variantSlug = makeSlug(`${productSlug} ${variantLabel}`);
+  return productAssetForSlug(variantSlug) || generatedVialUrl(variantSlug);
+};
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
+
+function ProductVialPreview({ name, slug, size }: { name: string; slug: string; size?: string }) {
+  const exactAsset = productAssetForSlug(slug);
+  const src = exactAsset || generatedVialPreviewUrl(slug, name, size);
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="font-semibold text-slate-800 text-sm">Live Vial Preview</h3>
+          <p className="text-xs text-slate-500">Auto-updates from product name and size.</p>
+        </div>
+        <Badge variant={exactAsset ? "secondary" : "outline"}>{exactAsset ? "Manus asset" : "Generated HD vial"}</Badge>
+      </div>
+      <div className="flex justify-center rounded-lg bg-white p-4 min-h-[260px]">
+        <img
+          src={src}
+          alt="Live vial preview"
+          className="max-h-[360px] w-auto object-contain"
+        />
+      </div>
+    </div>
+  );
+}
 
 function ProductForm({ product, onSave, onCancel, saving }: any) {
   const categoriesQuery = trpc.categories.list.useQuery();
@@ -386,7 +421,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         label: String(v.label || "").trim(),
         price: String(v.price || form.price || "0").trim(),
         sortOrder: index,
-        imageUrl: v.imageUrl || form.imageUrl || imageUrlForSlug(form.slug),
+        imageUrl: v.imageUrl || imageUrlForVariant(form.slug, String(v.label || "")) || form.imageUrl || imageUrlForSlug(form.slug),
       }));
 
     const payload = {
@@ -412,9 +447,12 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
             <div><Label>Product Name *</Label><Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" /></div>
             <div><Label>URL Slug *</Label><Input value={form.slug} onChange={(e) => updateField("slug", e.target.value)} className="mt-1.5" /></div>
             <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => updateField("sku", e.target.value)} className="mt-1.5" /></div>
-            <div><Label>Image URL</Label><Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
+            <div><Label>Image URL</Label><Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} className="mt-1.5" placeholder="Auto-filled from Manus asset or generated HD vial" /></div>
             <div className="md:col-span-2"><Label>Short Description</Label><Input value={form.shortDescription} onChange={(e) => updateField("shortDescription", e.target.value)} className="mt-1.5" /></div>
             <div className="md:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
+          </div>
+          <div className="mt-5">
+            <ProductVialPreview name={form.name} slug={form.slug} size={form.size} />
           </div>
         </div>
 

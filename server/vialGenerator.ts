@@ -129,117 +129,195 @@ function drawWrappedText(
  * with product-specific text overlaid on the black label area
  */
 async function drawVialWithLabel(productName: string): Promise<Buffer> {
-  const template = await getVialTemplate();
-  
-  // Output size for product cards (smaller than template for performance)
-  const outW = 528;
-  const outH = 704;
-  
+  // Generate a transparent HD-style vial for products that do not already have
+  // a Manus-provided asset. This intentionally does not use the old photo
+  // template, because that template includes a dark solid background.
+  const outW = 900;
+  const outH = 1200;
   const canvas = createCanvas(outW, outH);
   const ctx = canvas.getContext('2d');
-  
-  // Draw the vial template image scaled to output size
-  ctx.drawImage(template, 0, 0, outW, outH);
-  
-  // The black label area on the white-bg template (measured):
-  // Top: 33.3%, Bottom: 76.7%, Left: 33.3%, Right: 67.4%
-  const labelTop = outH * 0.333;
-  const labelBottom = outH * 0.767;
-  const labelLeft = outW * 0.333;
-  const labelRight = outW * 0.674;
-  const labelW = labelRight - labelLeft;
-  const labelH = labelBottom - labelTop;
-  const labelCenterX = (labelLeft + labelRight) / 2;
-  
-  const peptideName = extractPeptideName(productName);
+  ctx.clearRect(0, 0, outW, outH);
+
+  const centerX = outW / 2;
+  const vialX = 240;
+  const vialY = 90;
+  const vialW = 420;
+  const vialH = 980;
+  const capH = 105;
+  const shoulderH = 150;
+  const bottomH = 120;
+
+  const peptideName = extractPeptideName(productName) || productName;
   const dosage = extractDosage(productName);
-  
-  // === VR LOGO at top of label ===
-  // Draw a simplified VR mountain logo
-  const logoY = labelTop + labelH * 0.08;
-  const logoSize = labelW * 0.35;
-  
-  // Mountain peaks
-  ctx.fillStyle = '#ffffff';
+
+  // Soft transparent shadow only under the vial.
+  const shadow = ctx.createRadialGradient(centerX, vialY + vialH - 18, 30, centerX, vialY + vialH - 12, 260);
+  shadow.addColorStop(0, 'rgba(0, 55, 120, 0.24)');
+  shadow.addColorStop(1, 'rgba(0, 55, 120, 0)');
+  ctx.fillStyle = shadow;
   ctx.beginPath();
-  ctx.moveTo(labelCenterX - logoSize * 0.45, logoY + logoSize * 0.45);
-  ctx.lineTo(labelCenterX - logoSize * 0.15, logoY - logoSize * 0.05);
-  ctx.lineTo(labelCenterX - logoSize * 0.05, logoY + logoSize * 0.12);
-  ctx.lineTo(labelCenterX + logoSize * 0.15, logoY - logoSize * 0.15);
-  ctx.lineTo(labelCenterX + logoSize * 0.35, logoY + logoSize * 0.25);
-  ctx.lineTo(labelCenterX + logoSize * 0.45, logoY + logoSize * 0.45);
-  ctx.closePath();
+  ctx.ellipse(centerX, vialY + vialH - 10, 245, 50, 0, 0, Math.PI * 2);
   ctx.fill();
-  
-  // VR text above mountains
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${Math.round(labelW * 0.14)}px Inter, sans-serif`;
+
+  // Glass body silhouette.
+  const bodyGrad = ctx.createLinearGradient(vialX, 0, vialX + vialW, 0);
+  bodyGrad.addColorStop(0, 'rgba(70, 170, 255, 0.10)');
+  bodyGrad.addColorStop(0.10, 'rgba(255,255,255,0.55)');
+  bodyGrad.addColorStop(0.24, 'rgba(90, 185, 255, 0.16)');
+  bodyGrad.addColorStop(0.50, 'rgba(255,255,255,0.33)');
+  bodyGrad.addColorStop(0.76, 'rgba(40, 145, 255, 0.22)');
+  bodyGrad.addColorStop(0.90, 'rgba(255,255,255,0.58)');
+  bodyGrad.addColorStop(1, 'rgba(40, 125, 220, 0.16)');
+
+  ctx.fillStyle = bodyGrad;
+  roundRect(ctx, vialX + 30, vialY + capH + shoulderH - 25, vialW - 60, vialH - capH - shoulderH - bottomH + 65, 72);
+  ctx.fill();
+
+  // Neck and shoulder glass.
+  ctx.fillStyle = bodyGrad;
+  roundRect(ctx, vialX + 118, vialY + capH - 5, vialW - 236, shoulderH + 40, 44);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.36)';
+  roundRect(ctx, vialX + 92, vialY + capH + 95, vialW - 184, 55, 30);
+  ctx.fill();
+
+  // Body outline/highlights.
+  ctx.strokeStyle = 'rgba(255,255,255,0.70)';
+  ctx.lineWidth = 5;
+  roundRect(ctx, vialX + 30, vialY + capH + shoulderH - 25, vialW - 60, vialH - capH - shoulderH - bottomH + 65, 72);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,125,255,0.45)';
+  ctx.lineWidth = 4;
+  roundRect(ctx, vialX + 45, vialY + capH + shoulderH - 10, vialW - 90, vialH - capH - shoulderH - bottomH + 35, 58);
+  ctx.stroke();
+
+  // Liquid/glass bottom.
+  const liquidY = vialY + vialH - bottomH - 95;
+  const liquidGrad = ctx.createLinearGradient(0, liquidY, 0, liquidY + 170);
+  liquidGrad.addColorStop(0, 'rgba(165,215,255,0.30)');
+  liquidGrad.addColorStop(1, 'rgba(70,170,255,0.50)');
+  ctx.fillStyle = liquidGrad;
+  roundRect(ctx, vialX + 55, liquidY, vialW - 110, 145, 38);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.58)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(centerX, liquidY + 10, (vialW - 115) / 2, 18, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Cap.
+  const capGrad = ctx.createLinearGradient(vialX + 65, 0, vialX + vialW - 65, 0);
+  capGrad.addColorStop(0, '#8d949d');
+  capGrad.addColorStop(0.18, '#eef1f3');
+  capGrad.addColorStop(0.50, '#727a84');
+  capGrad.addColorStop(0.78, '#f5f7f9');
+  capGrad.addColorStop(1, '#7d858f');
+  ctx.fillStyle = capGrad;
+  roundRect(ctx, vialX + 58, vialY, vialW - 116, capH, 42);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+  ctx.lineWidth = 3;
+  roundRect(ctx, vialX + 58, vialY, vialW - 116, capH, 42);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  roundRect(ctx, vialX + 90, vialY + 12, vialW - 180, 18, 12);
+  ctx.fill();
+
+  // Black label with subtle blue edge bands.
+  const labelX = vialX + 72;
+  const labelY = vialY + 405;
+  const labelW = vialW - 144;
+  const labelH = 415;
+  const labelGrad = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
+  labelGrad.addColorStop(0, '#020612');
+  labelGrad.addColorStop(0.20, '#171b22');
+  labelGrad.addColorStop(0.50, '#080b10');
+  labelGrad.addColorStop(0.78, '#171c23');
+  labelGrad.addColorStop(1, '#020612');
+  ctx.fillStyle = labelGrad;
+  roundRect(ctx, labelX, labelY, labelW, labelH, 18);
+  ctx.fill();
+  const bandGrad = ctx.createLinearGradient(labelX, 0, labelX + labelW, 0);
+  bandGrad.addColorStop(0, '#004872');
+  bandGrad.addColorStop(0.5, '#27b7ff');
+  bandGrad.addColorStop(1, '#004872');
+  ctx.fillStyle = bandGrad;
+  roundRect(ctx, labelX, labelY, labelW, 14, 8);
+  ctx.fill();
+  roundRect(ctx, labelX, labelY + labelH - 14, labelW, 14, 8);
+  ctx.fill();
+
+  // Logo text/mark.
+  ctx.fillStyle = '#d8dde2';
+  ctx.font = `900 68px Inter, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('VR', labelCenterX, logoY - logoSize * 0.08);
-  
-  // River curve
-  ctx.beginPath();
-  ctx.strokeStyle = '#4a9eff';
-  ctx.lineWidth = 2.5;
-  ctx.moveTo(labelCenterX - logoSize * 0.35, logoY + logoSize * 0.38);
-  ctx.quadraticCurveTo(labelCenterX, logoY + logoSize * 0.28, labelCenterX + logoSize * 0.4, logoY + logoSize * 0.42);
-  ctx.stroke();
-  
-  // === "RIVER VALLEY RESEARCH" text ===
-  const companyY = labelTop + labelH * 0.28;
-  drawWrappedText(ctx, 'RIVER VALLEY RESEARCH', labelCenterX, companyY, labelW * 0.85, Math.round(labelW * 0.075), '600', '#a8b8cc');
-  
-  // === PRODUCT NAME (large, centered) ===
-  const maxNameW = labelW * 0.82;
-  let nameFontSize = Math.round(labelW * 0.17);
-  ctx.font = `bold ${nameFontSize}px Inter, sans-serif`;
-  
-  // Shrink font until it fits
-  while (nameFontSize > labelW * 0.08 && ctx.measureText(peptideName).width > maxNameW) {
-    nameFontSize -= 2;
-    ctx.font = `bold ${nameFontSize}px Inter, sans-serif`;
-  }
-  
-  // Word wrap if still too long
-  const words = peptideName.split(/(?<=[\s\/-])|(?=[\s\/-])/);
-  const lines: string[] = [];
-  let curLine = '';
-  
-  for (const word of words) {
-    const test = curLine + word;
-    ctx.font = `bold ${nameFontSize}px Inter, sans-serif`;
-    if (ctx.measureText(test.trim()).width > maxNameW && curLine.trim()) {
-      lines.push(curLine.trim());
-      curLine = word;
-    } else {
-      curLine = test;
+  ctx.fillText('RVR', centerX, labelY + 95);
+  ctx.font = `600 19px Inter, sans-serif`;
+  ctx.fillStyle = '#8e99a6';
+  ctx.fillText('RIVER VALLEY RESEARCH', centerX, labelY + 145);
+
+  // Product name with wrapping.
+  const maxNameW = labelW * 0.86;
+  let nameFontSize = 56;
+  const words = peptideName.split(/\s+/).filter(Boolean);
+  let lines: string[] = [];
+  while (nameFontSize >= 28) {
+    ctx.font = `900 ${nameFontSize}px Inter, sans-serif`;
+    lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxNameW && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
     }
+    if (line) lines.push(line);
+    if (lines.length <= 2 && lines.every(l => ctx.measureText(l).width <= maxNameW)) break;
+    nameFontSize -= 3;
   }
-  if (curLine.trim()) lines.push(curLine.trim());
-  
-  const lineSpacing = nameFontSize * 1.2;
-  const nameBlockHeight = lines.length * lineSpacing;
-  const nameStartY = labelTop + labelH * 0.48 - nameBlockHeight / 2 + lineSpacing / 2;
-  
-  for (let i = 0; i < lines.length; i++) {
-    drawWrappedText(
-      ctx, lines[i], labelCenterX, nameStartY + i * lineSpacing,
-      maxNameW, nameFontSize, 'bold', '#ffffff'
-    );
-  }
-  
-  // === DOSAGE ===
+  ctx.fillStyle = '#ffffff';
+  const nameStartY = labelY + 235 - ((lines.length - 1) * nameFontSize * 0.58);
+  lines.forEach((line, i) => {
+    ctx.font = `900 ${nameFontSize}px Inter, sans-serif`;
+    ctx.fillText(line, centerX, nameStartY + i * nameFontSize * 1.08);
+  });
+
   if (dosage) {
-    const dosageY = nameStartY + lines.length * lineSpacing + nameFontSize * 0.4;
-    drawWrappedText(ctx, dosage, labelCenterX, dosageY, labelW * 0.7, Math.round(labelW * 0.12), 'bold', '#e0e8f0');
+    ctx.font = `900 50px Inter, sans-serif`;
+    ctx.fillStyle = '#f2f5f8';
+    ctx.fillText(dosage, centerX, labelY + 315);
   }
-  
-  // === "Research Use Only" at bottom ===
-  const footerY = labelTop + labelH * 0.90;
-  drawWrappedText(ctx, 'Research Use Only', labelCenterX, footerY, labelW * 0.8, Math.round(labelW * 0.065), '500', '#666680');
-  
+  ctx.font = `600 23px Inter, sans-serif`;
+  ctx.fillStyle = '#d3d7dc';
+  ctx.fillText('Research Use Only', centerX, labelY + 370);
+
+  // Final glass shine over label edges.
+  const shine = ctx.createLinearGradient(vialX, 0, vialX + vialW, 0);
+  shine.addColorStop(0, 'rgba(255,255,255,0)');
+  shine.addColorStop(0.18, 'rgba(255,255,255,0.18)');
+  shine.addColorStop(0.28, 'rgba(255,255,255,0.02)');
+  shine.addColorStop(0.76, 'rgba(255,255,255,0.10)');
+  shine.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine;
+  roundRect(ctx, vialX + 40, vialY + 145, vialW - 80, vialH - 185, 72);
+  ctx.fill();
+
   return Buffer.from(canvas.toBuffer('image/png'));
+}
+
+function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: number) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
 }
 
 /**
