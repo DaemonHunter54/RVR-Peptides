@@ -19,6 +19,19 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+const productVariantInput = z.object({
+  id: z.number().optional(),
+  label: z.string().optional(),
+  price: z.string().optional(),
+  compareAtPrice: z.string().optional(),
+  sku: z.string().optional(),
+  stockQuantity: z.number().optional(),
+  inStock: z.boolean().optional(),
+  imageUrl: z.string().optional(),
+  sortOrder: z.number().optional(),
+});
+
+
 export const appRouter = router({
   system: systemRouter,
 
@@ -307,7 +320,12 @@ export const appRouter = router({
     // Products
     products: router({
       list: adminProcedure.input(z.object({ search: z.string().optional(), limit: z.number().optional(), offset: z.number().optional() }).optional()).query(async ({ input }) => {
-        return db.getAllProducts({ search: input?.search, limit: input?.limit, offset: input?.offset });
+        const result = await db.getAllProducts({ search: input?.search, limit: input?.limit, offset: input?.offset });
+        const enrichedProducts = await Promise.all(result.products.map(async (product: any) => ({
+          ...product,
+          variants: await db.getProductVariants(product.id),
+        })));
+        return { ...result, products: enrichedProducts };
       }),
       get: adminProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
         const product = await db.getProductById(input.id);
@@ -315,7 +333,8 @@ export const appRouter = router({
         const cats = await db.getProductCategories(product.id);
         const research = await db.getProductResearch(product.id);
         const citations = await db.getProductCitations(product.id);
-        return { ...product, categories: cats, research, citations };
+        const variants = await db.getProductVariants(product.id);
+        return { ...product, categories: cats, research, citations, variants };
       }),
       create: adminProcedure.input(z.object({
         name: z.string(), slug: z.string(), description: z.string().optional(), shortDescription: z.string().optional(),
@@ -326,18 +345,25 @@ export const appRouter = router({
         discountPercent: z.string().optional(), discountActive: z.boolean().optional(),
         coaUrl: z.string().optional(), hplcUrl: z.string().optional(), massSpecUrl: z.string().optional(),
         categoryIds: z.array(z.number()).optional(),
+        variants: z.array(productVariantInput).optional(),
       })).mutation(async ({ input }) => {
-        const { categoryIds, ...data } = input;
-        // Auto-generate vial image if no imageUrl provided
+        const { categoryIds, variants, ...data } = input;
         if (!data.imageUrl) {
-          try {
-            const vialUrl = await generateVialImage(data.name, data.slug);
-            data.imageUrl = vialUrl;
-          } catch (e) {
-            console.error('Failed to generate vial image:', e);
-          }
+          data.imageUrl = `/api/vial/${data.slug}.png`;
         }
         const id = await db.createProduct(data as any, categoryIds);
+        if (variants?.length) {
+          await db.replaceProductVariants(id, variants.map((variant, index) => ({
+            label: variant.label || data.size || data.name,
+            price: variant.price || data.price,
+            compareAtPrice: variant.compareAtPrice || undefined,
+            sku: variant.sku || undefined,
+            stockQuantity: variant.stockQuantity ?? data.stockQuantity ?? 100,
+            inStock: variant.inStock ?? data.inStock ?? true,
+            imageUrl: variant.imageUrl || data.imageUrl,
+            sortOrder: variant.sortOrder ?? index,
+          })));
+        }
         return { id };
       }),
       update: adminProcedure.input(z.object({
@@ -350,20 +376,28 @@ export const appRouter = router({
         isFeatured: z.boolean().optional(), discountPercent: z.string().optional(), discountActive: z.boolean().optional(),
         coaUrl: z.string().optional(), hplcUrl: z.string().optional(), massSpecUrl: z.string().optional(),
         sortOrder: z.number().optional(), categoryIds: z.array(z.number()).optional(),
+        variants: z.array(productVariantInput).optional(),
         regenerateVial: z.boolean().optional(),
       })).mutation(async ({ input }) => {
-        const { id, categoryIds, regenerateVial, ...data } = input;
-        // Regenerate vial image if requested or if name changed
-        if (regenerateVial && data.name) {
-          try {
-            const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            const vialUrl = await generateVialImage(data.name, slug);
-            data.imageUrl = vialUrl;
-          } catch (e) {
-            console.error('Failed to regenerate vial image:', e);
-          }
+        const { id, categoryIds, variants, regenerateVial, ...data } = input;
+        if ((regenerateVial || !data.imageUrl) && (data.slug || data.name)) {
+          const slug = data.slug || data.name!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          data.imageUrl = `/api/vial/${slug}.png`;
         }
         await db.updateProduct(id, data as any, categoryIds);
+        if (variants !== undefined) {
+          const product = await db.getProductById(id);
+          await db.replaceProductVariants(id, variants.map((variant, index) => ({
+            label: variant.label || product?.size || product?.name || `Option ${index + 1}`,
+            price: variant.price || String(product?.price || data.price || "0"),
+            compareAtPrice: variant.compareAtPrice || undefined,
+            sku: variant.sku || undefined,
+            stockQuantity: variant.stockQuantity ?? product?.stockQuantity ?? 100,
+            inStock: variant.inStock ?? product?.inStock ?? true,
+            imageUrl: variant.imageUrl || data.imageUrl || product?.imageUrl || undefined,
+            sortOrder: variant.sortOrder ?? index,
+          })));
+        }
         return { success: true };
       }),
       delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {

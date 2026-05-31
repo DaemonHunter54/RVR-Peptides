@@ -17,19 +17,31 @@ if (fs.existsSync(fontPath)) {
 let cachedVialTemplate: Image | null = null;
 let cachedHeroImage: Buffer | null = null;
 
-const VIAL_TEMPLATE_PATH = path.join(__dirname, 'vial-template.png');
-const HERO_IMAGE_PATH = path.join(__dirname, 'hero-3vials.png');
+const VIAL_TEMPLATE_PATHS = [
+  path.join(__dirname, 'vial-template.png'),
+  path.join(process.cwd(), 'client/public/assets/rvr-vial-template-single_c7ba8797.png'),
+];
+const HERO_IMAGE_PATHS = [
+  path.join(__dirname, 'hero-3vials.png'),
+  path.join(process.cwd(), 'client/public/assets/rvr-hero-3vials-composed_5511eda3.png'),
+];
+
+function firstExisting(paths: string[]): string {
+  const found = paths.find((p) => fs.existsSync(p));
+  if (!found) throw new Error(`Required image asset not found. Checked: ${paths.join(', ')}`);
+  return found;
+}
 
 async function getVialTemplate(): Promise<Image> {
   if (!cachedVialTemplate) {
-    cachedVialTemplate = await loadImage(VIAL_TEMPLATE_PATH);
+    cachedVialTemplate = await loadImage(firstExisting(VIAL_TEMPLATE_PATHS));
   }
   return cachedVialTemplate;
 }
 
 function getHeroImageBuffer(): Buffer {
   if (!cachedHeroImage) {
-    cachedHeroImage = fs.readFileSync(HERO_IMAGE_PATH);
+    cachedHeroImage = fs.readFileSync(firstExisting(HERO_IMAGE_PATHS));
   }
   return cachedHeroImage;
 }
@@ -234,10 +246,9 @@ async function drawVialWithLabel(productName: string): Promise<Buffer> {
  * Generate a single product vial image and upload to storage
  */
 export async function generateVialImage(productName: string, productSlug: string): Promise<string> {
-  const buffer = await drawVialWithLabel(productName);
-  const fileKey = `product-vials/${productSlug}.png`;
-  const { url } = await storagePut(fileKey, buffer, 'image/png');
-  return url;
+  // Railway-native: generated vial images are served dynamically by /api/vial/:slug.png.
+  // This avoids Manus/Forge storage requirements while preserving the auto-filled Image URL field.
+  return `/api/vial/${productSlug}.png`;
 }
 
 /**

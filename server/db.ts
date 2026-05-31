@@ -241,13 +241,48 @@ export async function createProductVariant(data: { productId: number; label: str
 export async function updateProductVariant(id: number, data: Partial<{ label: string; price: string; compareAtPrice: string; sku: string; stockQuantity: number; inStock: boolean; imageUrl: string; sortOrder: number }>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(productVariants).set(data as any).where(eq(productVariants.id, id));
+  await db.update(productVariants).set(cleanVariantMutationData(data) as any).where(eq(productVariants.id, id));
 }
 
 export async function deleteProductVariant(id: number) {
   const db = await getDb();
   if (!db) return;
   await db.delete(productVariants).where(eq(productVariants.id, id));
+}
+
+function cleanVariantMutationData(data: any) {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data || {})) {
+    if (value === undefined) continue;
+    if (["compareAtPrice", "sku", "imageUrl"].includes(key)) {
+      cleaned[key] = value === "" || value === null ? null : value;
+      continue;
+    }
+    cleaned[key] = value;
+  }
+  return cleaned;
+}
+
+export async function replaceProductVariants(productId: number, variants: Array<{ label: string; price: string; compareAtPrice?: string; sku?: string; stockQuantity?: number; inStock?: boolean; imageUrl?: string; sortOrder?: number }>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(productVariants).where(eq(productVariants.productId, productId));
+  const rows = variants
+    .filter(v => String(v.label || "").trim())
+    .map((v, index) => cleanVariantMutationData({
+      productId,
+      label: String(v.label || "").trim(),
+      price: String(v.price || "0"),
+      compareAtPrice: v.compareAtPrice,
+      sku: v.sku,
+      stockQuantity: v.stockQuantity ?? 100,
+      inStock: v.inStock ?? true,
+      imageUrl: v.imageUrl,
+      sortOrder: v.sortOrder ?? index,
+    }));
+  if (rows.length > 0) {
+    await db.insert(productVariants).values(rows as any);
+  }
 }
 
 export async function getAllProductsWithVariantCount(opts?: { activeOnly?: boolean; categorySlug?: string; search?: string; limit?: number; offset?: number }) {

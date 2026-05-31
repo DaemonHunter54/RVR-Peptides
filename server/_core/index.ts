@@ -46,14 +46,15 @@ async function startServer() {
   app.get("/api/vial/:slug.png", async (req, res) => {
     try {
       const { getProductBySlug } = await import("../db");
+      const { generateVialBuffer } = await import("../vialGenerator");
       const product = await getProductBySlug(req.params.slug);
-      if (!product || !product.imageUrl) {
-        res.status(404).send('Product not found');
-        return;
-      }
-      res.redirect(product.imageUrl);
+      const productName = product?.name || req.params.slug.replace(/-/g, " ");
+      const buffer = await generateVialBuffer(productName);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(buffer);
     } catch (err: any) {
-      console.error('[Vial Redirect Error]', err.message);
+      console.error('[Vial Generate Error]', err.message);
       res.status(500).send('Error');
     }
   });

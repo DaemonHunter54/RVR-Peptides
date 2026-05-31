@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Settings, Tag,
   Plus, Pencil, Trash2, Search, Truck, Save, ArrowLeft,
   DollarSign, AlertCircle, CreditCard, Eye, EyeOff, CheckCircle2, XCircle,
-  Paintbrush, RotateCcw, Sparkles
+  Paintbrush, RotateCcw
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
@@ -211,10 +211,6 @@ function ProductsSection() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  const generateAllVials = trpc.admin.products.generateAllVials.useMutation({
-    onSuccess: (data: any) => { toast.success(`Generated ${data.generated}/${data.total} vial images!`); productsQuery.refetch(); },
-    onError: (err: any) => toast.error(err.message),
-  });
 
   const products = productsQuery.data?.products ?? (Array.isArray(productsQuery.data) ? productsQuery.data : []);
 
@@ -241,15 +237,6 @@ function ProductsSection() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Products</h1>
         <div className="flex gap-2">
-          <Button
-            onClick={() => { if (confirm('Generate vial images for ALL products? This may take a minute.')) generateAllVials.mutate(); }}
-            variant="outline"
-            className="gap-2 border-slate-300"
-            disabled={generateAllVials.isPending}
-          >
-            <Sparkles className="h-4 w-4" />
-            {generateAllVials.isPending ? 'Generating...' : 'Generate All Vials'}
-          </Button>
           <Button onClick={() => { setEditingProduct(null); setShowForm(true); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
             <Plus className="h-4 w-4" /> Add Product
           </Button>
@@ -312,6 +299,10 @@ function ProductsSection() {
 }
 
 // ─── Product Form ────────────────────────────────────────────────────
+const makeSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const vialUrlForSlug = (slug: string) => slug ? `/api/vial/${slug}.png` : "";
+const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
+
 function ProductForm({ product, onSave, onCancel, saving }: any) {
   const categoriesQuery = trpc.categories.list.useQuery();
   const [form, setForm] = useState({
@@ -341,16 +332,69 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     coaUrl: product?.coaUrl || "",
     hplcUrl: product?.hplcUrl || "",
     massSpecUrl: product?.massSpecUrl || "",
+    variants: product?.variants?.length ? product.variants.map((v: any) => ({
+      id: v.id,
+      label: v.label || "",
+      price: v.price ? String(v.price) : "",
+      compareAtPrice: v.compareAtPrice ? String(v.compareAtPrice) : "",
+      sku: v.sku || "",
+      stockQuantity: v.stockQuantity ?? 100,
+      inStock: v.inStock ?? true,
+      imageUrl: v.imageUrl || "",
+      sortOrder: v.sortOrder ?? 0,
+    })) : [],
   });
 
   const updateField = (field: string, value: any) => {
     setForm(prev => {
       const next = { ...prev, [field]: value };
       if (field === "name" && !product?.id) {
-        next.slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        const slug = makeSlug(value);
+        next.slug = slug;
+        if (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/")) {
+          next.imageUrl = vialUrlForSlug(slug);
+        }
+      }
+      if (field === "slug" && !product?.id && (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/"))) {
+        next.imageUrl = vialUrlForSlug(makeSlug(value));
       }
       return next;
     });
+  };
+
+  const updateVariant = (index: number, field: string, value: any) => {
+    setForm(prev => ({
+      ...prev,
+      variants: prev.variants.map((v: any, i: number) => i === index ? { ...v, [field]: value } : v),
+    }));
+  };
+
+  const addVariant = () => {
+    setForm(prev => ({ ...prev, variants: [...prev.variants, { ...blankVariant(), sortOrder: prev.variants.length }] }));
+  };
+
+  const removeVariant = (index: number) => {
+    setForm(prev => ({ ...prev, variants: prev.variants.filter((_: any, i: number) => i !== index) }));
+  };
+
+  const saveProduct = () => {
+    const variants = (form.variants || [])
+      .filter((v: any) => String(v.label || "").trim() || String(v.price || "").trim())
+      .map((v: any, index: number) => ({
+        ...v,
+        label: String(v.label || "").trim(),
+        price: String(v.price || form.price || "0").trim(),
+        sortOrder: index,
+        imageUrl: v.imageUrl || form.imageUrl || vialUrlForSlug(form.slug),
+      }));
+
+    const payload = {
+      ...form,
+      imageUrl: form.imageUrl || vialUrlForSlug(form.slug),
+      variants,
+    };
+
+    onSave(payload);
   };
 
   return (
@@ -406,6 +450,37 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           </div>
         </div>
 
+        {/* Variants / Dose Options */}
+        <div className="bg-white rounded-xl p-6 border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-slate-800">Dose Options / Variants</h2>
+              <p className="text-sm text-slate-500">Add multiple sizes or mg amounts under this same product. Leave empty for a single product.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={addVariant} className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" /> Add Option
+            </Button>
+          </div>
+          {form.variants.length === 0 ? (
+            <p className="text-sm text-slate-400">No dose options added. This product will save as a single item.</p>
+          ) : (
+            <div className="space-y-3">
+              {form.variants.map((variant: any, index: number) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <div className="md:col-span-2"><Label>Label / Size</Label><Input value={variant.label} onChange={(e) => updateVariant(index, "label", e.target.value)} className="mt-1.5" placeholder="5mg" /></div>
+                  <div className="md:col-span-2"><Label>Price ($)</Label><Input type="number" step="0.01" value={variant.price} onChange={(e) => updateVariant(index, "price", e.target.value)} className="mt-1.5" placeholder={form.price || "0.00"} /></div>
+                  <div className="md:col-span-2"><Label>Compare At</Label><Input type="number" step="0.01" value={variant.compareAtPrice} onChange={(e) => updateVariant(index, "compareAtPrice", e.target.value)} className="mt-1.5" /></div>
+                  <div className="md:col-span-2"><Label>SKU</Label><Input value={variant.sku} onChange={(e) => updateVariant(index, "sku", e.target.value)} className="mt-1.5" /></div>
+                  <div className="md:col-span-2"><Label>Stock</Label><Input type="number" value={variant.stockQuantity} onChange={(e) => updateVariant(index, "stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" /></div>
+                  <div className="md:col-span-1 flex items-end gap-2 pb-2"><Switch checked={variant.inStock} onCheckedChange={(v) => updateVariant(index, "inStock", v)} /><Label>Stock</Label></div>
+                  <div className="md:col-span-1 flex items-end"><Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => removeVariant(index)}><Trash2 className="h-4 w-4" /></Button></div>
+                  <div className="md:col-span-12"><Label>Variant Image URL</Label><Input value={variant.imageUrl} onChange={(e) => updateVariant(index, "imageUrl", e.target.value)} className="mt-1.5" placeholder="Leave blank to use main product image" /></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Testing Documents */}
         <div className="bg-white rounded-xl p-6 border border-slate-200">
           <h2 className="font-semibold text-slate-800 mb-4">Testing Documents</h2>
@@ -433,7 +508,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
         {/* Save */}
         <div className="flex items-center gap-3">
-          <Button onClick={() => onSave(form)} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+          <Button onClick={saveProduct} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
             <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save Product"}
           </Button>
           <Button variant="outline" onClick={onCancel}>Cancel</Button>
