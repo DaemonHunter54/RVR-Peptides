@@ -19,6 +19,45 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+
+function normalizeAdminProductInput<T extends Record<string, any>>(input: T): T {
+  const out: Record<string, any> = { ...input };
+
+  // Required decimal field in MySQL: blank admin input should not become an invalid decimal.
+  if (out.price === undefined || out.price === null || String(out.price).trim() === "") out.price = "0";
+
+  // Optional decimal fields: blank string should be NULL, not an invalid decimal.
+  for (const key of ["compareAtPrice", "discountPercent"]) {
+    if (out[key] === undefined || out[key] === null || String(out[key]).trim() === "") out[key] = null;
+  }
+
+  // Optional URL/text fields: blank strings should be NULL to avoid bad SQL payloads.
+  for (const key of [
+    "sku", "imageUrl", "size", "contents", "form", "purity",
+    "molecularFormula", "molecularWeight", "otherNames",
+    "coaUrl", "hplcUrl", "massSpecUrl"
+  ]) {
+    if (out[key] === undefined || out[key] === null || String(out[key]).trim() === "") out[key] = null;
+  }
+
+  if (out.stockQuantity === undefined || out.stockQuantity === null || out.stockQuantity === "") out.stockQuantity = 100;
+  if (out.lowStockThreshold === "" || out.lowStockThreshold === null) delete out.lowStockThreshold;
+  if (out.sortOrder === "" || out.sortOrder === null) delete out.sortOrder;
+
+  return out as T;
+}
+
+function normalizeAdminVariantInput<T extends Record<string, any>>(variant: T, fallbackPrice = "0"): T {
+  const out: Record<string, any> = { ...variant };
+  if (out.price === undefined || out.price === null || String(out.price).trim() === "") out.price = fallbackPrice || "0";
+  if (out.compareAtPrice === undefined || out.compareAtPrice === null || String(out.compareAtPrice).trim() === "") out.compareAtPrice = null;
+  for (const key of ["sku", "imageUrl"]) {
+    if (out[key] === undefined || out[key] === null || String(out[key]).trim() === "") out[key] = null;
+  }
+  if (out.stockQuantity === undefined || out.stockQuantity === null || out.stockQuantity === "") out.stockQuantity = 100;
+  return out as T;
+}
+
 const productVariantInput = z.object({
   id: z.number().optional(),
   label: z.string().optional(),
@@ -347,22 +386,26 @@ export const appRouter = router({
         categoryIds: z.array(z.number()).optional(),
         variants: z.array(productVariantInput).optional(),
       })).mutation(async ({ input }) => {
-        const { categoryIds, variants, ...data } = input;
+        const { categoryIds, variants, ...rawData } = input;
+        const data = normalizeAdminProductInput(rawData);
         if (!data.imageUrl) {
           data.imageUrl = `/api/vial/${data.slug}.png`;
         }
         const id = await db.createProduct(data as any, categoryIds);
         if (variants?.length) {
-          await db.replaceProductVariants(id, variants.map((variant, index) => ({
-            label: variant.label || data.size || data.name,
-            price: variant.price || data.price,
-            compareAtPrice: variant.compareAtPrice || undefined,
-            sku: variant.sku || undefined,
-            stockQuantity: variant.stockQuantity ?? data.stockQuantity ?? 100,
-            inStock: variant.inStock ?? data.inStock ?? true,
-            imageUrl: variant.imageUrl || data.imageUrl,
-            sortOrder: variant.sortOrder ?? index,
-          })));
+          await db.replaceProductVariants(id, variants.map((variant, index) => {
+            const cleanVariant = normalizeAdminVariantInput(variant, data.price);
+            return {
+              label: cleanVariant.label || data.size || data.name,
+              price: cleanVariant.price || data.price || "0",
+              compareAtPrice: cleanVariant.compareAtPrice || undefined,
+              sku: cleanVariant.sku || undefined,
+              stockQuantity: cleanVariant.stockQuantity ?? data.stockQuantity ?? 100,
+              inStock: cleanVariant.inStock ?? data.inStock ?? true,
+              imageUrl: cleanVariant.imageUrl || data.imageUrl,
+              sortOrder: cleanVariant.sortOrder ?? index,
+            };
+          }));
         }
         return { id };
       }),
@@ -379,7 +422,8 @@ export const appRouter = router({
         variants: z.array(productVariantInput).optional(),
         regenerateVial: z.boolean().optional(),
       })).mutation(async ({ input }) => {
-        const { id, categoryIds, variants, regenerateVial, ...data } = input;
+        const { id, categoryIds, variants, regenerateVial, ...rawData } = input;
+        const data = normalizeAdminProductInput(rawData);
         if ((regenerateVial || !data.imageUrl) && (data.slug || data.name)) {
           const slug = data.slug || data.name!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
           data.imageUrl = `/api/vial/${slug}.png`;
@@ -387,16 +431,19 @@ export const appRouter = router({
         await db.updateProduct(id, data as any, categoryIds);
         if (variants !== undefined) {
           const product = await db.getProductById(id);
-          await db.replaceProductVariants(id, variants.map((variant, index) => ({
-            label: variant.label || product?.size || product?.name || `Option ${index + 1}`,
-            price: variant.price || String(product?.price || data.price || "0"),
-            compareAtPrice: variant.compareAtPrice || undefined,
-            sku: variant.sku || undefined,
-            stockQuantity: variant.stockQuantity ?? product?.stockQuantity ?? 100,
-            inStock: variant.inStock ?? product?.inStock ?? true,
-            imageUrl: variant.imageUrl || data.imageUrl || product?.imageUrl || undefined,
-            sortOrder: variant.sortOrder ?? index,
-          })));
+          await db.replaceProductVariants(id, variants.map((variant, index) => {
+            const cleanVariant = normalizeAdminVariantInput(variant, String(product?.price || data.price || "0"));
+            return {
+              label: cleanVariant.label || product?.size || product?.name || `Option ${index + 1}`,
+              price: cleanVariant.price || String(product?.price || data.price || "0"),
+              compareAtPrice: cleanVariant.compareAtPrice || undefined,
+              sku: cleanVariant.sku || undefined,
+              stockQuantity: cleanVariant.stockQuantity ?? product?.stockQuantity ?? 100,
+              inStock: cleanVariant.inStock ?? product?.inStock ?? true,
+              imageUrl: cleanVariant.imageUrl || data.imageUrl || product?.imageUrl || undefined,
+              sortOrder: cleanVariant.sortOrder ?? index,
+            };
+          }));
         }
         return { success: true };
       }),
