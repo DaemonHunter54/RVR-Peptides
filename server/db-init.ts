@@ -170,7 +170,7 @@ const TABLES = [
   updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
 )`,
-`CREATE TABLE IF NOT EXISTS productVariants (
+`CREATE TABLE IF NOT EXISTS product_variants (
   id int AUTO_INCREMENT NOT NULL,
   productId int NOT NULL,
   label varchar(255) NOT NULL,
@@ -201,6 +201,40 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
   ["users", "createdAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],
   ["users", "updatedAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
   ["users", "lastSignedIn", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],
+
+  // Product columns that older Railway DBs may be missing. These must match drizzle/schema.ts
+  // because Drizzle SELECTs all mapped columns by default.
+  ["products", "description", "text"],
+  ["products", "shortDescription", "text"],
+  ["products", "compareAtPrice", "decimal(10,2)"],
+  ["products", "sku", "varchar(50)"],
+  ["products", "imageUrl", "text"],
+  ["products", "size", "varchar(100)"],
+  ["products", "contents", "varchar(255)"],
+  ["products", "form", "varchar(100)"],
+  ["products", "purity", "varchar(50)"],
+  ["products", "molecularFormula", "varchar(255)"],
+  ["products", "molecularWeight", "varchar(100)"],
+  ["products", "otherNames", "text"],
+  ["products", "stockQuantity", "int NOT NULL DEFAULT 100"],
+  ["products", "lowStockThreshold", "int NOT NULL DEFAULT 10"],
+  ["products", "inStock", "boolean NOT NULL DEFAULT true"],
+  ["products", "discountPercent", "decimal(5,2)"],
+  ["products", "discountActive", "boolean NOT NULL DEFAULT false"],
+  ["products", "coaUrl", "text"],
+  ["products", "hplcUrl", "text"],
+  ["products", "massSpecUrl", "text"],
+  ["products", "isActive", "boolean NOT NULL DEFAULT true"],
+  ["products", "isFeatured", "boolean NOT NULL DEFAULT false"],
+  ["products", "sortOrder", "int NOT NULL DEFAULT 0"],
+  ["products", "createdAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP"],
+  ["products", "updatedAt", "timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+
+    // Variant columns for existing order/cart tables.
+  ["orderItems", "variantId", "int"],
+  ["orderItems", "variantLabel", "varchar(255)"],
+  ["cartItems", "variantId", "int"],
+  ["cartItems", "variantLabel", "varchar(255)"],
 ];
 
 
