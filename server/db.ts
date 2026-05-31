@@ -254,6 +254,20 @@ function cleanVariantMutationData(data: any) {
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data || {})) {
     if (value === undefined) continue;
+
+    if (key === "price") {
+      const normalized = value === "" || value === null ? "0" : String(value);
+      cleaned[key] = normalized.trim() === "" ? "0" : normalized;
+      continue;
+    }
+
+    if (key === "stockQuantity" || key === "sortOrder") {
+      if (value === "" || value === null) continue;
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) cleaned[key] = parsed;
+      continue;
+    }
+
     if (["compareAtPrice", "sku", "imageUrl"].includes(key)) {
       cleaned[key] = value === "" || value === null ? null : value;
       continue;
@@ -325,12 +339,27 @@ function cleanProductMutationData(data: Partial<InsertProduct>): Partial<InsertP
     "hplcUrl",
     "massSpecUrl",
   ]);
+  const integerFields = new Set(["stockQuantity", "lowStockThreshold", "sortOrder"]);
 
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
     if (value === undefined) continue;
 
+    if (key === "price") {
+      const normalized = value === "" || value === null ? "0" : String(value);
+      cleaned[key] = normalized.trim() === "" ? "0" : normalized;
+      continue;
+    }
+
     if (nullableDecimalFields.has(key)) {
-      cleaned[key] = value === "" || value === null ? null : String(value);
+      const normalized = value === "" || value === null ? null : String(value);
+      cleaned[key] = typeof normalized === "string" && normalized.trim() === "" ? null : normalized;
+      continue;
+    }
+
+    if (integerFields.has(key)) {
+      if (value === "" || value === null) continue;
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) cleaned[key] = parsed;
       continue;
     }
 
