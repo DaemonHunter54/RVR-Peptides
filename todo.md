@@ -1,0 +1,38 @@
+# Project TODO
+
+- [x] Database schema: users, products, categories, orders, order_items, discounts, site_settings, research_citations, cart
+- [x] Custom email/password authentication system (register, login, logout)
+- [x] Product management backend API (CRUD, categories, search, filtering)
+- [x] Order management backend API (create, update status, tracking)
+- [x] Research citations backend API (CRUD per product)
+- [x] Discount/promo code backend API (individual product + site-wide)
+- [x] Site settings backend API (banners, logo, holiday themes)
+- [x] Shopping cart backend API (add, remove, update quantities)
+- [x] Homepage with hero section, feature badges, product grid (corepeptides.com style)
+- [x] Product listing page with category filtering and sorting
+- [x] Product detail page with research citations and sources
+- [x] User registration and login pages (email/password)
+- [x] User account page with order history and tracking
+- [x] Shopping cart page with quantity management
+- [x] Checkout page with guest checkout option
+- [x] NowPayments crypto payment integration
+- [x] Admin control panel: dashboard overview
+- [x] Admin: product management (add/edit/delete, inventory, pricing)
+- [x] Admin: order management (view orders, update status, input tracking)
+- [x] Admin: discount management (individual product + site-wide promo codes)
+- [x] Admin: site settings (banners, logo, holiday themes)
+- [x] Admin: research citations management per product
+- [x] Responsive navigation (top nav like corepeptides.com)
+- [x] Blue and silver color theme throughout
+- [x] Custom River Valley Research Peptides logo integration
+- [x] Footer with disclaimers and quick links
+- [x] Mobile responsive design across all pages
+- [x] NowPayments webhook endpoint for payment confirmation
+- [x] Deployment-ready configuration (Railway/GitHub ready)
+- [x] NowPayments admin config section in control panel (API key, IPN secret, webhook URL input/update)
+- [x] NowPayments checkout integration using admin-stored credentials
+- [x] Seed database with products from rvrpeptides.com
+- [x] Write unit tests (19/19 passing)
+- [x] Remove background from hero vials image (transparent/no box)
+- [x] Make hero vials slightly larger on the page
+- [x] Upgrade product card vials to match high-quality photorealistic hero vial style

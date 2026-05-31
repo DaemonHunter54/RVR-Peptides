@@ -102,7 +102,7 @@ async function seed() {
           p.name, slug, sku, p.price,
           p.description || "", p.shortDescription || "",
           p.purity || "", p.size || "", p.form || "",
-          "/rvr-peptide-vial.png", true, 100, true,
+          "", true, 100, true,
           p.categories.includes("Peptides") && p.price >= 35
         ]
       );

@@ -971,7 +971,7 @@ function CustomizationSection() {
     { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Free shipping on orders over $200!" },
     { key: "banner_bg_color", label: "Banner Background Color", type: "color", placeholder: "#0a1628" },
     { key: "banner_text_color", label: "Banner Text Color", type: "color", placeholder: "#94a3b8" },
-    { key: "logo_url", label: "Logo Image URL", type: "text", placeholder: "/images/rvr-logo.png" },
+    { key: "logo_url", label: "Logo Image URL", type: "text", placeholder: "/manus-storage/rvr-logo_19fbf80f.png" },
     { key: "footer_disclaimer", label: "Footer Disclaimer", type: "textarea", placeholder: "All products are sold for research purposes only..." },
   ];
 

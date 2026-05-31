@@ -32,10 +32,10 @@ export default function Navbar() {
   const cartCount = cartQuery.data?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
 
   const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/shop", label: "Shop" },
-    { href: "/about", label: "About" },
-    { href: "/contact", label: "Contact" },
+    { href: "/", label: "HOME" },
+    { href: "/shop", label: "PEPTIDES FOR SALE" },
+    { href: "/about", label: "ABOUT US" },
+    { href: "/contact", label: "CONTACT" },
   ];
 
   const bannerEnabled = settings.banner_enabled === "true";
