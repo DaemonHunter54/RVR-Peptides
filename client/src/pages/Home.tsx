@@ -111,7 +111,7 @@ export default function Home() {
       <section className="bg-white py-16 lg:py-20">
         <div className="container mx-auto px-6 lg:px-12">
           {allProductsQuery.isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 lg:gap-7">
               {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="flex flex-col items-center">
                   <Skeleton className="w-full aspect-square rounded-lg" />
@@ -121,7 +121,7 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 lg:gap-7">
               {allProducts.map((product: any) => (
                 <ProductCard key={product.id} product={product} />
               ))}

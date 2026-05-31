@@ -31,12 +31,12 @@ export default function ProductCard({ product }: ProductCardProps) {
     <Link href={`/product/${product.slug}`}>
       <div className="group flex flex-col items-center cursor-pointer h-full">
         {/* Vial Image */}
-        <div className="relative w-full aspect-[3/4] flex items-center justify-center mb-3 overflow-hidden">
-          <div className="relative w-full h-full flex items-center justify-center p-2">
+        <div className="relative w-full aspect-[3/4] flex items-center justify-center mb-4 overflow-hidden">
+          <div className="relative w-full h-full flex items-center justify-center p-3">
             <img
               src={product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
               alt={product.name}
-              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+              className="w-auto h-auto max-w-[82%] max-h-[230px] lg:max-h-[210px] object-contain group-hover:scale-105 transition-transform duration-500"
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />
           </div>
@@ -57,13 +57,13 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Product Name */}
-        <h3 className="text-center text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors leading-snug mb-1 px-2 line-clamp-2">
+        <h3 className="text-center text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors leading-snug mb-3 px-2 line-clamp-2">
           {product.name}
         </h3>
 
         {/* Multiple doses available indicator */}
         {product.hasVariants && (
-          <p className="text-center text-xs text-gray-500 italic mb-1">
+          <p className="text-center text-xs text-gray-500 italic mb-3">
             Multiple doses available
           </p>
         )}

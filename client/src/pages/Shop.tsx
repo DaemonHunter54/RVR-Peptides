@@ -134,7 +134,7 @@ export default function Shop() {
             </div>
 
             {productsQuery.isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-5">
                 {Array.from({ length: 12 }).map((_, i) => (
                   <div key={i} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                     <Skeleton className="aspect-square" />
@@ -154,7 +154,7 @@ export default function Shop() {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-5">
                 {products.map((product: any) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
