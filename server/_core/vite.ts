@@ -5,10 +5,10 @@ import { nanoid } from "nanoid";
 import path from "path";
 
 export async function setupVite(app: Express, server: Server) {
-  const [{ createServer: createViteServer }, { default: viteConfig }] = await Promise.all([
-    import("vite"),
-    import("../../vite.config"),
-  ]);
+  // Keep Vite strictly development-only. Do NOT import vite.config.ts here.
+  // That config imports Builder/Vite plugins that are devDependencies and must
+  // never be pulled into the production server bundle.
+  const { createServer: createViteServer } = await import("vite");
 
   const serverOptions = {
     middlewareMode: true,
@@ -17,8 +17,8 @@ export async function setupVite(app: Express, server: Server) {
   };
 
   const vite = await createViteServer({
-    ...viteConfig,
     configFile: false,
+    root: path.resolve(import.meta.dirname, "../..", "client"),
     server: serverOptions,
     appType: "custom",
   });
