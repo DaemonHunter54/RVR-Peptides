@@ -40,7 +40,7 @@ async function startServer() {
 
   // Vial image endpoints - redirect to pre-generated HD images stored in S3
   app.get("/api/vial/hero.png", (req, res) => {
-    res.redirect('/manus-storage/rvr-hero-3vials-composed_5511eda3.png');
+    res.redirect('/assets/rvr-hero-3vials-composed_5511eda3.png');
   });
 
   app.get("/api/vial/:slug.png", async (req, res) => {

@@ -377,6 +377,15 @@ function assetBySlug(slug: string): string | undefined {
   return getLocalAssetMap().get(normalized);
 }
 
+
+function exactAssetByProduct(row: RowDataPacket): string | undefined {
+  const slug = String(row.slug || "");
+  const name = String(row.name || "");
+  // Only exact matches. This lets bundled Manus assets override stale/generated DB images
+  // for the same product without guessing across different products.
+  return assetBySlug(slug) || assetBySlug(name);
+}
+
 function assetByProduct(row: RowDataPacket): string | undefined {
   const slug = String(row.slug || "");
   const name = String(row.name || "");
@@ -422,13 +431,26 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
 
   if (!rows.length) return;
 
-  // Repair only images that are missing, generated, generic fallback, or pointing at missing local files.
-  // This preserves valid Manus/CloudFront/custom URLs, but fixes the old generic-background vial rows.
+  // Repair product image paths without changing the frontend layout/design.
+  // Manus bundled the real product images in client/public/assets and they are served as /assets/*.
+  // Older deployments left generic/generated vial paths in the DB. If a product has an exact
+  // bundled Manus asset for its slug/name, that asset is the source of truth and should replace
+  // stale DB values. For products without an exact bundled asset, only repair missing/generated
+  // fallback paths.
   for (const row of rows) {
-    const expectedAsset = assetByProduct(row);
-    if (expectedAsset && isGeneratedOrFallbackImage(row.imageUrl)) {
-      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [expectedAsset, row.id]);
-      row.imageUrl = expectedAsset;
+    const exactAsset = exactAssetByProduct(row);
+    const repairAsset = exactAsset || assetByProduct(row);
+    const currentImage = String(row.imageUrl || "");
+
+    if (exactAsset && currentImage !== exactAsset) {
+      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [exactAsset, row.id]);
+      row.imageUrl = exactAsset;
+      continue;
+    }
+
+    if (repairAsset && isGeneratedOrFallbackImage(currentImage)) {
+      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairAsset, row.id]);
+      row.imageUrl = repairAsset;
     }
   }
 
