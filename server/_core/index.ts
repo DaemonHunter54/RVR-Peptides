@@ -35,7 +35,6 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
-  // Manus OAuth routes removed for Railway/local email-password auth.
 
   // NowPayments IPN webhook endpoint
   app.post("/api/nowpayments/ipn", async (req, res) => {
