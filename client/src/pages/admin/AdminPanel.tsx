@@ -330,6 +330,7 @@ function ProductVialPreview({ name, slug, size }: { name: string; slug: string; 
       </div>
       <div className="flex justify-center rounded-lg bg-white p-4 min-h-[260px]">
         <img
+          key={src}
           src={src}
           alt="Live vial preview"
           className="max-h-[360px] w-auto object-contain"
@@ -447,6 +448,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
             <div><Label>Product Name *</Label><Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" /></div>
             <div><Label>URL Slug *</Label><Input value={form.slug} onChange={(e) => updateField("slug", e.target.value)} className="mt-1.5" /></div>
             <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => updateField("sku", e.target.value)} className="mt-1.5" /></div>
+            <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
             <div><Label>Image URL</Label><Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} className="mt-1.5" placeholder="Auto-filled from Manus asset or generated HD vial" /></div>
             <div className="md:col-span-2"><Label>Short Description</Label><Input value={form.shortDescription} onChange={(e) => updateField("shortDescription", e.target.value)} className="mt-1.5" /></div>
             <div className="md:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
@@ -536,7 +538,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           <h2 className="font-semibold text-slate-800 mb-4">Specifications</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><Label>Purity</Label><Input value={form.purity} onChange={(e) => updateField("purity", e.target.value)} className="mt-1.5" placeholder="e.g. >99%" /></div>
-            <div><Label>Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
+            <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
             <div><Label>Form</Label><Input value={form.form} onChange={(e) => updateField("form", e.target.value)} className="mt-1.5" placeholder="e.g. Lyophilized Powder" /></div>
             <div><Label>Contents</Label><Input value={form.contents} onChange={(e) => updateField("contents", e.target.value)} className="mt-1.5" /></div>
             <div><Label>Molecular Formula</Label><Input value={form.molecularFormula} onChange={(e) => updateField("molecularFormula", e.target.value)} className="mt-1.5" /></div>

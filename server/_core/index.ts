@@ -51,8 +51,9 @@ async function startServer() {
       const queryName = typeof req.query.name === "string" ? req.query.name : "";
       const querySize = typeof req.query.size === "string" ? req.query.size : "";
       const productName = (queryName || product?.name || req.params.slug.replace(/-/g, " ")).trim();
-      const displayName = querySize && !productName.toLowerCase().includes(querySize.toLowerCase())
-        ? `${productName} ${querySize}`
+      const productSize = (querySize || (product as any)?.size || "").trim();
+      const displayName = productSize && !productName.toLowerCase().includes(productSize.toLowerCase())
+        ? `${productName} ${productSize}`
         : productName;
       const buffer = await generateVialBuffer(displayName);
       res.setHeader("Content-Type", "image/png");
