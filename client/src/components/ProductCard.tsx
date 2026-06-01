@@ -44,6 +44,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 "w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500",
                 isReconstitutionKit && "max-w-[62%] max-h-[165px] sm:max-h-[175px] lg:max-h-[185px] object-contain"
               )}
+              style={isReconstitutionKit ? { maxHeight: "135px", maxWidth: "50%" } : undefined}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />
           </div>
