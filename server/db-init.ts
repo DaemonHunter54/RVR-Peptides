@@ -300,12 +300,12 @@ const DEFAULT_PRODUCTS: SeedProduct[] = [
   { slug: "l-carnitine-300mg-ml-30ml", name: "L-Carnitine 300mg/ml 30ml", image: "/assets/l-carnitine-300mg-ml-30ml_a7fbf7c4.webp", category: "Wellness", price: "59.99" },
   { slug: "vitamin-b-complex", name: "Vitamin B Complex", image: "/assets/vitamin-b-complex_75a8cb81.webp", category: "Wellness", price: "39.99" },
   { slug: "vitamin-d-100-000-iu-ml", name: "Vitamin D 100,000 IU/ml", image: "/assets/vitamin-d-100-000-iu-ml_ee0dac38.webp", category: "Wellness", price: "39.99" },
-  { slug: "curenex-daily-care-rejuvenating-cream", name: "Curenex Daily Care Rejuvenating Cream", image: "/assets/curenex-daily-care-rejuvenating-cream_633ba9dc.webp", category: "Skin Care", price: "49.99" },
-  { slug: "curenex-daily-care-skin-booster", name: "Curenex Daily Care Skin Booster", image: "/assets/curenex-daily-care-skin-booster_197ee291.webp", category: "Skin Care", price: "59.99" },
-  { slug: "curenex-hydrating-cleanser", name: "Curenex Hydrating Cleanser", image: "/assets/curenex-hydrating-cleanser_1edb764f.webp", category: "Skin Care", price: "34.99" },
-  { slug: "curenex-sheer-sunscreen-50-spf", name: "Curenex Sheer Sunscreen 50 SPF", image: "/assets/curenex-sheer-sunscreen-50-spf_fa687400.webp", category: "Skin Care", price: "34.99" },
-  { slug: "rm-repair-moisturizing-cream", name: "RM Repair Moisturizing Cream", image: "/assets/rm-repair-moisturizing-cream_56a48eed.webp", category: "Skin Care", price: "49.99" },
-  { slug: "urea-cream-skin-softener", name: "Urea Cream Skin Softener", image: "/assets/urea-cream-skin-softener_f87a0c24.webp", category: "Skin Care", price: "29.99" },
+  { slug: "curenex-daily-care-rejuvenating-cream", name: "Curenex Daily Care Rejuvenating Cream", image: "/assets/curenex-daily-care-rejuvenating-cream-hd-tube.png", category: "Skin Care", price: "49.99" },
+  { slug: "curenex-daily-care-skin-booster", name: "Curenex Daily Care Skin Booster", image: "/assets/curenex-daily-care-skin-booster-hd-tube.png", category: "Skin Care", price: "59.99" },
+  { slug: "curenex-hydrating-cleanser", name: "Curenex Hydrating Cleanser", image: "/assets/curenex-hydrating-cleanser-hd-tube.png", category: "Skin Care", price: "34.99" },
+  { slug: "curenex-sheer-sunscreen-50-spf", name: "Curenex Sheer Sunscreen 50 SPF", image: "/assets/curenex-sheer-sunscreen-50-spf-hd-tube.png", category: "Skin Care", price: "34.99" },
+  { slug: "rm-repair-moisturizing-cream", name: "RM Repair Moisturizing Cream", image: "/assets/rm-repair-moisturizing-cream-hd-tube.png", category: "Skin Care", price: "49.99" },
+  { slug: "urea-cream-skin-softener", name: "Urea Cream Skin Softener", image: "/assets/urea-cream-skin-softener-hd-tube.png", category: "Skin Care", price: "29.99" },
 ];
 
 const DEFAULT_CATEGORIES = ["Peptides", "Blends", "Reconstitution", "Wellness", "Skin Care"];

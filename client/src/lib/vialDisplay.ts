@@ -2,6 +2,17 @@ export function makeSlug(value: string): string {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+
+const HD_TUBE_ASSETS: Record<string, string> = {
+  "cindelria": "/assets/cindelria-hd-tube.png",
+  "curenex-daily-care-rejuvenating-cream": "/assets/curenex-daily-care-rejuvenating-cream-hd-tube.png",
+  "curenex-daily-care-skin-booster": "/assets/curenex-daily-care-skin-booster-hd-tube.png",
+  "curenex-hydrating-cleanser": "/assets/curenex-hydrating-cleanser-hd-tube.png",
+  "curenex-sheer-sunscreen-50-spf": "/assets/curenex-sheer-sunscreen-50-spf-hd-tube.png",
+  "rm-repair-moisturizing-cream": "/assets/rm-repair-moisturizing-cream-hd-tube.png",
+  "urea-cream-skin-softener": "/assets/urea-cream-skin-softener-hd-tube.png",
+};
+
 const NON_VIAL_TERMS = [
   "capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum",
   "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"
@@ -180,6 +191,9 @@ export function productImageUrl(product: any, variant?: any): string {
   if (slug === "bpc-157-capsules-500mcg-30") {
     return "/assets/bpc-157-capsules-500mcg-30_hd.webp?v=4";
   }
+
+  const hdTubeAsset = HD_TUBE_ASSETS[slug];
+  if (hdTubeAsset) return hdTubeAsset;
 
   if (!isNonVialProduct(product)) {
     const variantLabel = variant?.label ? String(variant.label) : "";
