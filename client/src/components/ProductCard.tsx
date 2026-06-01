@@ -37,6 +37,8 @@ export default function ProductCard({ product }: ProductCardProps) {
             <img
               src={productImageUrl(product) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
               alt={product.name}
+              loading="lazy"
+              decoding="async"
               className="w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500"
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />

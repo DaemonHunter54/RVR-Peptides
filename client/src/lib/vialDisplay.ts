@@ -178,7 +178,7 @@ export function productImageUrl(product: any, variant?: any): string {
   // HD transparent asset regardless of any older imageUrl stored in the DB.
   // The query string intentionally busts browser/CDN cache after the asset swap.
   if (slug === "bpc-157-capsules-500mcg-30") {
-    return "/assets/bpc-157-capsules-500mcg-30_hd.png?v=4";
+    return "/assets/bpc-157-capsules-500mcg-30_hd.webp?v=4";
   }
 
   if (!isNonVialProduct(product)) {

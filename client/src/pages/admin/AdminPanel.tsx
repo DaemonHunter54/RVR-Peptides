@@ -14,7 +14,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Settings, Tag,
   Plus, Pencil, Trash2, Search, Truck, Save, ArrowLeft,
   DollarSign, AlertCircle, CreditCard, Eye, EyeOff, CheckCircle2, XCircle,
-  Paintbrush, RotateCcw
+  Paintbrush, RotateCcw, Sparkles
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
@@ -267,7 +267,7 @@ function ProductsSection() {
                 <tr key={product.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img src={product.imageUrl || ASSETS.peptideVial} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+                      <img src={product.imageUrl || ASSETS.peptideVial} alt="" loading="lazy" decoding="async" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-10 h-10 object-contain bg-slate-50 rounded" />
                       <div>
                         <p className="font-medium text-slate-800">{product.name}</p>

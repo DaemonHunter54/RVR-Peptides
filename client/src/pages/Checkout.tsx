@@ -316,7 +316,7 @@ export default function Checkout() {
                     const unitPrice = hasDisc ? price * (1 - Number(item.product.discountPercent) / 100) : price;
                     return (
                       <div key={item.id} className="flex items-center gap-3">
-                        <img src={item.product.imageUrl || ASSETS.peptideVial} alt="" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+                        <img src={item.product.imageUrl || ASSETS.peptideVial} alt="" loading="lazy" decoding="async" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                         className="w-10 h-10 object-contain bg-slate-50 rounded" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-800 truncate">{item.product.name}</p>
