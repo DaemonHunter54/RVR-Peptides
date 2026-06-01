@@ -41,8 +41,8 @@ export default function ProductCard({ product }: ProductCardProps) {
               loading="lazy"
               decoding="async"
               className={cn(
-                "w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[135px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500",
-                isReconstitutionKit && "max-w-[88%] max-h-[232px] sm:max-h-[247px] lg:max-h-[262px] scale-[1.14] group-hover:scale-[1.18]"
+                "w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500",
+                isReconstitutionKit && "max-w-[62%] max-h-[165px] sm:max-h-[175px] lg:max-h-[185px] object-contain"
               )}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />
