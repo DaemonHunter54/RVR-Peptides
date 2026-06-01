@@ -169,7 +169,7 @@ button:active {
 }
 @keyframes twinkle {
   0%, 100% { opacity: 0.3; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1.1); }
+  50% { opacity: 1; transform: scale(0.78); }
 }
 @keyframes bat-fly {
   0%, 100% { transform: translate(0, 0) scaleX(1); }
