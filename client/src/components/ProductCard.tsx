@@ -27,7 +27,6 @@ export default function ProductCard({ product }: ProductCardProps) {
   const price = Number(product.price);
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
-  const isReconstitutionKit = product.slug === "reconstitution-kit";
 
   return (
     <Link href={`/product/${product.slug}`}>
@@ -40,11 +39,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               alt={product.name}
               loading="lazy"
               decoding="async"
-              className={cn(
-                "w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500",
-                isReconstitutionKit && "max-w-[62%] max-h-[165px] sm:max-h-[175px] lg:max-h-[185px] object-contain"
-              )}
-              style={isReconstitutionKit ? { maxHeight: "135px", maxWidth: "50%" } : undefined}
+              className="w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500"
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />
           </div>
