@@ -77,8 +77,8 @@ export default function Home() {
                 <Plane className="w-12 h-12 stroke-[1.2]" />
               </div>
               <div>
-                <h3 className="text-[#c8d6e5] font-bold text-base tracking-wider uppercase mb-2">FREE DELIVERY</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">Any purchase of $200 or more qualifies for free delivery within the USA.</p>
+                <h3 className="text-[#c8d6e5] font-bold text-base tracking-wider uppercase mb-2">FAST ORDER PROCESSING</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">Orders are typically processed within 1–2 business days and shipped with tracking provided.</p>
               </div>
             </div>
 
