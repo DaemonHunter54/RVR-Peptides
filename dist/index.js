@@ -1959,7 +1959,7 @@ var init_vialGenerator = __esm({
     HERO_IMAGE_PATHS = [
       path3.join(process.cwd(), "client/public/assets/rvr-company-hero-3-vials.png"),
       path3.join(__dirname, "hero-3vials.png"),
-      path3.join(process.cwd(), "client/public/assets/rvr-hero-3vials-composed_5511eda3.png")
+      path3.join(process.cwd(), "client/public/assets/rvr-hero-vials-new-transparent.png")
     ];
     LOGO_PATHS = [
       path3.join(process.cwd(), "client/public/assets/rvr-company-logo-small.png"),
@@ -3426,7 +3426,7 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   app.get("/api/vial/hero.png", (req, res) => {
-    res.redirect("/assets/rvr-hero-3vials-composed_5511eda3.png");
+    res.redirect("/assets/rvr-hero-vials-new-transparent.png");
   });
   app.get("/api/vial/:slug.png", async (req, res) => {
     try {

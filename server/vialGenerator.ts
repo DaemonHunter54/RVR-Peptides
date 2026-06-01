@@ -17,7 +17,7 @@ let cachedPhotorealVialTemplate: Image | null = null;
 const HERO_IMAGE_PATHS = [
   path.join(process.cwd(), 'client/public/assets/rvr-company-hero-3-vials.png'),
   path.join(__dirname, 'hero-3vials.png'),
-  path.join(process.cwd(), 'client/public/assets/rvr-hero-3vials-composed_5511eda3.png'),
+  path.join(process.cwd(), 'client/public/assets/rvr-hero-vials-new-transparent.png'),
 ];
 
 const LOGO_PATHS = [
