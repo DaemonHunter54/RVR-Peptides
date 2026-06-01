@@ -42,7 +42,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               loading="lazy"
               decoding="async"
               className="w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500"
-              style={isReconstitutionKit ? { maxWidth: "82%", maxHeight: "230px", transform: "translateY(-8px)" } : isBpcCapsules ? { maxWidth: "120%", maxHeight: "320px", transform: "scale(1.18)" } : undefined}
+              style={isReconstitutionKit ? { maxWidth: "82%", maxHeight: "230px", transform: "translateY(-8px)" } : isBpcCapsules ? { maxWidth: "102%", maxHeight: "270px", transform: "scale(1.05)" } : undefined}
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />
           </div>
