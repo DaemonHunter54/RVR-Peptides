@@ -7,7 +7,7 @@ export const PRODUCT_ASSET_MAP: Record<string, string> = {
   "bacteriostatic-water-30ml": "/assets/bacteriostatic-water-30ml_0d6cfc45.png",
   "bpc-157-10mg": "/assets/bpc-157-10mg_358b8e1b.png",
   "bpc-157-5mg": "/assets/bpc-157-5mg_1e10350a.png",
-  "bpc-157-capsules-500mcg-30": "/assets/bpc-157-capsules-500mcg-30_a35e1c7b.png",
+  "bpc-157-capsules-500mcg-30": "/assets/bpc-157-capsules-500mcg-30_hd.png?v=4",
   "cagrilintide-5mg": "/assets/cagrilintide-5mg_f51eb3cf.png",
   "cagrilintide-semaglutide-5mg-5mg": "/assets/cagrilintide-semaglutide-5mg-5mg_7655c129.png",
   "cindelria": "/assets/cindelria_9598899d.png",

@@ -254,7 +254,7 @@ type SeedProduct = {
 const DEFAULT_PRODUCTS: SeedProduct[] = [
   { slug: "bpc-157-5mg", name: "BPC-157 5mg", image: "/assets/bpc-157-5mg_1e10350a.png", category: "Peptides", price: "39.99" },
   { slug: "bpc-157-10mg", name: "BPC-157 10mg", image: "/assets/bpc-157-10mg_358b8e1b.png", category: "Peptides", price: "69.99" },
-  { slug: "bpc-157-capsules-500mcg-30", name: "BPC-157 Capsules 500mcg (30)", image: "/assets/bpc-157-capsules-500mcg-30_a35e1c7b.png", category: "Peptides", price: "49.99" },
+  { slug: "bpc-157-capsules-500mcg-30", name: "BPC-157 Capsules 500mcg (30)", image: "/assets/bpc-157-capsules-500mcg-30_hd.png?v=4", category: "Peptides", price: "49.99" },
   { slug: "tb-500", name: "TB-500", image: "/assets/rvr-vial-template-single_c7ba8797.png", category: "Peptides", price: "49.99" },
   { slug: "cagrilintide-5mg", name: "Cagrilintide 5mg", image: "/assets/cagrilintide-5mg_f51eb3cf.png", category: "Peptides", price: "99.99" },
   { slug: "cagrilintide-semaglutide-5mg-5mg", name: "Cagrilintide/Semaglutide 5mg/5mg", image: "/assets/cagrilintide-semaglutide-5mg-5mg_7655c129.png", category: "Blends", price: "129.99" },

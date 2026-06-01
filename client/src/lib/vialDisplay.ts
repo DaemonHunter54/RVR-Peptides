@@ -172,6 +172,15 @@ export function generatedVialUrl(slug: string, name?: string, size?: string): st
 }
 
 export function productImageUrl(product: any, variant?: any): string {
+  const slug = String(product?.slug || "").toLowerCase();
+
+  // Keep the BPC-157 capsules product as a capsule bottle, but force the new
+  // HD transparent asset regardless of any older imageUrl stored in the DB.
+  // The query string intentionally busts browser/CDN cache after the asset swap.
+  if (slug === "bpc-157-capsules-500mcg-30") {
+    return "/assets/bpc-157-capsules-500mcg-30_hd.png?v=4";
+  }
+
   if (!isNonVialProduct(product)) {
     const variantLabel = variant?.label ? String(variant.label) : "";
     return generatedVialUrl(product?.slug || "product", product?.name || "Product", variantLabel || product?.size || "");
