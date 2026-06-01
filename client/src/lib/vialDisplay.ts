@@ -11,6 +11,7 @@ const HD_TUBE_ASSETS: Record<string, string> = {
   "curenex-sheer-sunscreen-50-spf": "/assets/curenex-sheer-sunscreen-50-spf-hd-tube.png",
   "rm-repair-moisturizing-cream": "/assets/rm-repair-moisturizing-cream-hd-tube.png",
   "urea-cream-skin-softener": "/assets/urea-cream-skin-softener-hd-tube.png",
+  "reconstitution-kit": "/assets/reconstitution-kit-hd.png",
 };
 
 const NON_VIAL_TERMS = [

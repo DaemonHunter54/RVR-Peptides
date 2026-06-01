@@ -41,7 +41,7 @@ export const PRODUCT_ASSET_MAP: Record<string, string> = {
   "pe-22-28-10mg": "/assets/pe-22-28-10mg_4ae32cc2.webp",
   "pinealon-20mg": "/assets/pinealon-20mg_9c886336.webp",
   "pt-141-10mg": "/assets/pt-141-10mg_15229f16.webp",
-  "reconstitution-kit": "/assets/reconstitution-kit_62db9cd5.webp",
+  "reconstitution-kit": "/assets/reconstitution-kit-hd.png",
   "retatrutide-15mg": "/assets/retatrutide-5mg_16793f06.webp",
   "retatrutide-5mg": "/assets/retatrutide-5mg_16793f06.webp",
   "rm-repair-moisturizing-cream": "/assets/rm-repair-moisturizing-cream-hd-tube.png",

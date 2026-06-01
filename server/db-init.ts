@@ -295,7 +295,7 @@ const DEFAULT_PRODUCTS: SeedProduct[] = [
   { slug: "bacteriostatic-water-10ml", name: "Bacteriostatic Water 10ml", image: "/assets/bacteriostatic-water-10ml_764a84d1.webp", category: "Reconstitution", price: "9.99" },
   { slug: "bacteriostatic-water-30ml", name: "Bacteriostatic Water 30ml", image: "/assets/bacteriostatic-water-10ml_764a84d1.webp", category: "Reconstitution", price: "14.99" },
   { slug: "hospira-bacteriostatic-water-30ml", name: "Hospira Bacteriostatic Water 30ml", image: "/assets/bacteriostatic-water-10ml_764a84d1.webp", category: "Reconstitution", price: "19.99" },
-  { slug: "reconstitution-kit", name: "Reconstitution Kit", image: "/assets/reconstitution-kit_62db9cd5.webp", category: "Reconstitution", price: "24.99" },
+  { slug: "reconstitution-kit", name: "Reconstitution Kit", image: "/assets/reconstitution-kit-hd.png", category: "Reconstitution", price: "24.99" },
   { slug: "glutathione-1200mg", name: "Glutathione 1200mg", image: "/assets/glutathione-1200mg_e3e41ad9.webp", category: "Wellness", price: "79.99" },
   { slug: "l-carnitine-300mg-ml-30ml", name: "L-Carnitine 300mg/ml 30ml", image: "/assets/l-carnitine-300mg-ml-30ml_a7fbf7c4.webp", category: "Wellness", price: "59.99" },
   { slug: "vitamin-b-complex", name: "Vitamin B Complex", image: "/assets/vitamin-b-complex_75a8cb81.webp", category: "Wellness", price: "39.99" },
