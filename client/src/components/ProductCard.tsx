@@ -50,7 +50,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 isReconstitutionKit
                   ? { maxWidth: "82%", maxHeight: "230px", transform: "translateY(-8px)" }
                   : isBpcCapsules
-                  ? { maxWidth: "88%", maxHeight: "220px", transform: "translateY(8px) scale(0.94)" }
+                  ? { maxWidth: "92%", maxHeight: "235px", transform: "translateY(6px) scale(0.99)" }
                   : isStorageContainer
                   ? { maxWidth: "92%", maxHeight: "250px", transform: "scale(1.12)" }
                   : isVialCap
