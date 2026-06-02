@@ -26,6 +26,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   const [giftCardAmount, setGiftCardAmount] = useState("");
+  const [giftCardRecipientEmail, setGiftCardRecipientEmail] = useState("");
   const [activeTab, setActiveTab] = useState("description");
   const productQuery = trpc.products.bySlug.useQuery({ slug: slug || "" });
   const addToCart = trpc.cart.add.useMutation({
@@ -122,11 +123,20 @@ export default function ProductDetail() {
       const minAmount = Number(product.price || 10);
       const maxAmount = Number(product.compareAtPrice || 0);
       const amount = Number(giftCardAmount || 0);
+      const recipientEmail = giftCardRecipientEmail.trim();
       if (!amount || amount < minAmount || (maxAmount > 0 && amount > maxAmount)) {
         toast.error(`Enter a gift card amount${maxAmount > 0 ? ` between $${minAmount.toFixed(2)} and $${maxAmount.toFixed(2)}` : ` of at least $${minAmount.toFixed(2)}`}.`);
         return;
       }
+      if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+        toast.error("Enter a valid recipient email for the gift card.");
+        return;
+      }
     }
+
+    const giftCardVariant = isGiftCard
+      ? `Gift Card $${Number(giftCardAmount || product.price || 10).toFixed(2)} | Recipient: ${giftCardRecipientEmail.trim()}`
+      : activeVariant?.label;
 
     if (!isAuthenticated) {
       guestCart.addItem({
@@ -137,7 +147,7 @@ export default function ProductDetail() {
         discountActive: product.discountActive || false,
         discountPercent: product.discountPercent || null,
         variantId: activeVariant?.id,
-        variantLabel: activeVariant?.label,
+        variantLabel: giftCardVariant,
       }, quantity);
       toast.success("Added to cart!");
       return;
@@ -146,7 +156,7 @@ export default function ProductDetail() {
       productId: product.id,
       quantity,
       variantId: activeVariant?.id,
-      variantLabel: isGiftCard ? `Gift Card $${Number(giftCardAmount || product.price || 10).toFixed(2)}` : activeVariant?.label,
+      variantLabel: giftCardVariant,
     }, {
       onSuccess: () => utils.cart.get.invalidate(),
     });
@@ -208,19 +218,32 @@ export default function ProductDetail() {
 
             {/* Gift Card Amount */}
             {isGiftCard && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Gift Card Amount</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={Number(product.price || 10)}
-                  max={Number(product.compareAtPrice || undefined)}
-                  value={giftCardAmount}
-                  onChange={(e) => setGiftCardAmount(e.target.value)}
-                  placeholder={`Minimum $${Number(product.price || 10).toFixed(2)}`}
-                  className="max-w-xs"
-                />
-                <p className="text-xs text-slate-500">Enter the amount you would like loaded onto the gift card.</p>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Gift Card Amount</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={Number(product.price || 10)}
+                    max={Number(product.compareAtPrice || undefined)}
+                    value={giftCardAmount}
+                    onChange={(e) => setGiftCardAmount(e.target.value)}
+                    placeholder={`Minimum $${Number(product.price || 10).toFixed(2)}`}
+                    className="max-w-xs"
+                  />
+                  <p className="text-xs text-slate-500">Enter the amount you would like loaded onto the gift card.</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Recipient Email</label>
+                  <Input
+                    type="email"
+                    value={giftCardRecipientEmail}
+                    onChange={(e) => setGiftCardRecipientEmail(e.target.value)}
+                    placeholder="recipient@email.com"
+                    className="max-w-xs"
+                  />
+                  <p className="text-xs text-slate-500">The gift card code will be sent to this email after payment is verified.</p>
+                </div>
               </div>
             )}
 
@@ -254,9 +277,6 @@ export default function ProductDetail() {
                 </>
               )}
             </div>
-
-            {/* Free shipping notice */}
-            <p className="text-sm text-green-600 font-medium">FREE Shipping on $200+ orders</p>
 
             {/* Stock Status */}
             <div className="flex items-center gap-2">

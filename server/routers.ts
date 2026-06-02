@@ -394,10 +394,9 @@ export const appRouter = router({
         discountAmount += giftCardApplied;
       }
 
-      // Shipping
-      const freeShippingThreshold = Number(await db.getSetting("free_shipping_threshold") || "200");
+      // Shipping: apply the configured flat rate to every order.
       const flatRateShipping = Number(await db.getSetting("flat_rate_shipping") || "9.99");
-      const shippingCost = (subtotal - discountAmount) >= freeShippingThreshold ? 0 : flatRateShipping;
+      const shippingCost = flatRateShipping;
       const total = subtotal - discountAmount + shippingCost;
 
       const orderNumber = `RVR-${Date.now().toString(36).toUpperCase()}-${nanoid(4).toUpperCase()}`;

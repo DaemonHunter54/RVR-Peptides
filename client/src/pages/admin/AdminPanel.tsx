@@ -333,13 +333,27 @@ const blankPreviewSrc = (type: PreviewProductType, slug: string, name: string, s
   return generatedVialPreviewUrl(slug, name || "Preview Product", size);
 };
 
-function ProductVialPreview({ name, slug, size, previewType, imageUrl }: { name: string; slug: string; size?: string; previewType: PreviewProductType; imageUrl?: string }) {
+function formatGiftCardRange(minAmount?: string, maxAmount?: string) {
+  const formatAmount = (value?: string) => {
+    const parsed = Number(String(value || "").replace(/[^0-9.]/g, ""));
+    return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "";
+  };
+  const min = formatAmount(minAmount);
+  const max = formatAmount(maxAmount);
+  if (min && max) return `${min} - ${max}`;
+  if (min) return `${min}+`;
+  if (max) return `Up to ${max}`;
+  return "";
+}
+
+function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount, maxAmount }: { name: string; slug: string; size?: string; previewType: PreviewProductType; imageUrl?: string; minAmount?: string; maxAmount?: string }) {
   const previewSrc = previewType ? blankPreviewSrc(previewType, slug, name || "Preview Product", size) : imageUrl;
   const title =
     previewType === "cream" ? "Live Cream Preview" :
     previewType === "face-mask" ? "Live Face Mask Preview" :
     previewType === "gift-card" ? "Live Gift Card Preview" :
     "Live Vial Preview";
+  const giftCardRange = previewType === "gift-card" ? formatGiftCardRange(minAmount, maxAmount) : "";
 
   if (!previewSrc) {
     return (
@@ -351,11 +365,18 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl }: { name:
 
   return (
     <div className="h-full min-h-[235px] flex items-start justify-center bg-transparent pt-0">
-      <img
-        src={previewSrc}
-        alt={title}
-        className="h-[245px] w-auto max-w-full object-contain"
-      />
+      <div className="relative inline-flex">
+        <img
+          src={previewSrc}
+          alt={title}
+          className="h-[245px] w-auto max-w-full object-contain"
+        />
+        {giftCardRange ? (
+          <div className="absolute right-[10%] top-[13%] rounded-md bg-slate-950/35 px-3 py-1 text-sm font-bold tracking-wide text-white shadow-sm">
+            {giftCardRange}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -425,7 +446,14 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       const response = await fetch("/api/product-preview/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: previewType, slug, name: form.name || "Preview Product", size: form.size || "" }),
+        body: JSON.stringify({
+          type: previewType,
+          slug,
+          name: form.name || "Preview Product",
+          size: form.size || "",
+          minAmount: form.price || "",
+          maxAmount: form.compareAtPrice || "",
+        }),
       });
       if (!response.ok) throw new Error(await response.text());
       const data = await response.json();
@@ -449,7 +477,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         slug: "gift-card",
         sku: "GIFT-CARD",
         price: prev.price || "10",
-        compareAtPrice: prev.compareAtPrice || "",
+        compareAtPrice: prev.compareAtPrice || "500",
         size: "",
         stockQuantity: 9999,
         imageUrl: "/assets/Gift-Card.png",
@@ -725,7 +753,15 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
             </div>
 
             <div className="justify-self-center w-full max-w-[360px]">
-              <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} imageUrl={form.imageUrl} />
+              <ProductVialPreview
+                name={form.name}
+                slug={form.slug || autoSlug}
+                size={form.size}
+                previewType={previewType}
+                imageUrl={form.imageUrl}
+                minAmount={form.price}
+                maxAmount={form.compareAtPrice}
+              />
             </div>
 
             <div className="xl:col-span-2"><div className="mb-1.5 flex items-center gap-3"><Label>Full Description</Label><Button type="button" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700" onClick={pullDescriptionFromNih} disabled={pullingNih}>{pullingNih ? "Pulling..." : "Pull from NIH"}</Button></div><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
@@ -1349,7 +1385,7 @@ function CustomizationSection() {
     { key: "hero_text_color", label: "Hero Text Color", type: "color", placeholder: "#ffffff" },
     { key: "accent_color", label: "Accent / Button Color", type: "color", placeholder: "#2563eb" },
     { key: "banner_enabled", label: "Show Announcement Banner", type: "toggle", placeholder: "" },
-    { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Free shipping on orders over $200!" },
+    { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Research-grade peptides and supplies" },
     { key: "banner_bg_color", label: "Banner Background Color", type: "color", placeholder: "#0a1628" },
     { key: "banner_text_color", label: "Banner Text Color", type: "color", placeholder: "#94a3b8" },
     { key: "logo_url", label: "Logo Image URL", type: "text", placeholder: "/assets/rvr-company-logo-large.png" },
@@ -1711,7 +1747,7 @@ function SettingsSection() {
       title: "Banner / Announcements",
       items: [
         { key: "banner_enabled", label: "Enable Banner", type: "toggle" },
-        { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Free shipping on orders over $200!" },
+        { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Research-grade peptides and supplies" },
         { key: "banner_bg_color", label: "Banner Background Color", type: "text", placeholder: "#1E3A5F" },
         { key: "banner_text_color", label: "Banner Text Color", type: "text", placeholder: "#FFFFFF" },
       ],
@@ -1725,7 +1761,6 @@ function SettingsSection() {
     {
       title: "Shipping",
       items: [
-        { key: "free_shipping_threshold", label: "Free Shipping Threshold ($)", type: "text", placeholder: "200" },
         { key: "flat_rate_shipping", label: "Flat Rate Shipping ($)", type: "text", placeholder: "9.99" },
       ],
     },

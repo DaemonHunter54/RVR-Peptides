@@ -42,9 +42,8 @@ export default function Cart() {
   }, 0);
 
   const discountAmount = appliedDiscount?.discountAmount || 0;
-  const freeShippingThreshold = 200;
   const flatRateShipping = 9.99;
-  const shippingCost = (subtotal - discountAmount) >= freeShippingThreshold ? 0 : flatRateShipping;
+  const shippingCost = flatRateShipping;
   const total = subtotal - discountAmount + shippingCost;
 
   const validateDiscount = trpc.discounts.validate.useQuery(
@@ -187,13 +186,8 @@ export default function Cart() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-slate-500">Shipping</span>
-                    <span className="text-slate-800">{shippingCost === 0 ? "FREE" : `$${shippingCost.toFixed(2)}`}</span>
+                    <span className="text-slate-800">${shippingCost.toFixed(2)}</span>
                   </div>
-                  {shippingCost > 0 && (
-                    <p className="text-xs text-blue-600">
-                      Free shipping on orders over ${freeShippingThreshold}
-                    </p>
-                  )}
                   <div className="border-t border-slate-200 pt-3 flex justify-between font-semibold text-base">
                     <span className="text-slate-800">Total</span>
                     <span className="text-slate-900">${total.toFixed(2)}</span>

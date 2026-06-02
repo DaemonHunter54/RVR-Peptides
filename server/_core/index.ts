@@ -279,7 +279,21 @@ async function startServer() {
       const slug = makeSafeSlug(req.body?.slug || req.body?.name);
       const name = String(req.body?.name || slug.replace(/-/g, " ")).trim();
       const size = String(req.body?.size || "").trim();
+      const minAmount = String(req.body?.minAmount || "").trim();
+      const maxAmount = String(req.body?.maxAmount || "").trim();
       const displayName = size && !name.toLowerCase().includes(size.toLowerCase()) ? `${name} ${size}` : name;
+      const formatGiftCardAmount = (value: string) => {
+        const parsed = Number(String(value || "").replace(/[^0-9.]/g, ""));
+        return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "";
+      };
+      const giftCardRange = (() => {
+        const min = formatGiftCardAmount(minAmount);
+        const max = formatGiftCardAmount(maxAmount);
+        if (min && max) return `${min} - ${max}`;
+        if (min) return `${min}+`;
+        if (max) return `Up to ${max}`;
+        return "";
+      })();
 
       const assetsDir = path.join(process.cwd(), "client", "public", "assets");
       fs.mkdirSync(assetsDir, { recursive: true });
@@ -293,7 +307,30 @@ async function startServer() {
       } else if (type === "face-mask") {
         buffer = fs.readFileSync(path.join(assetsDir, "face-mask-blank-hd.png"));
       } else if (type === "gift-card") {
-        buffer = fs.readFileSync(path.join(assetsDir, "Gift-Card.png"));
+        const giftCardBuffer = fs.readFileSync(path.join(assetsDir, "Gift-Card.png"));
+        if (giftCardRange) {
+          try {
+            const { createCanvas, loadImage } = await import("@napi-rs/canvas");
+            const image = await loadImage(giftCardBuffer);
+            const canvas = createCanvas(image.width, image.height);
+            const context = canvas.getContext("2d");
+            context.drawImage(image, 0, 0);
+            const fontSize = Math.max(34, Math.round(image.width * 0.035));
+            context.font = `700 ${fontSize}px Arial, sans-serif`;
+            context.textAlign = "right";
+            context.textBaseline = "top";
+            context.shadowColor = "rgba(0,0,0,0.45)";
+            context.shadowBlur = Math.round(fontSize * 0.18);
+            context.fillStyle = "#ffffff";
+            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.07), Math.round(image.height * 0.075));
+            buffer = await canvas.encode("png");
+          } catch (giftCardError) {
+            console.warn("[Gift Card Preview] Amount-range rendering failed; saving base gift card image.", giftCardError);
+            buffer = giftCardBuffer;
+          }
+        } else {
+          buffer = giftCardBuffer;
+        }
       } else {
         const { generateVialBuffer } = await import("../vialGenerator");
         buffer = await generateVialBuffer(displayName);

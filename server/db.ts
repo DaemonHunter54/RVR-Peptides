@@ -545,6 +545,12 @@ export async function updateOrderPayment(paymentId: string, paymentStatus: strin
 
 
 
+function parseGiftCardRecipientEmail(label?: string | null) {
+  const text = String(label || "");
+  const match = text.match(/Recipient:\s*([^|\s]+@[^|\s]+\.[^|\s]+)/i);
+  return match ? match[1].trim() : undefined;
+}
+
 async function sendGiftCardEmail(to: string | undefined, code: string, amount: number) {
   if (!to) return;
   const subject = "Your River Valley Research Peptides Gift Card";
@@ -604,8 +610,9 @@ export async function issueGiftCardsForOrder(orderId: number, purchaserEmail?: s
         const existing = await getGiftCardByCode(code);
         if (!existing) break;
       }
+      const recipientEmail = parseGiftCardRecipientEmail((item as any).variantLabel) || purchaserEmail;
       await createGiftCard({ code, originalAmount: amount.toFixed(2), balance: amount.toFixed(2), purchaserEmail, orderId, isActive: true });
-      await sendGiftCardEmail(purchaserEmail, code, amount);
+      await sendGiftCardEmail(recipientEmail, code, amount);
       console.log(`[Gift Card] Issued ${code} for order ${orderId}`);
     }
   }
