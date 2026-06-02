@@ -980,6 +980,33 @@ async function ensureDefaultSiteSettings(conn: mysql.Connection) {
 }
 
 
+
+async function clearLegacyResearchDefaultsOnce(conn: mysql.Connection) {
+  // One-time cleanup requested for existing catalog records:
+  // remove seeded/default research content and citations so admin-provided
+  // research starts clean and is not re-populated on restarts/redeploys.
+  const cleanupKey = "research_content_citations_cleared_2026_06_02";
+  const [existing] = await conn.execute<RowDataPacket[]>(
+    `SELECT id FROM siteSettings WHERE settingKey = ? LIMIT 1`,
+    [cleanupKey]
+  );
+
+  if (existing.length) return;
+
+  await conn.execute(`UPDATE productResearch SET overview = '', researchContent = ''`);
+  await conn.execute(`DELETE FROM researchCitations`);
+
+  await conn.execute(
+    `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE settingValue = settingValue`,
+    [cleanupKey, "true", "boolean", "Research Content/Citations Cleanup Complete", "general"]
+  );
+
+  console.log("[DB init] Cleared legacy research content and citations once.");
+}
+
+
 export async function ensureDatabaseReady() {
   if (initialized) return;
   if (initPromise) return initPromise;
@@ -1005,6 +1032,7 @@ export async function ensureDatabaseReady() {
       await ensureConfiguredSuperAdmin(conn);
       await ensureProductColumnTypes(conn);
       await ensureDefaultSiteSettings(conn);
+      await clearLegacyResearchDefaultsOnce(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
       console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");

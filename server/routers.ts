@@ -598,8 +598,20 @@ export const appRouter = router({
         coaUrl: z.string().optional(), hplcUrl: z.string().optional(), massSpecUrl: z.string().optional(),
         categoryIds: z.array(z.number()).optional(),
         variants: z.array(productVariantInput).optional(),
+        researchDraft: z.object({
+          chemicalMakeup: z.string().optional(),
+          researchContent: z.string().optional(),
+          citations: z.array(z.object({
+            title: z.string(),
+            authors: z.string().optional(),
+            journal: z.string().optional(),
+            year: z.string().optional(),
+            url: z.string().optional(),
+            summary: z.string().optional(),
+          })).optional(),
+        }).optional(),
       })).mutation(async ({ input }) => {
-        const { categoryIds, variants, ...rawData } = input;
+        const { categoryIds, variants, researchDraft, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
         if (!isNonVialProduct(data)) {
@@ -622,6 +634,28 @@ export const appRouter = router({
               sortOrder: cleanVariant.sortOrder ?? index,
             };
           }));
+        }
+        if (researchDraft) {
+          await db.upsertProductResearch(id, {
+            overview: "",
+            chemicalMakeup: researchDraft.chemicalMakeup || "",
+            researchContent: researchDraft.researchContent || "",
+          });
+          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 3) : [];
+          for (let index = 0; index < citations.length; index++) {
+            const citation = citations[index];
+            if (!String(citation.title || "").trim()) continue;
+            await db.createCitation({
+              productId: id,
+              citationNumber: index + 1,
+              title: citation.title,
+              authors: citation.authors || "",
+              journal: citation.journal || "NIH/PubMed",
+              year: citation.year || "",
+              url: citation.url || "",
+              summary: citation.summary || "",
+            } as any);
+          }
         }
         return { id };
       }),

@@ -428,6 +428,12 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       sortOrder: v.sortOrder ?? 0,
     })) : [],
   });
+  const [draftResearch, setDraftResearch] = useState<{
+    chemicalMakeup: string;
+    researchContent: string;
+    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
+  }>({ chemicalMakeup: "", researchContent: "", citations: [] });
+
   const initialPreviewType: PreviewProductType =
     (product?.previewType as PreviewProductType) ||
     (makeSlug(product?.slug || product?.name || "") === "gift-card" || String(product?.imageUrl || "").toLowerCase().includes("gift-card") ? "gift-card" :
@@ -622,6 +628,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       stockQuantity: previewType === "gift-card" ? 9999 : form.stockQuantity,
       imageUrl: linkedImageUrl || form.imageUrl || imageUrlForSlug(slug),
       variants,
+      researchDraft: !product?.id && previewType !== "gift-card" ? draftResearch : undefined,
     };
 
     onSave(payload);
@@ -814,6 +821,14 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           </>
         )}
 
+        {!isGiftCardTemplate && (
+          product?.id ? (
+            <ResearchCitationsEditor productId={product.id} productName={form.name} />
+          ) : (
+            <DraftResearchEditor productName={form.name} value={draftResearch} onChange={setDraftResearch} />
+          )
+        )}
+
         {/* Save */}
         <div className="flex items-center gap-3">
           <Button onClick={saveProduct} disabled={saving || linkingPreview} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
@@ -821,9 +836,153 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           </Button>
           <Button variant="outline" onClick={onCancel}>Cancel</Button>
         </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* Research Citations - only for existing products */}
-        {product?.id && !isGiftCardTemplate && <ResearchCitationsEditor productId={product.id} productName={form.name} />}
+
+// ─── Draft Research Editor (Add Product) ─────────────────────────────
+function DraftResearchEditor({
+  productName,
+  value,
+  onChange,
+}: {
+  productName: string;
+  value: {
+    chemicalMakeup: string;
+    researchContent: string;
+    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
+  };
+  onChange: (next: {
+    chemicalMakeup: string;
+    researchContent: string;
+    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
+  }) => void;
+}) {
+  const [gettingResearchDetails, setGettingResearchDetails] = useState(false);
+
+  const getResearchDetails = async () => {
+    const name = String(productName || "").trim();
+    if (!name) {
+      toast.error("Enter a product name before getting research details.");
+      return;
+    }
+
+    setGettingResearchDetails(true);
+    try {
+      const response = await fetch(`/api/product-research-details?name=${encodeURIComponent(name)}`);
+      if (!response.ok) throw new Error(await response.text());
+      const details = await response.json();
+      onChange({
+        chemicalMakeup: details.chemicalMakeup || "",
+        researchContent: details.researchContent || "",
+        citations: Array.isArray(details.citations) ? details.citations.slice(0, 3) : [],
+      });
+      toast.success("Research details added.");
+    } catch (error: any) {
+      toast.error(error?.message || "Unable to get research details.");
+    } finally {
+      setGettingResearchDetails(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl p-6 border border-slate-200">
+        <div className="mb-3 flex justify-start">
+          <Button type="button" size="sm" onClick={getResearchDetails} disabled={gettingResearchDetails} className="bg-blue-600 hover:bg-blue-700 text-white">
+            {gettingResearchDetails ? "Researching..." : "Get Research Details"}
+          </Button>
+        </div>
+        <h2 className="font-semibold text-slate-800">Research Information</h2>
+        <p className="text-xs text-slate-400 mb-4 mt-1">Add research background, chemical makeup, and study summaries. This appears on the product detail page.</p>
+        <div className="space-y-4">
+          <div>
+            <Label>Chemical Makeup</Label>
+            <Textarea
+              value={value.chemicalMakeup}
+              onChange={(e) => onChange({ ...value, chemicalMakeup: e.target.value })}
+              className="mt-1.5"
+              rows={3}
+              placeholder="Chemical structure, amino acid sequence, molecular formula, molecular weight, etc."
+            />
+          </div>
+          <div>
+            <Label>Research Content</Label>
+            <Textarea
+              value={value.researchContent}
+              onChange={(e) => onChange({ ...value, researchContent: e.target.value })}
+              className="mt-1.5"
+              rows={5}
+              placeholder="Detailed research findings, studies, and applications..."
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-6 border border-slate-200">
+        <div className="mb-4">
+          <h2 className="font-semibold text-slate-800">Research Citations & Sources</h2>
+          <p className="text-xs text-slate-400">The Get Research Details button will automatically add at least 3 sources here.</p>
+        </div>
+        {value.citations.length ? (
+          <div className="space-y-3">
+            {value.citations.map((citation, index) => (
+              <div key={index} className="flex gap-3 p-4 rounded-lg border border-slate-100 bg-slate-50">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold text-sm">{index + 1}</div>
+                <div className="flex-1 min-w-0">
+                  <Input
+                    value={citation.title || ""}
+                    onChange={(e) => {
+                      const citations = [...value.citations];
+                      citations[index] = { ...citation, title: e.target.value };
+                      onChange({ ...value, citations });
+                    }}
+                    className="mb-2 bg-white font-medium"
+                    placeholder="Source title"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <Input
+                      value={citation.journal || ""}
+                      onChange={(e) => {
+                        const citations = [...value.citations];
+                        citations[index] = { ...citation, journal: e.target.value };
+                        onChange({ ...value, citations });
+                      }}
+                      className="bg-white text-sm"
+                      placeholder="Journal/source"
+                    />
+                    <Input
+                      value={citation.year || ""}
+                      onChange={(e) => {
+                        const citations = [...value.citations];
+                        citations[index] = { ...citation, year: e.target.value };
+                        onChange({ ...value, citations });
+                      }}
+                      className="bg-white text-sm"
+                      placeholder="Year"
+                    />
+                    <Input
+                      value={citation.url || ""}
+                      onChange={(e) => {
+                        const citations = [...value.citations];
+                        citations[index] = { ...citation, url: e.target.value };
+                        onChange({ ...value, citations });
+                      }}
+                      className="bg-white text-sm"
+                      placeholder="URL"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+            No sources added yet. Click Get Research Details to populate research citations automatically.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -922,7 +1081,7 @@ function ResearchCitationsEditor({ productId, productName }: { productId: number
     <div className="space-y-6 mt-6">
       {/* Research Overview */}
       <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex justify-start">
           <Button type="button" size="sm" onClick={getResearchDetails} disabled={gettingResearchDetails} className="bg-blue-600 hover:bg-blue-700 text-white">
             {gettingResearchDetails ? "Researching..." : "Get Research Details"}
           </Button>

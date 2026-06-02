@@ -403,15 +403,42 @@ async function startServer() {
         ].slice(0, 3);
       }
 
-      const chemicalMakeup = [
-        `${cleanName} chemical makeup should be verified against supplier testing, certificate-of-analysis data, and published chemistry references.`,
-        "Use this field for molecular formula, molecular weight, amino-acid sequence, salt form, excipients, concentration, and other product-specific analytical details when available.",
-      ].join("\n\n");
+      let chemicalMakeup = "";
+      try {
+        const pubChemUrl = new URL(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/property/MolecularFormula,MolecularWeight,IUPACName/JSON`);
+        const pubChemResponse = await fetch(pubChemUrl);
+        if (pubChemResponse.ok) {
+          const pubChemJson: any = await pubChemResponse.json();
+          const props = pubChemJson?.PropertyTable?.Properties?.[0];
+          if (props) {
+            chemicalMakeup = [
+              props.MolecularFormula ? `Molecular formula: ${props.MolecularFormula}` : "",
+              props.MolecularWeight ? `Molecular weight: ${props.MolecularWeight}` : "",
+              props.IUPACName ? `IUPAC name: ${props.IUPACName}` : "",
+              "",
+              "Verify chemical identity against the product certificate of analysis, supplier testing documents, and product-specific analytical records before publishing."
+            ].filter(Boolean).join("\n");
+          }
+        }
+      } catch (chemicalError) {
+        console.warn("[Research Details] PubChem lookup failed; using verification guidance.", chemicalError);
+      }
 
+      if (!chemicalMakeup) {
+        chemicalMakeup = [
+          `${cleanName} chemical makeup should be verified against supplier testing, certificate-of-analysis data, PubChem where available, and published chemistry references.`,
+          "Use this field for molecular formula, molecular weight, amino-acid sequence, salt form, excipients, concentration, and other product-specific analytical details when available."
+        ].join("\n\n");
+      }
+
+      const citedTitles = citations.map((citation: any) => citation.title).filter(Boolean).slice(0, 3);
       const researchContent = [
-        `${cleanName} is presented as a research-focused product for laboratory, analytical, and study-context review. Buyers looking for high-quality research materials should review the product specifications, available testing documents, and the supporting literature before purchase.`,
-        `Current public research resources can help customers understand the scientific context, terminology, chemical identity, and analytical considerations associated with ${cleanName}. This summary is written to support clear product education while keeping claims tied to research and quality review.`,
-        "Key review points include product identity, purity documentation, handling requirements, formulation details, testing records, and relevant published literature. The sources below provide starting points for deeper research and can be edited before publishing.",
+        `${cleanName} is offered as a research-focused product for laboratory, analytical, and study-context review. Customers evaluating this product should consider the available testing documentation, product specifications, and the research literature connected to its chemical identity and intended research context.`,
+        `Current NIH/PubMed and chemistry database resources provide useful background for understanding ${cleanName}, including terminology, formulation considerations, analytical handling, and published scientific context. This helps customers make a more confident purchasing decision based on quality documentation and transparent product information.`,
+        citedTitles.length
+          ? `Recent source material reviewed for this summary includes: ${citedTitles.join("; ")}. These references should be checked directly before publishing any product-specific claims.`
+          : "Relevant literature should be checked directly through NIH/PubMed, PubChem, supplier certificates of analysis, and product-specific testing documentation before publishing any product-specific claims.",
+        "This product description is intended for research-material education only and should remain tied to laboratory use, analytical review, quality documentation, and published source material."
       ].join("\n\n");
 
       res.json({
