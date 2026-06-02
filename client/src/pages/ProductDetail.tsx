@@ -210,7 +210,7 @@ export default function ProductDetail() {
                 className="w-full object-contain"
               />
               {shouldOverlayGiftCardRange ? (
-                <div className="absolute right-[7%] top-[20%] whitespace-nowrap text-sm md:text-base font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+                <div className="absolute right-[18%] top-[8%] whitespace-nowrap text-sm md:text-base font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
                   {giftCardRange}
                 </div>
               ) : null}

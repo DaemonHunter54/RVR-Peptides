@@ -134,6 +134,8 @@ function DashboardSection() {
   const statsQuery = trpc.admin.dashboard.useQuery();
   const stats = statsQuery.data;
 
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Dashboard</h1>
@@ -249,6 +251,8 @@ function ProductsSection() {
       />
     );
   }
+
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -382,7 +386,7 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
           className="h-[245px] w-auto max-w-full object-contain"
         />
         {giftCardRange ? (
-          <div className="absolute right-[7%] top-[20%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+          <div className="absolute right-[18%] top-[8%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
             {giftCardRange}
           </div>
         ) : null}
@@ -629,6 +633,8 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     onSave(payload);
   };
 
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
@@ -780,6 +786,8 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           </div>
         </div>
 
+        {!isGiftCardTemplate && (
+          <>
         {/* Testing Documents */}
         <div className="bg-white rounded-xl p-6 border border-slate-200">
           <h2 className="font-semibold text-slate-800 mb-4">Testing Documents</h2>
@@ -807,6 +815,9 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           </div>
         </div>
 
+          </>
+        )}
+
         {/* Save */}
         <div className="flex items-center gap-3">
           <Button onClick={saveProduct} disabled={saving || linkingPreview} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
@@ -816,7 +827,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         </div>
 
         {/* Research Citations - only for existing products */}
-        {product?.id && <ResearchCitationsEditor productId={product.id} productName={form.name} />}
+        {product?.id && !isGiftCardTemplate && <ResearchCitationsEditor productId={product.id} productName={form.name} />}
       </div>
     </div>
   );
@@ -915,13 +926,13 @@ function ResearchCitationsEditor({ productId, productName }: { productId: number
     <div className="space-y-6 mt-6">
       {/* Research Overview */}
       <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <div className="flex items-center justify-between gap-4 mb-1">
-          <h2 className="font-semibold text-slate-800">Research Information</h2>
+        <div className="mb-3 flex justify-end">
           <Button type="button" size="sm" onClick={getResearchDetails} disabled={gettingResearchDetails} className="bg-blue-600 hover:bg-blue-700 text-white">
             {gettingResearchDetails ? "Researching..." : "Get Research Details"}
           </Button>
         </div>
-        <p className="text-xs text-slate-400 mb-4">Add research background, chemical makeup, and study summaries. This appears on the product detail page.</p>
+        <h2 className="font-semibold text-slate-800">Research Information</h2>
+        <p className="text-xs text-slate-400 mb-4 mt-1">Add research background, chemical makeup, and study summaries. This appears on the product detail page.</p>
         <div className="space-y-4">
           <div>
             <Label>Chemical Makeup</Label>
@@ -1048,6 +1059,8 @@ function OrdersSection() {
   const result = ordersQuery.data;
   const orders = result?.orders || (Array.isArray(result) ? result : []);
 
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Orders</h1>
@@ -1151,6 +1164,8 @@ function DiscountsSection() {
   const [form, setForm] = useState({ code: "", type: "percentage" as const, value: "", minOrderAmount: "", maxUses: "", isActive: true, expiresAt: "" });
   const discounts = Array.isArray(discountsQuery.data) ? discountsQuery.data : [];
 
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -1249,6 +1264,8 @@ function CustomersSection() {
     if (role === "admin") return "bg-purple-100 text-purple-800";
     return "bg-slate-100 text-slate-600";
   };
+
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1372,6 +1389,8 @@ function PaymentsSection() {
       setWebhookChanged(false);
     }
   }, [settings.nowpayments_api_key, settings.nowpayments_ipn_secret, settings.nowpayments_webhook_url, settings.nowpayments_sandbox_mode]);
+
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1697,6 +1716,8 @@ function CustomizationSection() {
     toast.success("All changes saved!");
   };
 
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -1895,6 +1916,8 @@ function SettingsSection() {
       ],
     },
   ];
+
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>

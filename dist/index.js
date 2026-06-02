@@ -334,6 +334,8 @@ function getNihResearchProfile(row) {
   return NIH_RESEARCH_PROFILES.find((profile) => profile.keys.some((key) => haystack.includes(key))) || NIH_GENERIC_RESEARCH_PROFILE;
 }
 async function ensureNihResearchDescriptions(conn) {
+  console.log("[DB init] NIH research auto-seed disabled; preserving admin-entered descriptions, research details, and citations.");
+  return;
   const [rows] = await conn.execute(`SELECT id, name, slug FROM products ORDER BY id ASC`);
   if (!rows.length) return;
   for (const row of rows) {
@@ -3918,7 +3920,7 @@ async function startServer() {
             context.shadowBlur = Math.round(fontSize * 0.16);
             context.shadowOffsetY = Math.max(1, Math.round(fontSize * 0.035));
             context.fillStyle = "#ffffff";
-            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.07), Math.round(image.height * 0.20));
+            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.18), Math.round(image.height * 0.08));
             buffer = await canvas.encode("png");
           } catch (giftCardError) {
             console.warn("[Gift Card Preview] Amount-range rendering failed; saving base gift card image.", giftCardError);

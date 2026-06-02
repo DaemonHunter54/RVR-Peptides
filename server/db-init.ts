@@ -670,6 +670,8 @@ function getNihResearchProfile(row: RowDataPacket): NihResearchProfile {
 }
 
 async function ensureNihResearchDescriptions(conn: mysql.Connection) {
+  console.log("[DB init] NIH research auto-seed disabled; preserving admin-entered descriptions, research details, and citations.");
+  return;
   const [rows] = await conn.execute<RowDataPacket[]>(`SELECT id, name, slug FROM products ORDER BY id ASC`);
   if (!rows.length) return;
 
