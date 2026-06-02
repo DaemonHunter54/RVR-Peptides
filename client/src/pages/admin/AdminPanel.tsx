@@ -332,11 +332,19 @@ const blankPreviewSrc = (type: PreviewProductType, slug: string, name: string, s
 };
 
 function ProductVialPreview({ name, slug, size, previewType, imageUrl }: { name: string; slug: string; size?: string; previewType: PreviewProductType; imageUrl?: string }) {
-  const previewSrc = previewType ? blankPreviewSrc(previewType, slug, name || "Preview Product", size) : (imageUrl || blankPreviewSrc("vial", slug, name || "Preview Product", size));
+  const previewSrc = previewType ? blankPreviewSrc(previewType, slug, name || "Preview Product", size) : imageUrl;
   const title = previewType === "cream" ? "Live Cream Preview" : previewType === "face-mask" ? "Live Face Mask Preview" : "Live Vial Preview";
 
+  if (!previewSrc) {
+    return (
+      <div className="h-full min-h-[235px] flex items-center justify-center bg-transparent px-6 text-center">
+        <p className="text-sm font-medium text-slate-400">Select template or upload an image to preview</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full min-h-[235px] flex items-start justify-end bg-transparent pt-0 pr-0">
+    <div className="h-full min-h-[235px] flex items-start justify-center bg-transparent pt-0">
       <img
         src={previewSrc}
         alt={title}
@@ -467,8 +475,6 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         next.sku = slug ? slug.toUpperCase().replace(/-/g, "-") : "";
         if (previewType) {
           next.imageUrl = blankPreviewSrc(previewType, slug, value || "Preview Product", next.size);
-        } else if (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/")) {
-          next.imageUrl = imageUrlForSlug(slug);
         }
       }
       if (field === "size" && previewType) {
@@ -616,19 +622,27 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                       ))}
                     </SelectContent>
                   </Select>
-                  {previewType ? (
-                    <Button type="button" className="bg-blue-600 hover:bg-blue-700 text-white px-6" onClick={linkPreviewToUrl} disabled={linkingPreview}>
-                      {linkingPreview ? "Linking..." : "Link URL"}
-                    </Button>
-                  ) : null}
-                </div>
-                {!previewType ? (
-                  <div className="mt-2">
-                    <Input type="file" accept="image/*" onChange={(e) => handleAssetFile(e.target.files?.[0])} />
-                    <p className="mt-1 text-xs text-slate-500">Uploaded product images are saved to assets with the white background converted to transparency.</p>
+                  <div>
+                    <input
+                      id="admin-product-image-upload"
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={Boolean(previewType)}
+                      onChange={(e) => handleAssetFile(e.target.files?.[0])}
+                    />
+                    <label
+                      htmlFor={previewType ? undefined : "admin-product-image-upload"}
+                      className={`inline-flex h-10 min-w-[132px] items-center justify-center rounded-md px-4 text-sm font-semibold transition-colors ${
+                        previewType
+                          ? "cursor-not-allowed bg-slate-200 text-slate-400"
+                          : "cursor-pointer bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      Choose File
+                    </label>
                   </div>
-                ) : null}
-                <p className="mt-1 text-xs text-slate-500">URL Slug and SKU are auto-generated in the background: {autoSlug || "waiting for product name"} / {autoSku || "waiting for product name"}</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(180px,280px)_1fr] gap-4 items-end pt-1">
@@ -645,7 +659,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               </div>
             </div>
 
-            <div className="justify-self-end w-full max-w-[360px]">
+            <div className="justify-self-center w-full max-w-[360px]">
               <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} imageUrl={form.imageUrl} />
             </div>
 
