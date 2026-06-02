@@ -91,7 +91,25 @@ async function startServer() {
         res.status(400).send("Invalid image upload");
         return;
       }
+      const mimeType = match[1].toLowerCase();
       const buffer = Buffer.from(match[2], "base64");
+      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+      fs.mkdirSync(assetsDir, { recursive: true });
+      const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
+
+      if (mimeType === "image/svg+xml" || mimeType === "image/svg") {
+        const svgText = buffer.toString("utf8").trim();
+        if (!/^<svg[\s>]/i.test(svgText) || /<script[\s>]/i.test(svgText) || /on\w+\s*=/i.test(svgText)) {
+          res.status(400).send("SVG uploads must be valid, safe SVG files. Please upload a PNG, JPG, WEBP, or a clean SVG.");
+          return;
+        }
+
+        const filename = `${baseSlug}-${Date.now()}.svg`;
+        fs.writeFileSync(path.join(assetsDir, filename), svgText, "utf8");
+        res.json({ name: filename, url: `/assets/${filename}` });
+        return;
+      }
+
       const { createCanvas, loadImage } = await import("@napi-rs/canvas");
       const image = await loadImage(buffer);
       const canvas = createCanvas(image.width, image.height);
@@ -113,9 +131,6 @@ async function startServer() {
 
       context.putImageData(imageData, 0, 0);
       const processedBuffer = await canvas.encode("png");
-      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
-      fs.mkdirSync(assetsDir, { recursive: true });
-      const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
       const filename = `${baseSlug}-${Date.now()}.png`;
       fs.writeFileSync(path.join(assetsDir, filename), processedBuffer);
       res.json({ name: filename, url: `/assets/${filename}` });

@@ -629,7 +629,10 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                       accept="image/*"
                       className="sr-only"
                       disabled={Boolean(previewType)}
-                      onChange={(e) => handleAssetFile(e.target.files?.[0])}
+                      onChange={(e) => {
+                        handleAssetFile(e.target.files?.[0]);
+                        e.currentTarget.value = "";
+                      }}
                     />
                     <label
                       htmlFor={previewType ? undefined : "admin-product-image-upload"}
