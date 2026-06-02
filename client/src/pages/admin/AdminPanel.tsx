@@ -418,7 +418,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   const autoSku = autoSlug ? autoSlug.toUpperCase().replace(/-/g, "-") : "";
 
   const linkPreviewToUrl = async () => {
-    if (!previewType) return;
+    if (!previewType) return form.imageUrl;
     const slug = autoSlug || makeSlug(form.slug || "preview-product");
     setLinkingPreview(true);
     try {
@@ -429,9 +429,11 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       });
       if (!response.ok) throw new Error(await response.text());
       const data = await response.json();
-      updateField("imageUrl", data.url);
+      setForm(prev => ({ ...prev, imageUrl: data.url }));
+      return data.url as string;
     } catch (error: any) {
       alert(error?.message || "Unable to link preview image.");
+      return "";
     } finally {
       setLinkingPreview(false);
     }
@@ -448,8 +450,8 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         sku: "GIFT-CARD",
         price: prev.price || "10",
         compareAtPrice: prev.compareAtPrice || "",
-        size: prev.size || "$10 minimum",
-        stockQuantity: prev.stockQuantity || 9999,
+        size: "",
+        stockQuantity: 9999,
         imageUrl: "/assets/Gift-Card.png",
       }));
       return;
@@ -515,11 +517,14 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         const slug = makeSlug(value);
         next.slug = slug;
         next.sku = slug ? slug.toUpperCase().replace(/-/g, "-") : "";
-        if (previewType) {
+        if (previewType && previewType !== "gift-card") {
           next.imageUrl = blankPreviewSrc(previewType, slug, value || "Preview Product", next.size);
         }
+        if (previewType === "gift-card") {
+          next.imageUrl = "/assets/Gift-Card.png";
+        }
       }
-      if (field === "size" && previewType) {
+      if (field === "size" && previewType && previewType !== "gift-card") {
         next.imageUrl = blankPreviewSrc(previewType, next.slug || makeSlug(next.name), next.name || "Preview Product", value);
       }
       return next;
@@ -563,23 +568,34 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     });
   };
 
-  const saveProduct = () => {
-    const variants = (form.variants || [])
-      .filter((v: any) => String(v.label || "").trim() || String(v.price || "").trim())
-      .map((v: any, index: number) => ({
-        ...v,
-        label: String(v.label || "").trim(),
-        price: String(v.price || form.price || "0").trim(),
-        sortOrder: index,
-        imageUrl: v.imageUrl || imageUrlForVariant(form.slug, String(v.label || "")) || form.imageUrl || imageUrlForSlug(form.slug),
-      }));
-
+  const saveProduct = async () => {
     const slug = makeSlug(form.name || form.slug);
+    const linkedImageUrl = previewType ? (await linkPreviewToUrl()) : form.imageUrl;
+
+    const variants = (form.variants || [])
+      .filter((v: any) => String(v.label || "").trim() || String(v.price || "").trim() || String(v.compareAtPrice || "").trim())
+      .map((v: any, index: number) => {
+        const cleanLabel = previewType === "gift-card"
+          ? `$${String(v.price || form.price || "10").trim()} minimum${String(v.compareAtPrice || form.compareAtPrice || "").trim() ? ` / $${String(v.compareAtPrice || form.compareAtPrice).trim()} maximum` : ""}`
+          : String(v.label || "").trim();
+        return {
+          ...v,
+          label: cleanLabel,
+          price: String(v.price || form.price || "0").trim(),
+          compareAtPrice: String(v.compareAtPrice || "").trim() || null,
+          stockQuantity: previewType === "gift-card" ? 9999 : (v.stockQuantity ?? form.stockQuantity ?? 100),
+          sortOrder: index,
+          imageUrl: v.imageUrl || linkedImageUrl || imageUrlForVariant(form.slug, cleanLabel) || imageUrlForSlug(form.slug),
+        };
+      });
+
     const payload = {
       ...form,
       slug,
       sku: slug ? slug.toUpperCase().replace(/-/g, "-") : form.sku,
-      imageUrl: form.imageUrl || imageUrlForSlug(slug),
+      size: previewType === "gift-card" ? "" : form.size,
+      stockQuantity: previewType === "gift-card" ? 9999 : form.stockQuantity,
+      imageUrl: linkedImageUrl || form.imageUrl || imageUrlForSlug(slug),
       variants,
     };
 
@@ -598,22 +614,24 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           <h2 className="font-semibold text-slate-800 mb-4">Basic Information</h2>
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,780px)_1fr] gap-8 items-start">
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))] gap-4 items-end">
+              <div className={`grid grid-cols-1 gap-4 items-end ${previewType === "gift-card" ? "md:grid-cols-[minmax(260px,1.45fr)_repeat(2,minmax(150px,0.55fr))]" : "md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))]"}`}>
                 <div>
                   <Label>Product Name *</Label>
                   <Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" />
                 </div>
-                <div>
-                  <Label>Dose / Size</Label>
-                  <Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" />
-                </div>
+                {previewType !== "gift-card" ? (
+                  <div>
+                    <Label>Dose / Size</Label>
+                    <Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" />
+                  </div>
+                ) : null}
                 <div>
                   <Label>{previewType === "gift-card" ? "Minimum Amount ($)" : "Price ($) *"}</Label>
-                  <Input type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" />
+                  <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" />
                 </div>
                 <div>
                   <Label>{previewType === "gift-card" ? "Maximum Amount ($)" : "Stock"}</Label>
-                  <Input type="number" value={previewType === "gift-card" ? (form.compareAtPrice || "") : form.stockQuantity} onChange={(e) => previewType === "gift-card" ? updateField("compareAtPrice", e.target.value) : updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" placeholder={previewType === "gift-card" ? "No max" : undefined} />
+                  <Input type="number" min="0" value={previewType === "gift-card" ? (form.compareAtPrice || "") : form.stockQuantity} onChange={(e) => previewType === "gift-card" ? updateField("compareAtPrice", e.target.value) : updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" placeholder={previewType === "gift-card" ? "No max" : undefined} />
                 </div>
               </div>
 
@@ -626,21 +644,23 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               {multipleProducts ? (
                 <div className="space-y-3 rounded-xl bg-slate-50/80 p-3">
                   {form.variants.map((variant: any, index: number) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))_auto] gap-4 items-end">
+                    <div key={index} className={`grid grid-cols-1 gap-4 items-end ${previewType === "gift-card" ? "md:grid-cols-[minmax(260px,1.45fr)_repeat(2,minmax(150px,0.55fr))_auto]" : "md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))_auto]"}`}>
                       <div className="hidden md:block text-xs font-medium text-slate-500 pb-3">
-                        Additional Dose {index + 1}
+                        {previewType === "gift-card" ? `Gift Card Range ${index + 1}` : `Additional Dose ${index + 1}`}
+                      </div>
+                      {previewType !== "gift-card" ? (
+                        <div>
+                          <Label>Dose / Size</Label>
+                          <Input value={variant.label} onChange={(e) => updateVariant(index, "label", e.target.value)} className="mt-1.5 bg-white" placeholder={form.size || "e.g. 10mg"} />
+                        </div>
+                      ) : null}
+                      <div>
+                        <Label>{previewType === "gift-card" ? "Lowest Amount Allowed ($)" : "Price ($)"}</Label>
+                        <Input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, "price", e.target.value)} className="mt-1.5 bg-white" placeholder={form.price || "10.00"} />
                       </div>
                       <div>
-                        <Label>Dose / Size</Label>
-                        <Input value={variant.label} onChange={(e) => updateVariant(index, "label", e.target.value)} className="mt-1.5 bg-white" placeholder={form.size || "e.g. 10mg"} />
-                      </div>
-                      <div>
-                        <Label>Price ($)</Label>
-                        <Input type="number" step="0.01" value={variant.price} onChange={(e) => updateVariant(index, "price", e.target.value)} className="mt-1.5 bg-white" placeholder={form.price || "0.00"} />
-                      </div>
-                      <div>
-                        <Label>Stock</Label>
-                        <Input type="number" value={variant.stockQuantity} onChange={(e) => updateVariant(index, "stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5 bg-white" />
+                        <Label>{previewType === "gift-card" ? "Highest Amount Allowed ($)" : "Stock"}</Label>
+                        <Input type="number" min="0" value={previewType === "gift-card" ? (variant.compareAtPrice || "") : variant.stockQuantity} onChange={(e) => previewType === "gift-card" ? updateVariant(index, "compareAtPrice", e.target.value) : updateVariant(index, "stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5 bg-white" placeholder={previewType === "gift-card" ? form.compareAtPrice || "No max" : undefined} />
                       </div>
                       <Button type="button" variant="ghost" size="sm" className="text-red-500 mb-0.5" onClick={() => removeVariant(index)}>
                         <Trash2 className="h-4 w-4" />
@@ -648,7 +668,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                     </div>
                   ))}
                   <Button type="button" variant="outline" size="sm" onClick={addVariant} className="gap-1.5">
-                    <Plus className="h-3.5 w-3.5" /> Add Dose
+                    <Plus className="h-3.5 w-3.5" /> {previewType === "gift-card" ? "Add Range" : "Add Dose"}
                   </Button>
                 </div>
               ) : null}
@@ -743,7 +763,9 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           <h2 className="font-semibold text-slate-800 mb-4">Specifications</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><Label>Purity</Label><Input value={form.purity} onChange={(e) => updateField("purity", e.target.value)} className="mt-1.5" placeholder="e.g. >99%" /></div>
-            <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
+            {previewType !== "gift-card" ? (
+              <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
+            ) : null}
             <div><Label>Form</Label><Input value={form.form} onChange={(e) => updateField("form", e.target.value)} className="mt-1.5" placeholder="e.g. Lyophilized Powder" /></div>
             <div><Label>Contents</Label><Input value={form.contents} onChange={(e) => updateField("contents", e.target.value)} className="mt-1.5" /></div>
             <div><Label>Molecular Formula</Label><Input value={form.molecularFormula} onChange={(e) => updateField("molecularFormula", e.target.value)} className="mt-1.5" /></div>
@@ -754,8 +776,8 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
         {/* Save */}
         <div className="flex items-center gap-3">
-          <Button onClick={saveProduct} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
-            <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save Product"}
+          <Button onClick={saveProduct} disabled={saving || linkingPreview} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+            <Save className="h-4 w-4" /> {saving || linkingPreview ? "Saving..." : "Save Product"}
           </Button>
           <Button variant="outline" onClick={onCancel}>Cancel</Button>
         </div>

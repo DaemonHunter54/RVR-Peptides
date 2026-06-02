@@ -142,7 +142,12 @@ export default function ProductDetail() {
       toast.success("Added to cart!");
       return;
     }
-    addToCart.mutate({ productId: product.id, quantity, variantId: activeVariant?.id, variantLabel: activeVariant?.label }, {
+    addToCart.mutate({
+      productId: product.id,
+      quantity,
+      variantId: activeVariant?.id,
+      variantLabel: isGiftCard ? `Gift Card $${Number(giftCardAmount || product.price || 10).toFixed(2)}` : activeVariant?.label,
+    }, {
       onSuccess: () => utils.cart.get.invalidate(),
     });
   };

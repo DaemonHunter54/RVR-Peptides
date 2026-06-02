@@ -11,6 +11,26 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleIpnWebhook } from "../nowpayments";
+import { storagePut } from "../storage";
+
+
+
+async function saveProductAsset(
+  relativeName: string,
+  data: Buffer | Uint8Array | string,
+  contentType: string,
+): Promise<{ name: string; url: string }> {
+  const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+  fs.mkdirSync(assetsDir, { recursive: true });
+  fs.writeFileSync(path.join(assetsDir, relativeName), data as any);
+  try {
+    const stored = await storagePut(`assets/${relativeName}`, data, contentType);
+    return { name: relativeName, url: stored.url };
+  } catch (error) {
+    console.warn("[Product Asset Storage] Persistent storage unavailable; using local asset path.", error);
+    return { name: relativeName, url: `/assets/${relativeName}` };
+  }
+}
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -153,49 +173,61 @@ async function startServer() {
         res.status(400).send("Invalid image upload");
         return;
       }
-      const mimeType = match[1].toLowerCase();
-      const buffer = Buffer.from(match[2], "base64");
-      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
-      fs.mkdirSync(assetsDir, { recursive: true });
-      const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
 
-      if (mimeType === "image/svg+xml" || mimeType === "image/svg") {
-        const svgText = buffer.toString("utf8").trim();
+      const mimeType = match[1].toLowerCase();
+      const originalBuffer = Buffer.from(match[2], "base64");
+      const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
+      const requestedName = String(req.body?.filename || "").toLowerCase();
+
+      if (mimeType === "image/svg+xml" || mimeType === "image/svg" || requestedName.endsWith(".svg")) {
+        const svgText = originalBuffer.toString("utf8").trim();
         if (!/<svg[\s>]/i.test(svgText) || /<script[\s>]/i.test(svgText) || /on\w+\s*=/i.test(svgText)) {
-          res.status(400).send("SVG uploads must be valid, safe SVG files. Please upload a PNG, JPG, WEBP, or a clean SVG.");
+          res.status(400).send("SVG uploads must be valid, safe SVG files. Please upload a PNG, JPG, WEBP, GIF, or a clean SVG.");
           return;
         }
-
         const filename = `${baseSlug}-${Date.now()}.svg`;
-        fs.writeFileSync(path.join(assetsDir, filename), svgText, "utf8");
-        res.json({ name: filename, url: `/assets/${filename}` });
+        const saved = await saveProductAsset(filename, svgText, "image/svg+xml");
+        res.json(saved);
         return;
       }
 
-      const { createCanvas, loadImage } = await import("@napi-rs/canvas");
-      const image = await loadImage(buffer);
-      const canvas = createCanvas(image.width, image.height);
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0);
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = imageData.data;
+      try {
+        const { createCanvas, loadImage } = await import("@napi-rs/canvas");
+        const image = await loadImage(originalBuffer);
+        const canvas = createCanvas(image.width, image.height);
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
 
-      for (let index = 0; index < pixels.length; index += 4) {
-        const red = pixels[index];
-        const green = pixels[index + 1];
-        const blue = pixels[index + 2];
-        const alpha = pixels[index + 3];
-        if (alpha > 0 && red > 238 && green > 238 && blue > 238 && Math.abs(red - green) < 12 && Math.abs(red - blue) < 12 && Math.abs(green - blue) < 12) {
-          const whiteness = Math.min(red, green, blue);
-          pixels[index + 3] = whiteness > 250 ? 0 : Math.max(0, Math.min(alpha, (255 - whiteness) * 12));
+        for (let index = 0; index < pixels.length; index += 4) {
+          const red = pixels[index];
+          const green = pixels[index + 1];
+          const blue = pixels[index + 2];
+          const alpha = pixels[index + 3];
+          if (alpha > 0 && red > 238 && green > 238 && blue > 238 && Math.abs(red - green) < 12 && Math.abs(red - blue) < 12 && Math.abs(green - blue) < 12) {
+            const whiteness = Math.min(red, green, blue);
+            pixels[index + 3] = whiteness > 250 ? 0 : Math.max(0, Math.min(alpha, (255 - whiteness) * 12));
+          }
         }
-      }
 
-      context.putImageData(imageData, 0, 0);
-      const processedBuffer = await canvas.encode("png");
-      const filename = `${baseSlug}-${Date.now()}.png`;
-      fs.writeFileSync(path.join(assetsDir, filename), processedBuffer);
-      res.json({ name: filename, url: `/assets/${filename}` });
+        context.putImageData(imageData, 0, 0);
+        const processedBuffer = await canvas.encode("png");
+        const filename = `${baseSlug}-${Date.now()}.png`;
+        const saved = await saveProductAsset(filename, processedBuffer, "image/png");
+        res.json(saved);
+        return;
+      } catch (imageError) {
+        console.warn("[Product Image Upload] Transparent-background conversion failed; saving original image.", imageError);
+        const extension =
+          mimeType.includes("webp") ? "webp" :
+          mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" :
+          mimeType.includes("gif") ? "gif" :
+          mimeType.includes("png") ? "png" : "bin";
+        const filename = `${baseSlug}-${Date.now()}.${extension}`;
+        const saved = await saveProductAsset(filename, originalBuffer, mimeType);
+        res.json(saved);
+      }
     } catch (err: any) {
       console.error("[Product Image Upload Error]", err);
       res.status(500).send(err?.message || "Unable to upload product image");
@@ -231,8 +263,8 @@ async function startServer() {
       }
 
       const filename = `${slug}-${type}-preview.${extension}`;
-      fs.writeFileSync(path.join(assetsDir, filename), buffer);
-      res.json({ url: `/assets/${filename}`, contentType });
+      const saved = await saveProductAsset(filename, buffer, contentType);
+      res.json({ url: saved.url, contentType });
     } catch (err: any) {
       console.error("[Product Preview Link Error]", err);
       res.status(500).send(err?.message || "Unable to link preview image");

@@ -543,6 +543,52 @@ export async function updateOrderPayment(paymentId: string, paymentStatus: strin
   }
 }
 
+
+
+async function sendGiftCardEmail(to: string | undefined, code: string, amount: number) {
+  if (!to) return;
+  const subject = "Your River Valley Research Peptides Gift Card";
+  const text = [
+    "Thank you for your gift card purchase.",
+    "",
+    `Gift card code: ${code}`,
+    `Amount: $${amount.toFixed(2)}`,
+    "",
+    "Use this code during checkout in the Use gift card field.",
+  ].join("\n");
+
+  const resendKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.GIFT_CARD_FROM_EMAIL || process.env.FROM_EMAIL || "orders@rivervalleyresearchpeptides.com";
+  if (resendKey) {
+    try {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: fromEmail, to, subject, text }),
+      });
+      return;
+    } catch (error) {
+      console.warn("[Gift Card Email] Resend delivery failed.", error);
+    }
+  }
+
+  const webhookUrl = process.env.GIFT_CARD_EMAIL_WEBHOOK_URL;
+  if (webhookUrl) {
+    try {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject, text, code, amount }),
+      });
+      return;
+    } catch (error) {
+      console.warn("[Gift Card Email] Webhook delivery failed.", error);
+    }
+  }
+
+  console.log(`[Gift Card Email Pending] ${to}: ${code} for $${amount.toFixed(2)}`);
+}
+
 export async function issueGiftCardsForOrder(orderId: number, purchaserEmail?: string) {
   const db = await getDb();
   if (!db) return;
@@ -559,6 +605,7 @@ export async function issueGiftCardsForOrder(orderId: number, purchaserEmail?: s
         if (!existing) break;
       }
       await createGiftCard({ code, originalAmount: amount.toFixed(2), balance: amount.toFixed(2), purchaserEmail, orderId, isActive: true });
+      await sendGiftCardEmail(purchaserEmail, code, amount);
       console.log(`[Gift Card] Issued ${code} for order ${orderId}`);
     }
   }

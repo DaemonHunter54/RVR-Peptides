@@ -101,7 +101,9 @@ function productAssetForDisplay(input: { slug?: string | null; name?: string | n
 function preserveManusImage(product: any): any {
   if (!product) return product;
   if (!isNonVialProduct(product)) {
-    return { ...product, imageUrl: generatedVialUrlForProduct(product) };
+    return shouldReplaceGeneratedImage(product.imageUrl)
+      ? { ...product, imageUrl: generatedVialUrlForProduct(product) }
+      : product;
   }
   const mappedImage = productAssetForDisplay(product);
   if (mappedImage && shouldReplaceGeneratedImage(product.imageUrl)) {
@@ -116,6 +118,24 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+
+
+
+function isGiftCardProduct(product: any) {
+  return makeProductSlug(product?.slug || product?.name || "") === "gift-card" || String(product?.name || "").toLowerCase().includes("gift card");
+}
+
+function parseGiftCardAmountFromLabel(label?: string | null) {
+  const text = String(label || "");
+  const match = text.match(/(?:gift\s*card\s*)?\$?([0-9]+(?:\.[0-9]{1,2})?)/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function giftCardVariantLabel(amount: number) {
+  return `Gift Card $${amount.toFixed(2)}`;
+}
 
 function normalizeAdminProductInput<T extends Record<string, any>>(input: T): T {
   const out: Record<string, any> = { ...input };
@@ -270,7 +290,13 @@ export const appRouter = router({
       for (const item of items) {
         const product = await db.getProductById(item.productId);
         if (product) {
-          enriched.push({ ...item, product });
+          const giftAmount = isGiftCardProduct(product) ? parseGiftCardAmountFromLabel(item.variantLabel) : null;
+          enriched.push({
+            ...item,
+            product: giftAmount
+              ? { ...product, name: `${product.name} ($${giftAmount.toFixed(2)})`, price: giftAmount.toFixed(2) }
+              : product,
+          });
         }
       }
       return enriched;
@@ -333,14 +359,15 @@ export const appRouter = router({
         const product = await db.getProductById(item.productId);
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Product ${item.productId} not found` });
         if (!product.inStock || product.stockQuantity < item.quantity) throw new TRPCError({ code: "BAD_REQUEST", message: `${product.name} is out of stock` });
-        let unitPrice = Number(product.price);
-        if (product.discountActive && product.discountPercent) {
+        const giftAmount = isGiftCardProduct(product) ? parseGiftCardAmountFromLabel(item.variantLabel) : null;
+        let unitPrice = giftAmount ?? Number(product.price);
+        if (!giftAmount && product.discountActive && product.discountPercent) {
           unitPrice = unitPrice * (1 - Number(product.discountPercent) / 100);
         }
         const totalPrice = unitPrice * item.quantity;
         subtotal += totalPrice;
-        const displayName = item.variantLabel ? `${product.name} (${item.variantLabel})` : product.name;
-        orderItems.push({ productId: item.productId, productName: displayName, variantId: item.variantId || null, variantLabel: item.variantLabel || null, quantity: item.quantity, unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2) });
+        const displayName = giftAmount ? `${product.name} ($${giftAmount.toFixed(2)})` : (item.variantLabel ? `${product.name} (${item.variantLabel})` : product.name);
+        orderItems.push({ productId: item.productId, productName: displayName, variantId: item.variantId || null, variantLabel: giftAmount ? giftCardVariantLabel(giftAmount) : (item.variantLabel || null), quantity: item.quantity, unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2) });
       }
 
       // Apply discount code
@@ -519,7 +546,7 @@ export const appRouter = router({
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
         if (!isNonVialProduct(data)) {
-          data.imageUrl = generatedVialUrlForProduct(data);
+          if (shouldReplaceGeneratedImage(data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
         } else if (mappedImage && shouldReplaceGeneratedImage(data.imageUrl)) {
           data.imageUrl = mappedImage;
         }
@@ -558,7 +585,7 @@ export const appRouter = router({
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
         if (!isNonVialProduct(data)) {
-          data.imageUrl = generatedVialUrlForProduct(data);
+          if (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
         } else if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
           data.imageUrl = mappedImage;
         }
