@@ -114,10 +114,17 @@ function preserveManusImage(product: any): any {
 
 // Admin middleware
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+  if (ctx.user.role !== "admin" && ctx.user.role !== "super_admin") throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   return next({ ctx });
 });
 
+
+const superAdminProcedure = adminProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "super_admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Super admin access required" });
+  }
+  return next({ ctx });
+});
 
 
 
@@ -752,9 +759,24 @@ export const appRouter = router({
       }),
     }),
 
-    // Users
+    // Users / database-backed roles
     users: router({
       list: adminProcedure.query(async () => db.getAllUsers()),
+      admins: adminProcedure.query(async () => db.getAdminUsers()),
+      updateRole: superAdminProcedure.input(z.object({
+        id: z.number(),
+        role: z.enum(["user", "admin", "super_admin"]),
+      })).mutation(async ({ input, ctx }) => {
+        if (input.id === ctx.user.id && input.role !== "super_admin") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot remove your own super admin role." });
+        }
+
+        const target = await db.getUserById(input.id);
+        if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+
+        const updated = await db.updateUserRole(input.id, input.role);
+        return { success: true, user: updated };
+      }),
     }),
 
     // NowPayments status check

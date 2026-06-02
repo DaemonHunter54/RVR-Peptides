@@ -103,7 +103,7 @@ export async function createLocalUser(data: { email: string; username: string; p
     passwordHash: data.passwordHash,
     name: data.name || data.username,
     loginMethod: "local",
-    role: isConfiguredAdmin ? "admin" : "user",
+    role: isConfiguredAdmin ? "super_admin" : "user",
     lastSignedIn: new Date(),
   });
   return getUserByOpenId(openId);
@@ -119,6 +119,24 @@ export async function updateUserProfile(userId: number, data: Partial<{ name: st
   const db = await getDb();
   if (!db) return;
   await db.update(users).set(data).where(eq(users.id, userId));
+}
+
+
+export async function updateUserRole(userId: number, role: "user" | "admin" | "super_admin") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ role }).where(eq(users.id, userId));
+  return getUserById(userId);
+}
+
+export async function getAdminUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ id: users.id, name: users.name, email: users.email, username: users.username, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
+    .from(users)
+    .where(or(eq(users.role, "admin"), eq(users.role, "super_admin")))
+    .orderBy(desc(users.createdAt));
 }
 
 export async function getAllUsers() {

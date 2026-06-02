@@ -9,7 +9,7 @@ const TABLES = [
   name text,
   email varchar(320),
   loginMethod varchar(64),
-  role enum('user','admin') NOT NULL DEFAULT 'user',
+  role enum('user','admin','super_admin') NOT NULL DEFAULT 'user',
   passwordHash varchar(255),
   username varchar(100),
   phone varchar(20),
@@ -220,7 +220,7 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
   ["users", "name", "text"],
   ["users", "email", "varchar(320)"],
   ["users", "loginMethod", "varchar(64)"],
-  ["users", "role", "enum('user','admin') NOT NULL DEFAULT 'user'"],
+  ["users", "role", "enum('user','admin','super_admin') NOT NULL DEFAULT 'user'"],
   ["users", "passwordHash", "varchar(255)"],
   ["users", "username", "varchar(100)"],
   ["users", "phone", "varchar(20)"],
@@ -808,6 +808,18 @@ let initialized = false;
 let initPromise: Promise<void> | null = null;
 
 
+async function ensureConfiguredSuperAdmin(conn: mysql.Connection) {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminUsername = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+
+  if (adminEmail) {
+    await conn.execute("UPDATE users SET role = 'super_admin' WHERE LOWER(email) = ?", [adminEmail]);
+  }
+  if (adminUsername) {
+    await conn.execute("UPDATE users SET role = 'super_admin' WHERE LOWER(username) = ?", [adminUsername]);
+  }
+}
+
 async function ensureProductColumnTypes(conn: mysql.Connection) {
   const statements = [
     "ALTER TABLE products MODIFY COLUMN description LONGTEXT",
@@ -825,6 +837,15 @@ async function ensureProductColumnTypes(conn: mysql.Connection) {
     } catch (error) {
       console.warn("[DB init] Could not normalize product column type:", statement, error);
     }
+  }
+}
+
+
+async function ensureUserRoleEnum(conn: mysql.Connection) {
+  try {
+    await conn.execute("ALTER TABLE users MODIFY COLUMN role enum('user','admin','super_admin') NOT NULL DEFAULT 'user'");
+  } catch (error) {
+    console.warn("[DB init] Could not normalize users.role enum:", error);
   }
 }
 
@@ -860,6 +881,8 @@ export async function ensureDatabaseReady() {
       for (const [table, column, definition] of REQUIRED_COLUMNS) {
         await addColumnIfMissing(conn, table, column, definition);
       }
+      await ensureUserRoleEnum(conn);
+      await ensureConfiguredSuperAdmin(conn);
       await ensureProductColumnTypes(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);

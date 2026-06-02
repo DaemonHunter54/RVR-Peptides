@@ -136,7 +136,7 @@ export default function Navbar() {
                         <Package className="h-4 w-4" /> My Orders
                       </Link>
                     </DropdownMenuItem>
-                    {user?.role === "admin" && (
+                    {(user?.role === "admin" || user?.role === "super_admin") && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>

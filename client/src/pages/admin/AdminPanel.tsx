@@ -34,7 +34,7 @@ export default function AdminPanel() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== "admin") {
+  if (!isAuthenticated || (user?.role !== "admin" && user?.role !== "super_admin")) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
@@ -1175,14 +1175,48 @@ function DiscountsSection() {
   );
 }
 
-// ─── Customers ───────────────────────────────────────────────────────
+// ─── Customers / Admin Roles ─────────────────────────────────────────
 function CustomersSection() {
+  const { user } = useAuth();
   const customersQuery = trpc.admin.users.list.useQuery();
+  const utils = trpc.useUtils();
   const customers = Array.isArray(customersQuery.data) ? customersQuery.data : [];
+  const canManageRoles = user?.role === "super_admin";
+
+  const updateRole = trpc.admin.users.updateRole.useMutation({
+    onSuccess: () => {
+      toast.success("User role updated");
+      utils.admin.users.list.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message || "Unable to update role"),
+  });
+
+  const roleBadgeClass = (role: string) => {
+    if (role === "super_admin") return "bg-blue-100 text-blue-800";
+    if (role === "admin") return "bg-purple-100 text-purple-800";
+    return "bg-slate-100 text-slate-600";
+  };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-900 mb-6">Customers</h1>
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Customers & Admin Roles</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Admin access is now controlled by database roles. Super admins can promote or demote users here.
+          </p>
+        </div>
+        <Badge className={canManageRoles ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"}>
+          Signed in as {user?.role?.replace("_", " ") || "user"}
+        </Badge>
+      </div>
+
+      {!canManageRoles && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          You can view users because you are an admin. Only a super admin can change database roles.
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1193,18 +1227,57 @@ function CustomersSection() {
                 <th className="text-left px-4 py-3 font-medium text-slate-500">Username</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-500">Role</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-500">Joined</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-500">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {customers.map((c: any) => (
-                <tr key={c.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-800">{c.name || "N/A"}</td>
-                  <td className="px-4 py-3 text-slate-600">{c.email || "N/A"}</td>
-                  <td className="px-4 py-3 text-slate-600">{c.username || "N/A"}</td>
-                  <td className="px-4 py-3"><Badge className={c.role === "admin" ? "bg-purple-100 text-purple-800" : "bg-slate-100 text-slate-600"}>{c.role}</Badge></td>
-                  <td className="px-4 py-3 text-slate-500">{new Date(c.createdAt).toLocaleDateString()}</td>
+              {customers.map((c: any) => {
+                const isSelf = c.id === user?.id;
+                return (
+                  <tr key={c.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-800">{c.name || "N/A"}</td>
+                    <td className="px-4 py-3 text-slate-600">{c.email || "N/A"}</td>
+                    <td className="px-4 py-3 text-slate-600">{c.username || "N/A"}</td>
+                    <td className="px-4 py-3">
+                      <Badge className={roleBadgeClass(c.role)}>{String(c.role || "user").replace("_", " ")}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "N/A"}</td>
+                    <td className="px-4 py-3">
+                      {canManageRoles ? (
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={c.role || "user"}
+                            disabled={updateRole.isPending || (isSelf && c.role === "super_admin")}
+                            onValueChange={(role: "user" | "admin" | "super_admin") => {
+                              if (isSelf && role !== "super_admin") {
+                                toast.error("You cannot remove your own super admin role.");
+                                return;
+                              }
+                              updateRole.mutate({ id: c.id, role });
+                            }}
+                          >
+                            <SelectTrigger className="h-9 w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="super_admin">Super admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">View only</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {customers.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">No users found.</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
