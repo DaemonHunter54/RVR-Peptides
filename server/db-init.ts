@@ -278,7 +278,7 @@ const DEFAULT_PRODUCTS: SeedProduct[] = [
   { slug: "bpc-157-5mg", name: "BPC-157 5mg", image: "/assets/bpc-157-5mg_1e10350a.webp", category: "Peptides", price: "39.99" },
   { slug: "bpc-157-10mg", name: "BPC-157 10mg", image: "/assets/bpc-157-5mg_1e10350a.webp", category: "Peptides", price: "69.99" },
   { slug: "bpc-157-capsules-500mcg-30", name: "BPC-157 Capsules 500mcg (30)", image: "/assets/bpc-157-capsules-500mcg-30_hd.webp?v=4", category: "Peptides", price: "49.99" },
-  { slug: "tb-500", name: "TB-500", image: "/assets/rvr-vial-template-single_c7ba8797.png", category: "Peptides", price: "49.99" },
+  { slug: "tb-500", name: "TB-500", image: "/api/vial/tb-500.png?name=TB-500&v=rvr-photoreal-adaptive-fit-v1", category: "Peptides", price: "49.99" },
   { slug: "cagrilintide-5mg", name: "Cagrilintide 5mg", image: "/assets/cagrilintide-5mg_f51eb3cf.webp", category: "Peptides", price: "99.99" },
   { slug: "cagrilintide-semaglutide-5mg-5mg", name: "Cagrilintide/Semaglutide 5mg/5mg", image: "/assets/cagrilintide-semaglutide-5mg-5mg_7655c129.webp", category: "Blends", price: "129.99" },
   { slug: "cjc-1295-no-dac-ipamorelin-5mg-5mg", name: "CJC-1295 No DAC/Ipamorelin 5mg/5mg", image: "/assets/cjc-1295-no-dac-ipamorelin-5mg-5mg_446f4b27.webp", category: "Blends", price: "79.99" },
@@ -435,6 +435,43 @@ function localAssetExists(image: string) {
   if (!image.startsWith("/assets/")) return false;
   const filename = image.replace(/^\/assets\//, "");
   return fs.existsSync(path.join(process.cwd(), "client", "public", "assets", filename));
+}
+
+
+const NON_VIAL_TERMS = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
+
+function rowIsNonVialProduct(row: RowDataPacket): boolean {
+  const text = [row.slug, row.name, row.form, row.category]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return NON_VIAL_TERMS.some((term) => text.includes(term));
+}
+
+function generatedVialUrlForRow(row: RowDataPacket): string {
+  const slug = slugifyValue(String(row.slug || row.name || "product")) || "product";
+  const params = new URLSearchParams();
+  if (row.name) params.set("name", String(row.name));
+  if (row.size || row.contents) params.set("size", String(row.size || row.contents));
+  params.set("v", "rvr-photoreal-adaptive-fit-v1");
+  return `/api/vial/${slug}.png?${params.toString()}`;
+}
+
+function isLegacyBundledVialAsset(value: unknown): boolean {
+  const image = String(value || "").toLowerCase();
+  if (!image) return false;
+  if (image.startsWith("/assets/products/")) return false;
+
+  return (
+    image.includes("rvr-vial-template-single") ||
+    image.includes("rvr-company-blank-vial") ||
+    image.includes("bacteriostatic-water") ||
+    (
+      image.startsWith("/assets/") &&
+      /_[0-9a-f]{8}\.(webp|png|jpg|jpeg)(?:\?|$)/i.test(image) &&
+      !/(gift-card|capsule|capsules|tube|cream|cleanser|sunscreen|mask|kit|box|storage|cap)/i.test(image)
+    )
+  );
 }
 
 function isGeneratedOrFallbackImage(value: unknown) {
@@ -679,7 +716,7 @@ async function ensureNihResearchDescriptions(conn: mysql.Connection) {
 
 async function ensureProductDisplayData(conn: mysql.Connection) {
   const [rows] = await conn.execute<RowDataPacket[]>(
-    `SELECT id, name, slug, price, imageUrl, isActive, sortOrder FROM products ORDER BY sortOrder ASC, id ASC`
+    `SELECT id, name, slug, price, imageUrl, size, contents, form, isActive, sortOrder FROM products ORDER BY sortOrder ASC, id ASC`
   );
 
   if (!rows.length) return;
@@ -691,9 +728,22 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
   // stale DB values. For products without an exact bundled asset, only repair missing/generated
   // fallback paths.
   for (const row of rows) {
+    const currentImage = String(row.imageUrl || "");
+
+    // Vial products should never be repaired back to older bundled/cached vial images.
+    // If an existing DB record points at a legacy vial asset, convert it to the
+    // approved HD vial renderer URL so it survives restarts and deploys.
+    if (!rowIsNonVialProduct(row)) {
+      if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset(currentImage)) {
+        const hdVialUrl = generatedVialUrlForRow(row);
+        await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [hdVialUrl, row.id]);
+        row.imageUrl = hdVialUrl;
+      }
+      continue;
+    }
+
     const exactAsset = exactAssetByProduct(row);
     const repairAsset = exactAsset || assetByProduct(row);
-    const currentImage = String(row.imageUrl || "");
 
     // Never overwrite a real admin-selected product image during startup.
     // Only repair missing/generated/fallback image URLs. This keeps product
@@ -720,7 +770,9 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
     const baseName = normalizeVariantGroupName(String(group[0].name)).base;
     const sorted = [...group].sort((a, b) => Number(a.price) - Number(b.price));
     const canonical = sorted[0];
-    const canonicalAsset = assetByProduct(canonical) || String(canonical.imageUrl || "");
+    const canonicalAsset = rowIsNonVialProduct(canonical)
+      ? assetByProduct(canonical) || String(canonical.imageUrl || "")
+      : generatedVialUrlForRow(canonical);
 
     // Use one visible parent product and turn sibling dose rows into variants.
     await conn.execute(
@@ -732,7 +784,9 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
       const row = sorted[i];
       const { label } = normalizeVariantGroupName(String(row.name));
       if (!label) continue;
-      const variantImage = assetByProduct(row) || row.imageUrl || canonicalAsset || null;
+      const variantImage = rowIsNonVialProduct(row)
+        ? assetByProduct(row) || row.imageUrl || canonicalAsset || null
+        : generatedVialUrlForRow(row);
       await conn.execute(
         `INSERT INTO product_variants (productId, label, price, imageUrl, stockQuantity, inStock, sortOrder)
          SELECT ?, ?, ?, ?, 100, true, ? FROM DUAL

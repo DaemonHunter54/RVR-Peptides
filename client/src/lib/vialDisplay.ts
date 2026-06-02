@@ -27,6 +27,24 @@ export function isNonVialProduct(product: any): boolean {
   return NON_VIAL_TERMS.some((term) => text.includes(term));
 }
 
+
+function isLegacyBundledVialAsset(value: unknown): boolean {
+  const image = String(value || "").toLowerCase();
+  if (!image) return false;
+  if (image.startsWith("/assets/products/")) return false;
+
+  return (
+    image.includes("rvr-vial-template-single") ||
+    image.includes("rvr-company-blank-vial") ||
+    image.includes("bacteriostatic-water") ||
+    (
+      image.startsWith("/assets/") &&
+      /_[0-9a-f]{8}\.(webp|png|jpg|jpeg)(?:\?|$)/i.test(image) &&
+      !/(gift-card|capsule|capsules|tube|cream|cleanser|sunscreen|mask|kit|box|storage|cap)/i.test(image)
+    )
+  );
+}
+
 function escXml(value: string): string {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -200,9 +218,13 @@ export function productImageUrl(product: any, variant?: any): string {
   const explicitProductImage = String(product?.imageUrl || "");
   const explicitImage = explicitVariantImage || explicitProductImage;
 
+  const nonVial = isNonVialProduct(product);
+
   // User/admin-selected images are the source of truth. Do not replace them
   // with generated or cached template assets on product cards or detail pages.
-  if (explicitImage && !isGeneratedImageUrl(explicitImage)) {
+  // For vial products, legacy bundled/cached vial assets are intentionally not
+  // treated as user-selected images; they are replaced by the approved HD vial renderer.
+  if (explicitImage && !isGeneratedImageUrl(explicitImage) && (nonVial || !isLegacyBundledVialAsset(explicitImage))) {
     return explicitImage;
   }
 
@@ -215,7 +237,7 @@ export function productImageUrl(product: any, variant?: any): string {
   const hdTubeAsset = HD_TUBE_ASSETS[slug];
   if (hdTubeAsset) return hdTubeAsset;
 
-  if (!isNonVialProduct(product)) {
+  if (!nonVial) {
     const variantLabel = variant?.label ? String(variant.label) : "";
     return generatedVialUrl(product?.slug || "product", product?.name || "Product", variantLabel || product?.size || "");
   }

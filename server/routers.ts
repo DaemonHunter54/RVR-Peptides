@@ -74,6 +74,28 @@ function shouldReplaceGeneratedImage(image?: string | null): boolean {
     || value.includes("/assets/generated/");
 }
 
+
+function isLegacyBundledVialAsset(value?: string | null): boolean {
+  const image = String(value || "").toLowerCase();
+  if (!image) return false;
+  if (image.startsWith("/assets/products/")) return false;
+
+  return (
+    image.includes("rvr-vial-template-single") ||
+    image.includes("rvr-company-blank-vial") ||
+    image.includes("bacteriostatic-water") ||
+    (
+      image.startsWith("/assets/") &&
+      /_[0-9a-f]{8}\.(webp|png|jpg|jpeg)(?:\?|$)/i.test(image) &&
+      !/(gift-card|capsule|capsules|tube|cream|cleanser|sunscreen|mask|kit|box|storage|cap)/i.test(image)
+    )
+  );
+}
+
+function shouldReplaceVialImage(product: any, image?: string | null): boolean {
+  return shouldReplaceGeneratedImage(image) || (!isNonVialProduct(product) && isLegacyBundledVialAsset(image));
+}
+
 function productAssetForDisplay(input: { slug?: string | null; name?: string | null; imageUrl?: string | null; size?: string | null; contents?: string | null }): string {
   const assets = getProductAssetMap();
   const exact = productAssetForInput(input);
@@ -101,7 +123,7 @@ function productAssetForDisplay(input: { slug?: string | null; name?: string | n
 function preserveManusImage(product: any): any {
   if (!product) return product;
   if (!isNonVialProduct(product)) {
-    return shouldReplaceGeneratedImage(product.imageUrl)
+    return shouldReplaceVialImage(product, product.imageUrl)
       ? { ...product, imageUrl: generatedVialUrlForProduct(product) }
       : product;
   }
@@ -552,7 +574,7 @@ export const appRouter = router({
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
         if (!isNonVialProduct(data)) {
-          if (shouldReplaceGeneratedImage(data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
+          if (shouldReplaceVialImage(data, data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
         } else if (mappedImage && shouldReplaceGeneratedImage(data.imageUrl)) {
           data.imageUrl = mappedImage;
         }
@@ -591,7 +613,7 @@ export const appRouter = router({
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
         if (!isNonVialProduct(data)) {
-          if (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
+          if (regenerateVial || shouldReplaceVialImage(data, data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
         } else if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
           data.imageUrl = mappedImage;
         }
