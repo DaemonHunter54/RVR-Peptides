@@ -40,8 +40,12 @@ export default function About() {
             </div>
             <div className="flex justify-center">
               <div className="relative">
-                <div className="absolute inset-0 bg-blue-500/10 rounded-3xl blur-2xl" />
-                <img src={ASSETS.peptideVial} alt="Research Peptide" className="relative w-72 h-72 object-contain" />
+                <div className="absolute inset-0 bg-blue-500/5 rounded-3xl blur-2xl" />
+                <img
+                  src={ASSETS.heroVials}
+                  alt="River Valley Research Peptide Vials"
+                  className="relative w-full max-w-md object-contain drop-shadow-[0_18px_45px_rgba(37,99,235,0.16)]"
+                />
               </div>
             </div>
           </div>
