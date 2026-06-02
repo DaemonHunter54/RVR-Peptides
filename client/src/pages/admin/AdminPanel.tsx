@@ -134,8 +134,6 @@ function DashboardSection() {
   const statsQuery = trpc.admin.dashboard.useQuery();
   const stats = statsQuery.data;
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Dashboard</h1>
@@ -251,8 +249,6 @@ function ProductsSection() {
       />
     );
   }
-
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -386,7 +382,7 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
           className="h-[245px] w-auto max-w-full object-contain"
         />
         {giftCardRange ? (
-          <div className="absolute right-[30%] top-[8%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+          <div className="absolute right-[28%] top-[8%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
             {giftCardRange}
           </div>
         ) : null}
@@ -441,6 +437,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     (makeSlug(product?.slug || product?.name || "") === "gift-card" || String(product?.imageUrl || "").toLowerCase().includes("gift-card") ? "gift-card" :
       product?.imageUrl?.includes("/api/vial/") ? "vial" : "");
   const [previewType, setPreviewType] = useState<PreviewProductType>(initialPreviewType);
+  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
   const [linkingPreview, setLinkingPreview] = useState(false);
   const [imageAssets, setImageAssets] = useState<Array<{ name: string; url: string }>>([]);
   const [multipleProducts, setMultipleProducts] = useState(Boolean(product?.variants?.length));
@@ -632,8 +629,6 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
     onSave(payload);
   };
-
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1059,8 +1054,6 @@ function OrdersSection() {
   const result = ordersQuery.data;
   const orders = result?.orders || (Array.isArray(result) ? result : []);
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Orders</h1>
@@ -1164,8 +1157,6 @@ function DiscountsSection() {
   const [form, setForm] = useState({ code: "", type: "percentage" as const, value: "", minOrderAmount: "", maxUses: "", isActive: true, expiresAt: "" });
   const discounts = Array.isArray(discountsQuery.data) ? discountsQuery.data : [];
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -1264,8 +1255,6 @@ function CustomersSection() {
     if (role === "admin") return "bg-purple-100 text-purple-800";
     return "bg-slate-100 text-slate-600";
   };
-
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1389,8 +1378,6 @@ function PaymentsSection() {
       setWebhookChanged(false);
     }
   }, [settings.nowpayments_api_key, settings.nowpayments_ipn_secret, settings.nowpayments_webhook_url, settings.nowpayments_sandbox_mode]);
-
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1716,8 +1703,6 @@ function CustomizationSection() {
     toast.success("All changes saved!");
   };
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -1916,8 +1901,6 @@ function SettingsSection() {
       ],
     },
   ];
-
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
