@@ -183,12 +183,31 @@ export function generatedVialUrl(slug: string, name?: string, size?: string): st
   return `/api/vial/${safeSlug}.png?${params.toString()}`;
 }
 
+function isGeneratedImageUrl(value: unknown): boolean {
+  const image = String(value || "");
+  return (
+    image.startsWith("/api/vial/") ||
+    image.includes("generated-vials/") ||
+    image.includes("rvr-vial-template-single") ||
+    image.includes("/vials/") ||
+    image.includes("placeholder")
+  );
+}
+
 export function productImageUrl(product: any, variant?: any): string {
   const slug = String(product?.slug || "").toLowerCase();
+  const explicitVariantImage = String(variant?.imageUrl || "");
+  const explicitProductImage = String(product?.imageUrl || "");
+  const explicitImage = explicitVariantImage || explicitProductImage;
 
-  // Keep the BPC-157 capsules product as a capsule bottle, but force the new
-  // HD transparent asset regardless of any older imageUrl stored in the DB.
-  // The query string intentionally busts browser/CDN cache after the asset swap.
+  // User/admin-selected images are the source of truth. Do not replace them
+  // with generated or cached template assets on product cards or detail pages.
+  if (explicitImage && !isGeneratedImageUrl(explicitImage)) {
+    return explicitImage;
+  }
+
+  // Keep the BPC-157 capsules product as a capsule bottle, but only when there
+  // is not a real saved image on the product/variant.
   if (slug === "bpc-157-capsules-500mcg-30") {
     return "/assets/bpc-157-capsules-500mcg-30_hd.webp?v=4";
   }
@@ -200,5 +219,6 @@ export function productImageUrl(product: any, variant?: any): string {
     const variantLabel = variant?.label ? String(variant.label) : "";
     return generatedVialUrl(product?.slug || "product", product?.name || "Product", variantLabel || product?.size || "");
   }
-  return variant?.imageUrl || product?.imageUrl || "";
+
+  return explicitImage || "";
 }

@@ -167,6 +167,16 @@ const TABLES = [
   PRIMARY KEY (id),
   UNIQUE KEY giftCards_code_unique (code)
 )`,
+`CREATE TABLE IF NOT EXISTS productAssets (
+  id int AUTO_INCREMENT NOT NULL,
+  name varchar(255) NOT NULL,
+  contentType varchar(100) NOT NULL,
+  data LONGBLOB NOT NULL,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY productAssets_name_unique (name)
+)`,
 `CREATE TABLE IF NOT EXISTS siteSettings (
   id int AUTO_INCREMENT NOT NULL,
   settingKey varchar(100) NOT NULL,
@@ -373,7 +383,7 @@ function getLocalAssetMap() {
   try {
     for (const file of fs.readdirSync(assetsDir)) {
       if (!/\.(png|jpg|jpeg|webp)$/i.test(file)) continue;
-      const key = stripAssetHash(file);
+      const key = slugifyValue(stripAssetHash(file));
       if (key && !_assetMap.has(key)) _assetMap.set(key, `/assets/${file}`);
     }
   } catch {
@@ -685,12 +695,10 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
     const repairAsset = exactAsset || assetByProduct(row);
     const currentImage = String(row.imageUrl || "");
 
-    if (exactAsset && currentImage !== exactAsset) {
-      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [exactAsset, row.id]);
-      row.imageUrl = exactAsset;
-      continue;
-    }
-
+    // Never overwrite a real admin-selected product image during startup.
+    // Only repair missing/generated/fallback image URLs. This keeps product
+    // edits hard-saved in the database and prevents redeploys from reverting
+    // products back to cached/template images.
     if (repairAsset && isGeneratedOrFallbackImage(currentImage)) {
       await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairAsset, row.id]);
       row.imageUrl = repairAsset;

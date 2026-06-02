@@ -266,7 +266,7 @@ function getLocalAssetMap() {
   try {
     for (const file of fs.readdirSync(assetsDir)) {
       if (!/\.(png|jpg|jpeg|webp)$/i.test(file)) continue;
-      const key = stripAssetHash(file);
+      const key = slugifyValue(stripAssetHash(file));
       if (key && !_assetMap.has(key)) _assetMap.set(key, `/assets/${file}`);
     }
   } catch {
@@ -359,11 +359,6 @@ async function ensureProductDisplayData(conn) {
     const exactAsset = exactAssetByProduct(row);
     const repairAsset = exactAsset || assetByProduct(row);
     const currentImage = String(row.imageUrl || "");
-    if (exactAsset && currentImage !== exactAsset) {
-      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [exactAsset, row.id]);
-      row.imageUrl = exactAsset;
-      continue;
-    }
     if (repairAsset && isGeneratedOrFallbackImage(currentImage)) {
       await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairAsset, row.id]);
       row.imageUrl = repairAsset;
@@ -686,7 +681,17 @@ var init_db_init = __esm({
   PRIMARY KEY (id),
   UNIQUE KEY giftCards_code_unique (code)
 )`,
-      `CREATE TABLE IF NOT EXISTS siteSettings (
+      `CREATE TABLE IF NOT EXISTS productAssets (
+  id int AUTO_INCREMENT NOT NULL,
+  name varchar(255) NOT NULL,
+  contentType varchar(100) NOT NULL,
+  data LONGBLOB NOT NULL,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY productAssets_name_unique (name)
+)`,
+`CREATE TABLE IF NOT EXISTS siteSettings (
   id int AUTO_INCREMENT NOT NULL,
   settingKey varchar(100) NOT NULL,
   settingValue text,
@@ -3567,6 +3572,93 @@ async function startServer() {
       fs6.writeFileSync(path6.join(assetsDir, relativeName), data);
     }
   };
+  const getProductAssetConnection2 = async () => {
+    const url = process.env.DATABASE_URL;
+    if (!url) return null;
+    try {
+      return await mysql.createConnection({ uri: url, connectTimeout: 1e4 });
+    } catch (error) {
+      console.warn("[Product Asset Storage] Database connection unavailable; using local asset path.", error);
+      return null;
+    }
+  };
+  const ensureProductAssetsTable2 = async (conn) => {
+    await conn.execute(`CREATE TABLE IF NOT EXISTS productAssets (
+      id int AUTO_INCREMENT NOT NULL,
+      name varchar(255) NOT NULL,
+      contentType varchar(100) NOT NULL,
+      data LONGBLOB NOT NULL,
+      createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY productAssets_name_unique (name)
+    )`);
+  };
+  const saveRuntimeProductAsset = async (relativeName, data, contentType) => {
+    writeRuntimeProductAsset(relativeName, data);
+    const conn = await getProductAssetConnection2();
+    if (!conn) return { name: relativeName, url: `/assets/${relativeName}` };
+    try {
+      await ensureProductAssetsTable2(conn);
+      const assetBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+      await conn.execute(
+        `INSERT INTO productAssets (name, contentType, data)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE contentType = VALUES(contentType), data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`,
+        [relativeName, contentType, assetBuffer]
+      );
+      return { name: relativeName, url: `/api/product-assets/${encodeURIComponent(relativeName)}` };
+    } catch (error) {
+      console.warn("[Product Asset Storage] Database asset save failed; using local asset path.", error);
+      return { name: relativeName, url: `/assets/${relativeName}` };
+    } finally {
+      await conn.end().catch(() => {});
+    }
+  };
+  const readRuntimeProductAsset = async (relativeName) => {
+    const conn = await getProductAssetConnection2();
+    if (!conn) return null;
+    try {
+      await ensureProductAssetsTable2(conn);
+      const [rows] = await conn.execute(`SELECT contentType, data FROM productAssets WHERE name = ? LIMIT 1`, [relativeName]);
+      const row = rows?.[0];
+      return row ? { contentType: String(row.contentType || "application/octet-stream"), data: Buffer.from(row.data) } : null;
+    } catch (error) {
+      console.warn("[Product Asset Storage] Database asset read failed; trying local asset path.", error);
+      return null;
+    } finally {
+      await conn.end().catch(() => {});
+    }
+  };
+  app.get("/api/product-assets/:name", async (req, res) => {
+    try {
+      const requestedName = path6.basename(String(req.params.name || ""));
+      if (!requestedName) {
+        res.status(400).send("Missing asset name");
+        return;
+      }
+      const dbAsset = await readRuntimeProductAsset(requestedName);
+      if (dbAsset) {
+        res.setHeader("Content-Type", dbAsset.contentType);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.send(dbAsset.data);
+        return;
+      }
+      for (const assetsDir of getRuntimeProductAssetDirs()) {
+        const fullPath = path6.join(assetsDir, requestedName);
+        if (fs6.existsSync(fullPath)) {
+          const ext = path6.extname(requestedName).toLowerCase();
+          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webp" ? "image/webp" : ext === ".gif" ? "image/gif" : ext === ".svg" ? "image/svg+xml" : "application/octet-stream";
+          res.setHeader("Content-Type", contentType);
+          res.send(fs6.readFileSync(fullPath));
+          return;
+        }
+      }
+      res.status(404).send("Product asset not found");
+    } catch (err) {
+      res.status(404).send("Product asset not found");
+    }
+  });
   app.get("/api/product-assets", async (req, res) => {
     try {
       const seen = /* @__PURE__ */ new Set();
@@ -3650,8 +3742,8 @@ async function startServer() {
           return;
         }
         const filename2 = `${baseSlug}-${Date.now()}.svg`;
-        writeRuntimeProductAsset(filename2, svgText);
-        res.json({ name: filename2, url: `/assets/${filename2}` });
+        const saved = await saveRuntimeProductAsset(filename2, svgText, "image/svg+xml");
+        res.json(saved);
         return;
       }
       const { createCanvas: createCanvas2, loadImage: loadImage2 } = await import("@napi-rs/canvas");
@@ -3674,8 +3766,8 @@ async function startServer() {
       context.putImageData(imageData, 0, 0);
       const processedBuffer = await canvas.encode("png");
       const filename = `${baseSlug}-${Date.now()}.png`;
-      writeRuntimeProductAsset(filename, processedBuffer);
-      res.json({ name: filename, url: `/assets/${filename}` });
+      const saved = await saveRuntimeProductAsset(filename, processedBuffer, "image/png");
+      res.json(saved);
     } catch (err) {
       console.error("[Product Image Upload Error]", err);
       res.status(500).send(err?.message || "Unable to upload product image");
@@ -3706,8 +3798,8 @@ async function startServer() {
       }
       const amountSlug = type === "gift-card" && giftCardRange ? `-${makeSafeSlug(giftCardRange)}` : "";
       const filename = `${slug}-${type}${amountSlug}-preview.${extension}`;
-      writeRuntimeProductAsset(filename, buffer);
-      res.json({ url: `/assets/${filename}`, contentType });
+      const saved = await saveRuntimeProductAsset(filename, buffer, contentType);
+      res.json({ url: saved.url, contentType });
     } catch (err) {
       console.error("[Product Preview Link Error]", err);
       res.status(500).send(err?.message || "Unable to link preview image");

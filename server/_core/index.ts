@@ -12,6 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleIpnWebhook } from "../nowpayments";
 import { storagePut } from "../storage";
+import mysql from "mysql2/promise";
 
 
 
@@ -63,12 +64,93 @@ function readServedAsset(relativeName: string): Buffer {
 }
 
 
+
+async function getProductAssetConnection(): Promise<mysql.Connection | null> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  try {
+    return await mysql.createConnection({ uri: url, connectTimeout: 10000 });
+  } catch (error) {
+    console.warn("[Product Asset Storage] Database connection unavailable; using local asset path.", error);
+    return null;
+  }
+}
+
+async function ensureProductAssetsTable(conn: mysql.Connection) {
+  await conn.execute(`CREATE TABLE IF NOT EXISTS productAssets (
+    id int AUTO_INCREMENT NOT NULL,
+    name varchar(255) NOT NULL,
+    contentType varchar(100) NOT NULL,
+    data LONGBLOB NOT NULL,
+    createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY productAssets_name_unique (name)
+  )`);
+}
+
+async function saveProductAssetToDatabase(
+  relativeName: string,
+  data: Buffer | Uint8Array | string,
+  contentType: string,
+): Promise<boolean> {
+  const conn = await getProductAssetConnection();
+  if (!conn) return false;
+  try {
+    await ensureProductAssetsTable(conn);
+    const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as any);
+    await conn.execute(
+      `INSERT INTO productAssets (name, contentType, data)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE contentType = VALUES(contentType), data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`,
+      [relativeName, contentType, buffer]
+    );
+    return true;
+  } catch (error) {
+    console.warn("[Product Asset Storage] Database asset save failed; using local asset path.", error);
+    return false;
+  } finally {
+    await conn.end().catch(() => {});
+  }
+}
+
+async function readProductAssetFromDatabase(relativeName: string): Promise<{ data: Buffer; contentType: string } | null> {
+  const conn = await getProductAssetConnection();
+  if (!conn) return null;
+  try {
+    await ensureProductAssetsTable(conn);
+    const [rows] = await conn.execute<any[]>(
+      `SELECT contentType, data FROM productAssets WHERE name = ? LIMIT 1`,
+      [relativeName]
+    );
+    const row = rows?.[0];
+    if (!row) return null;
+    return {
+      data: Buffer.from(row.data),
+      contentType: String(row.contentType || "application/octet-stream"),
+    };
+  } catch (error) {
+    console.warn("[Product Asset Storage] Database asset read failed; trying local asset path.", error);
+    return null;
+  } finally {
+    await conn.end().catch(() => {});
+  }
+}
+
 async function saveProductAsset(
   relativeName: string,
   data: Buffer | Uint8Array | string,
   contentType: string,
 ): Promise<{ name: string; url: string }> {
   writeProductAssetToServedLocations(relativeName, data);
+
+  // Hard-save generated/uploaded product images to the application database.
+  // Railway replaces the local filesystem on redeploy, so database-backed
+  // image URLs are the durable source for user-created product assets.
+  const savedToDatabase = await saveProductAssetToDatabase(relativeName, data, contentType);
+  if (savedToDatabase) {
+    return { name: relativeName, url: `/api/product-assets/${encodeURIComponent(relativeName)}` };
+  }
 
   try {
     const stored = await storagePut(`assets/${relativeName}`, data, contentType);
@@ -134,6 +216,40 @@ async function startServer() {
     }
   });
 
+
+
+  app.get("/api/product-assets/:name", async (req, res) => {
+    try {
+      const requestedName = path.basename(String(req.params.name || ""));
+      if (!requestedName) {
+        res.status(400).send("Missing asset name");
+        return;
+      }
+
+      const databaseAsset = await readProductAssetFromDatabase(requestedName);
+      if (databaseAsset) {
+        res.setHeader("Content-Type", databaseAsset.contentType);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.send(databaseAsset.data);
+        return;
+      }
+
+      const localBuffer = readServedAsset(requestedName);
+      const ext = path.extname(requestedName).toLowerCase();
+      const contentType =
+        ext === ".png" ? "image/png" :
+        ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" :
+        ext === ".webp" ? "image/webp" :
+        ext === ".gif" ? "image/gif" :
+        ext === ".svg" ? "image/svg+xml" :
+        "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(localBuffer);
+    } catch (err: any) {
+      res.status(404).send("Product asset not found");
+    }
+  });
 
 
   app.get("/api/product-assets", async (req, res) => {
