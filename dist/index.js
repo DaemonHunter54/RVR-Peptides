@@ -1977,8 +1977,6 @@ import "dotenv/config";
 import express2 from "express";
 import { createServer } from "http";
 import net from "net";
-import fs6 from "fs";
-import path6 from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // shared/const.ts
@@ -3449,10 +3447,11 @@ async function startServer() {
       res.status(500).send("Error");
     }
   });
+
   app.get("/api/product-assets", async (req, res) => {
     try {
-      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
-      const files = fs6.existsSync(assetsDir) ? fs6.readdirSync(assetsDir) : [];
+      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+      const files = fs.existsSync(assetsDir) ? fs.readdirSync(assetsDir) : [];
       res.json(files.filter((file) => /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file)).map((file) => ({ name: file, url: `/assets/${file}` })).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       res.status(500).send(err?.message || "Unable to list assets");
@@ -3467,31 +3466,14 @@ async function startServer() {
         res.status(400).send("Invalid image upload");
         return;
       }
+      const mime = match[1].toLowerCase();
+      const ext = mime.includes("jpeg") ? "jpg" : mime.split("/")[1].replace(/[^a-z0-9]/g, "") || "png";
       const buffer = Buffer.from(match[2], "base64");
-      const { createCanvas: createCanvas2, loadImage: loadImage2 } = await import("@napi-rs/canvas");
-      const image = await loadImage2(buffer);
-      const canvas = createCanvas2(image.width, image.height);
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0);
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = imageData.data;
-      for (let index = 0; index < pixels.length; index += 4) {
-        const red = pixels[index];
-        const green = pixels[index + 1];
-        const blue = pixels[index + 2];
-        const alpha = pixels[index + 3];
-        if (alpha > 0 && red > 238 && green > 238 && blue > 238 && Math.abs(red - green) < 12 && Math.abs(red - blue) < 12 && Math.abs(green - blue) < 12) {
-          const whiteness = Math.min(red, green, blue);
-          pixels[index + 3] = whiteness > 250 ? 0 : Math.max(0, Math.min(alpha, (255 - whiteness) * 12));
-        }
-      }
-      context.putImageData(imageData, 0, 0);
-      const processedBuffer = await canvas.encode("png");
-      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
-      fs6.mkdirSync(assetsDir, { recursive: true });
+      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+      fs.mkdirSync(assetsDir, { recursive: true });
       const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
-      const filename = `${baseSlug}-${Date.now()}.png`;
-      fs6.writeFileSync(path6.join(assetsDir, filename), processedBuffer);
+      const filename = `${baseSlug}-${Date.now()}.${ext}`;
+      fs.writeFileSync(path.join(assetsDir, filename), buffer);
       res.json({ name: filename, url: `/assets/${filename}` });
     } catch (err) {
       console.error("[Product Image Upload Error]", err);
@@ -3506,27 +3488,28 @@ async function startServer() {
       const name = String(req.body?.name || slug.replace(/-/g, " ")).trim();
       const size = String(req.body?.size || "").trim();
       const displayName = size && !name.toLowerCase().includes(size.toLowerCase()) ? `${name} ${size}` : name;
-      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
-      fs6.mkdirSync(assetsDir, { recursive: true });
+      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+      fs.mkdirSync(assetsDir, { recursive: true });
       let buffer;
       let extension = "png";
       let contentType = "image/png";
       if (type === "cream") {
-        buffer = fs6.readFileSync(path6.join(assetsDir, "lotion-bottle-blank-hd-tube.png"));
+        buffer = fs.readFileSync(path.join(assetsDir, "lotion-bottle-blank-hd-tube.png"));
       } else if (type === "face-mask") {
-        buffer = fs6.readFileSync(path6.join(assetsDir, "face-mask-blank-hd.png"));
+        buffer = fs.readFileSync(path.join(assetsDir, "face-mask-blank-hd.png"));
       } else {
-        const { generateVialBuffer: generateVialBuffer3 } = await Promise.resolve().then(() => (init_vialGenerator(), vialGenerator_exports));
-        buffer = await generateVialBuffer3(displayName);
+        const { generateVialBuffer: generateVialBuffer2 } = await Promise.resolve().then(() => (init_vialGenerator(), vialGenerator_exports));
+        buffer = await generateVialBuffer2(displayName);
       }
       const filename = `${slug}-${type}-preview.${extension}`;
-      fs6.writeFileSync(path6.join(assetsDir, filename), buffer);
+      fs.writeFileSync(path.join(assetsDir, filename), buffer);
       res.json({ url: `/assets/${filename}`, contentType });
     } catch (err) {
       console.error("[Product Preview Link Error]", err);
       res.status(500).send(err?.message || "Unable to link preview image");
     }
   });
+
   app.post("/api/nowpayments/ipn", async (req, res) => {
     try {
       const signature = req.headers["x-nowpayments-sig"] || "";

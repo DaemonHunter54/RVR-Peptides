@@ -331,17 +331,31 @@ const blankPreviewSrc = (type: PreviewProductType, slug: string, name: string, s
   return generatedVialPreviewUrl(slug, name || "Preview Product", size);
 };
 
-function ProductVialPreview({ name, slug, size, previewType, imageUrl }: { name: string; slug: string; size?: string; previewType: PreviewProductType; imageUrl?: string }) {
-  const previewSrc = previewType ? blankPreviewSrc(previewType, slug, name || "Preview Product", size) : (imageUrl || blankPreviewSrc("vial", slug, name || "Preview Product", size));
+function ProductVialPreview({ name, slug, size, previewType, onLink, linking }: { name: string; slug: string; size?: string; previewType: PreviewProductType; onLink: () => void; linking: boolean }) {
+  const previewSrc = blankPreviewSrc(previewType || "vial", slug, name || "Preview Product", size);
   const title = previewType === "cream" ? "Live Cream Preview" : previewType === "face-mask" ? "Live Face Mask Preview" : "Live Vial Preview";
 
   return (
-    <div className="h-full min-h-[285px] flex items-start justify-center bg-transparent pt-1">
-      <img
-        src={previewSrc}
-        alt={title}
-        className="h-[250px] w-auto max-w-full object-contain drop-shadow-sm"
-      />
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 h-full">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
+          <p className="text-xs text-slate-500">Auto-updates from product name and dose/size.</p>
+        </div>
+        {previewType ? <Badge variant="outline">Dynamic company asset</Badge> : null}
+      </div>
+      <div className="flex justify-center rounded-lg bg-white p-4 min-h-[230px] overflow-hidden">
+        <img
+          src={previewSrc}
+          alt={title}
+          className="h-[230px] w-auto max-w-full object-contain"
+        />
+      </div>
+      {previewType ? (
+        <Button type="button" variant="outline" size="sm" className="mt-3 w-full" onClick={onLink} disabled={linking}>
+          {linking ? "Linking..." : "Link to URL"}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -525,73 +539,78 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         {/* Basic Info */}
         <div className="bg-white rounded-xl p-6 border border-slate-200">
           <h2 className="font-semibold text-slate-800 mb-4">Basic Information</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><Label>Product Name *</Label><Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" /></div>
                 <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
               </div>
-
+              <div><Label>Short Description</Label><Input value={form.shortDescription} onChange={(e) => updateField("shortDescription", e.target.value)} className="mt-1.5" /></div>
               <div>
-                <Label>Select product template</Label>
-                <div className="mt-1.5 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                <Label>Image URL</Label>
+                <div className="mt-1.5 grid grid-cols-1 md:grid-cols-[220px_1fr] gap-2">
                   <Select value={previewType || "none"} onValueChange={handlePreviewTypeChange}>
-                    <SelectTrigger><SelectValue placeholder="Select product template" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Preview type" /></SelectTrigger>
                     <SelectContent>
                       {PRODUCT_PREVIEW_TYPES.map((option) => (
                         <SelectItem key={option.label} value={option.value || "none"}>{option.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {previewType ? (
-                    <Button type="button" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={linkPreviewToUrl} disabled={linkingPreview}>
-                      {linkingPreview ? "Linking..." : "Link URL"}
-                    </Button>
-                  ) : null}
+                  <Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} placeholder="Paste URL, generated link, or asset path" disabled={!!previewType} />
                 </div>
                 {!previewType ? (
-                  <div className="mt-2">
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2">
                     <Input type="file" accept="image/*" onChange={(e) => handleAssetFile(e.target.files?.[0])} />
-                    <p className="mt-1 text-xs text-slate-500">Uploaded product images are saved to assets with the white background converted to transparency.</p>
+                    <Select value={form.imageUrl || "none"} onValueChange={(value) => value !== "none" && updateField("imageUrl", value)}>
+                      <SelectTrigger><SelectValue placeholder="Select asset" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select asset file</SelectItem>
+                        {imageAssets.map((asset) => (
+                          <SelectItem key={asset.url} value={asset.url}>{asset.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 ) : null}
                 <p className="mt-1 text-xs text-slate-500">URL Slug and SKU are auto-generated in the background: {autoSlug || "waiting for product name"} / {autoSku || "waiting for product name"}</p>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Price ($) *</Label><Input type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" /></div>
-                <div><Label>Stock Quantity</Label><Input type="number" value={form.stockQuantity} onChange={(e) => updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" /></div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-[minmax(180px,260px)_1fr] gap-4 items-end">
-                <div><Label>Discount (%)</Label><Input type="number" step="1" value={form.discountPercent} onChange={(e) => updateField("discountPercent", e.target.value)} className="mt-1.5" /></div>
-                <div className="flex items-center gap-5 flex-wrap pb-2">
-                  <div className="flex items-center gap-2"><Switch checked={form.inStock} onCheckedChange={(v) => updateField("inStock", v)} /><Label>In Stock</Label></div>
-                  <div className="flex items-center gap-2"><Switch checked={form.isFeatured} onCheckedChange={(v) => updateField("isFeatured", v)} /><Label>Featured</Label></div>
-                  <div className="flex items-center gap-2"><Switch checked={form.isActive} onCheckedChange={(v) => updateField("isActive", v)} /><Label>Active</Label></div>
-                  <div className="flex items-center gap-2"><Switch checked={form.discountActive} onCheckedChange={(v) => updateField("discountActive", v)} /><Label>Discount Active</Label></div>
-                </div>
-              </div>
             </div>
-
-            <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} imageUrl={form.imageUrl} />
-
+            <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} onLink={linkPreviewToUrl} linking={linkingPreview} />
             <div className="lg:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
+          </div>
+        </div>
 
-            <div className="lg:col-span-2">
-              <h2 className="font-semibold text-slate-800 mb-4">Categories</h2>
-              <div className="flex flex-wrap gap-2">
-                {(categoriesQuery.data || []).map((cat: any) => {
-                  const selected = form.categoryIds.includes(cat.id);
-                  return (
-                    <button key={cat.id} type="button" onClick={() => setForm(prev => ({ ...prev, categoryIds: selected ? prev.categoryIds.filter((id: number) => id !== cat.id) : [...prev.categoryIds, cat.id] }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
+        {/* Pricing & Stock */}
+        <div className="bg-white rounded-xl p-6 border border-slate-200">
+          <h2 className="font-semibold text-slate-800 mb-4">Pricing & Inventory</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div><Label>Price ($) *</Label><Input type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" /></div>
+            <div><Label>Compare At Price ($)</Label><Input type="number" step="0.01" value={form.compareAtPrice} onChange={(e) => updateField("compareAtPrice", e.target.value)} className="mt-1.5" /></div>
+            <div><Label>Stock Quantity</Label><Input type="number" value={form.stockQuantity} onChange={(e) => updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" /></div>
+            <div><Label>Discount (%)</Label><Input type="number" step="1" value={form.discountPercent} onChange={(e) => updateField("discountPercent", e.target.value)} className="mt-1.5" /></div>
+            <div className="flex items-center gap-6 md:col-span-2 flex-wrap">
+              <div className="flex items-center gap-2"><Switch checked={form.inStock} onCheckedChange={(v) => updateField("inStock", v)} /><Label>In Stock</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.isFeatured} onCheckedChange={(v) => updateField("isFeatured", v)} /><Label>Featured</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.isActive} onCheckedChange={(v) => updateField("isActive", v)} /><Label>Active</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.discountActive} onCheckedChange={(v) => updateField("discountActive", v)} /><Label>Discount Active</Label></div>
             </div>
+          </div>
+        </div>
+
+        {/* Categories */}
+        <div className="bg-white rounded-xl p-6 border border-slate-200">
+          <h2 className="font-semibold text-slate-800 mb-4">Categories</h2>
+          <div className="flex flex-wrap gap-2">
+            {(categoriesQuery.data || []).map((cat: any) => {
+              const selected = form.categoryIds.includes(cat.id);
+              return (
+                <button key={cat.id} type="button" onClick={() => setForm(prev => ({ ...prev, categoryIds: selected ? prev.categoryIds.filter((id: number) => id !== cat.id) : [...prev.categoryIds, cat.id] }))}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                  {cat.name}
+                </button>
+              );
+            })}
           </div>
         </div>
 

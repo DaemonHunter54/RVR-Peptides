@@ -2,8 +2,6 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
-import fs from "fs";
-import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -91,33 +89,14 @@ async function startServer() {
         res.status(400).send("Invalid image upload");
         return;
       }
+      const mime = match[1].toLowerCase();
+      const ext = mime.includes("jpeg") ? "jpg" : mime.split("/")[1].replace(/[^a-z0-9]/g, "") || "png";
       const buffer = Buffer.from(match[2], "base64");
-      const { createCanvas, loadImage } = await import("@napi-rs/canvas");
-      const image = await loadImage(buffer);
-      const canvas = createCanvas(image.width, image.height);
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0);
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = imageData.data;
-
-      for (let index = 0; index < pixels.length; index += 4) {
-        const red = pixels[index];
-        const green = pixels[index + 1];
-        const blue = pixels[index + 2];
-        const alpha = pixels[index + 3];
-        if (alpha > 0 && red > 238 && green > 238 && blue > 238 && Math.abs(red - green) < 12 && Math.abs(red - blue) < 12 && Math.abs(green - blue) < 12) {
-          const whiteness = Math.min(red, green, blue);
-          pixels[index + 3] = whiteness > 250 ? 0 : Math.max(0, Math.min(alpha, (255 - whiteness) * 12));
-        }
-      }
-
-      context.putImageData(imageData, 0, 0);
-      const processedBuffer = await canvas.encode("png");
       const assetsDir = path.join(process.cwd(), "client", "public", "assets");
       fs.mkdirSync(assetsDir, { recursive: true });
       const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
-      const filename = `${baseSlug}-${Date.now()}.png`;
-      fs.writeFileSync(path.join(assetsDir, filename), processedBuffer);
+      const filename = `${baseSlug}-${Date.now()}.${ext}`;
+      fs.writeFileSync(path.join(assetsDir, filename), buffer);
       res.json({ name: filename, url: `/assets/${filename}` });
     } catch (err: any) {
       console.error("[Product Image Upload Error]", err);
