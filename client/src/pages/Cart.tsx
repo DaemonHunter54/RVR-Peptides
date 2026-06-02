@@ -11,6 +11,13 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 
+
+const makeProductSlug = (value: string) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const isGiftCardProduct = (product: any) =>
+  makeProductSlug(product?.slug || product?.name || product?.sku || "") === "gift-card" ||
+  String(product?.name || "").toLowerCase().includes("gift card") ||
+  String(product?.sku || "").toLowerCase() === "gift-card";
+
 export default function Cart() {
   const { isAuthenticated } = useAuth();
   const [discountCode, setDiscountCode] = useState("");
@@ -43,7 +50,8 @@ export default function Cart() {
 
   const discountAmount = appliedDiscount?.discountAmount || 0;
   const flatRateShipping = 9.99;
-  const shippingCost = flatRateShipping;
+  const hasShippableItems = items.some((item) => !isGiftCardProduct(item.product));
+  const shippingCost = hasShippableItems ? flatRateShipping : 0;
   const total = subtotal - discountAmount + shippingCost;
 
   const validateDiscount = trpc.discounts.validate.useQuery(

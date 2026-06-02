@@ -248,31 +248,35 @@ export default function ProductDetail() {
 
             {/* Gift Card Amount */}
             {isGiftCard && (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Gift Card Amount</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min={giftCardMinimumAmount}
-                    value={giftCardAmount}
-                    onChange={(e) => setGiftCardAmount(e.target.value)}
-                    onBlur={() => setGiftCardAmount(clampGiftCardAmount(giftCardAmount || giftCardMinimumAmount, giftCardMinimumAmount).toFixed(2))}
-                    placeholder={`Minimum $${giftCardMinimumAmount.toFixed(2)}`}
-                    className="max-w-xs"
-                  />
-                  <p className="text-xs text-slate-500">Enter the amount you would like loaded onto the gift card.</p>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[150px_minmax(0,160px)] items-center gap-4">
+                    <label className="text-sm font-medium text-slate-700">Gift Card Amount</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={giftCardMinimumAmount}
+                      value={giftCardAmount}
+                      onChange={(e) => setGiftCardAmount(e.target.value)}
+                      onBlur={() => setGiftCardAmount(clampGiftCardAmount(giftCardAmount || giftCardMinimumAmount, giftCardMinimumAmount).toFixed(2))}
+                      placeholder={`Minimum $${giftCardMinimumAmount.toFixed(2)}`}
+                      className="w-40"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 pl-[166px]">Enter the amount you would like loaded onto the gift card.</p>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Recipient Email</label>
-                  <Input
-                    type="email"
-                    value={giftCardRecipientEmail}
-                    onChange={(e) => setGiftCardRecipientEmail(e.target.value)}
-                    placeholder="recipient@email.com"
-                    className="max-w-xs"
-                  />
-                  <p className="text-xs text-slate-500">The gift card code will be sent to this email after payment is verified.</p>
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[150px_minmax(0,280px)] items-center gap-4">
+                    <label className="text-sm font-medium text-slate-700">Recipient Email</label>
+                    <Input
+                      type="email"
+                      value={giftCardRecipientEmail}
+                      onChange={(e) => setGiftCardRecipientEmail(e.target.value)}
+                      placeholder="recipient@email.com"
+                      className="w-full"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 pl-[166px]">The gift card code will be sent to this email after payment is verified.</p>
                 </div>
               </div>
             )}

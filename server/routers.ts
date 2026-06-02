@@ -383,12 +383,15 @@ export const appRouter = router({
       // Calculate totals
       let subtotal = 0;
       let discountAmount = 0;
+      let hasShippableItems = false;
       const orderItems = [];
       for (const item of input.items) {
         const product = await db.getProductById(item.productId);
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Product ${item.productId} not found` });
         if (!product.inStock || product.stockQuantity < item.quantity) throw new TRPCError({ code: "BAD_REQUEST", message: `${product.name} is out of stock` });
-        const giftAmount = isGiftCardProduct(product) ? parseGiftCardAmountFromLabel(item.variantLabel) : null;
+        const productIsGiftCard = isGiftCardProduct(product);
+        if (!productIsGiftCard) hasShippableItems = true;
+        const giftAmount = productIsGiftCard ? parseGiftCardAmountFromLabel(item.variantLabel) : null;
         let unitPrice = giftAmount ?? Number(product.price);
         if (!giftAmount && product.discountActive && product.discountPercent) {
           unitPrice = unitPrice * (1 - Number(product.discountPercent) / 100);
@@ -423,9 +426,9 @@ export const appRouter = router({
         discountAmount += giftCardApplied;
       }
 
-      // Shipping: apply the configured flat rate to every order.
+      // Shipping: gift-card-only orders are delivered by email and do not need shipping.
       const flatRateShipping = Number(await db.getSetting("flat_rate_shipping") || "9.99");
-      const shippingCost = flatRateShipping;
+      const shippingCost = hasShippableItems ? flatRateShipping : 0;
       const total = subtotal - discountAmount + shippingCost;
 
       const orderNumber = `RVR-${Date.now().toString(36).toUpperCase()}-${nanoid(4).toUpperCase()}`;

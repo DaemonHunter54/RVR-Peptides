@@ -17,6 +17,13 @@ import { toast } from "sonner";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
+
+const makeProductSlug = (value: string) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const isGiftCardProduct = (product: any) =>
+  makeProductSlug(product?.slug || product?.name || product?.sku || "") === "gift-card" ||
+  String(product?.name || "").toLowerCase().includes("gift card") ||
+  String(product?.sku || "").toLowerCase() === "gift-card";
+
 export default function Checkout() {
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
@@ -75,6 +82,10 @@ export default function Checkout() {
       ? price * (1 - Number(item.product.discountPercent) / 100) : price;
     return sum + disc * item.quantity;
   }, 0);
+  const hasShippableItems = items.some((item) => !isGiftCardProduct(item.product));
+  const flatRateShipping = 9.99;
+  const shippingCost = hasShippableItems ? flatRateShipping : 0;
+  const total = subtotal + shippingCost;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +97,11 @@ export default function Checkout() {
     // Validate guest email is provided for guest checkout
     if (!isAuthenticated && !form.guestEmail) {
       toast.error("Email address is required for order updates and tracking information.");
+      return;
+    }
+
+    if (hasShippableItems && (!form.shippingName || !form.shippingAddress || !form.shippingCity || !form.shippingState || !form.shippingZip)) {
+      toast.error("Shipping address is required when your cart contains physical products.");
       return;
     }
 
@@ -283,6 +299,7 @@ export default function Checkout() {
               </div>
 
               {/* Shipping */}
+              {hasShippableItems ? (
               <div className="bg-white rounded-xl p-6 border border-slate-200">
                 <h2 className="font-semibold text-slate-800 mb-4">Shipping Address</h2>
                 <div className="space-y-4">
@@ -319,6 +336,12 @@ export default function Checkout() {
                   </div>
                 </div>
               </div>
+              ) : (
+              <div className="bg-white rounded-xl p-6 border border-slate-200">
+                <h2 className="font-semibold text-slate-800 mb-2">Email Delivery</h2>
+                <p className="text-sm text-slate-500">This order contains only gift cards, so no shipping address or shipping fee is required.</p>
+              </div>
+              )}
 
               {/* Payment */}
               <div className="bg-white rounded-xl p-6 border border-slate-200">
@@ -367,9 +390,13 @@ export default function Checkout() {
                     <span className="text-slate-500">Subtotal</span>
                     <span>${subtotal.toFixed(2)}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Shipping</span>
+                    <span>{hasShippableItems ? `$${shippingCost.toFixed(2)}` : "Email delivery — Free"}</span>
+                  </div>
                   <div className="flex justify-between font-semibold text-base pt-2 border-t border-slate-100">
                     <span>Total</span>
-                    <span>${subtotal.toFixed(2)}</span>
+                    <span>${total.toFixed(2)}</span>
                   </div>
                 </div>
 
