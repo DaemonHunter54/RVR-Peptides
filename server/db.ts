@@ -13,6 +13,7 @@ import {
   siteSettings,
   cartItems,
   productVariants,
+  giftCards, InsertGiftCard,
 } from "../drizzle/schema";
 import { ensureDatabaseReady } from "./db-init";
 
@@ -534,7 +535,67 @@ export async function updateOrderPayment(paymentId: string, paymentStatus: strin
   const updateData: any = { paymentStatus };
   if (newStatus) updateData.status = newStatus;
   await db.update(orders).set(updateData).where(eq(orders.paymentId, paymentId));
+
+  if (newStatus === "paid") {
+    const paidOrders = await db.select().from(orders).where(eq(orders.paymentId, paymentId)).limit(1);
+    const order = paidOrders[0];
+    if (order) await issueGiftCardsForOrder(order.id, order.guestEmail || undefined);
+  }
 }
+
+export async function issueGiftCardsForOrder(orderId: number, purchaserEmail?: string) {
+  const db = await getDb();
+  if (!db) return;
+  const items = await getOrderItems(orderId);
+  for (const item of items) {
+    if (!String(item.productName || "").toLowerCase().includes("gift card")) continue;
+    const amount = Number(item.unitPrice || item.totalPrice || 0);
+    for (let i = 0; i < item.quantity; i += 1) {
+      let code = "";
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const raw = Math.random().toString(36).slice(2, 10).toUpperCase().replace(/[^A-Z0-9]/g, "").padEnd(8, "X").slice(0, 8);
+        code = `${raw.slice(0, 4)}-${raw.slice(4)}`;
+        const existing = await getGiftCardByCode(code);
+        if (!existing) break;
+      }
+      await createGiftCard({ code, originalAmount: amount.toFixed(2), balance: amount.toFixed(2), purchaserEmail, orderId, isActive: true });
+      console.log(`[Gift Card] Issued ${code} for order ${orderId}`);
+    }
+  }
+}
+
+
+// ─── Gift Cards ─────────────────────────────────────────────────────
+function normalizeGiftCardCode(code: string) {
+  return String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^(.{4})(.+)$/, "$1-$2").slice(0, 9);
+}
+
+export async function getGiftCardByCode(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const normalized = normalizeGiftCardCode(code);
+  const result = await db.select().from(giftCards).where(eq(giftCards.code, normalized)).limit(1);
+  return result[0];
+}
+
+export async function createGiftCard(data: InsertGiftCard) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(giftCards).values({ ...data, code: normalizeGiftCardCode(data.code) });
+}
+
+export async function applyGiftCard(code: string, amount: number) {
+  const db = await getDb();
+  if (!db) return { applied: 0, remainingBalance: 0 };
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive) return { applied: 0, remainingBalance: 0 };
+  const balance = Number(card.balance || 0);
+  const applied = Math.max(0, Math.min(balance, amount));
+  const remainingBalance = Math.max(0, balance - applied);
+  await db.update(giftCards).set({ balance: remainingBalance.toFixed(2), isActive: remainingBalance > 0 }).where(eq(giftCards.id, card.id));
+  return { applied, remainingBalance };
+}
+
 
 // ─── Discounts ───────────────────────────────────────────────────────
 export async function getAllDiscountCodes() {

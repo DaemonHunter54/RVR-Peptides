@@ -19,7 +19,7 @@ import {
   decimal,
   boolean
 } from "drizzle-orm/mysql-core";
-var users, categories, products, productCategories, researchCitations, productResearch, orders, orderItems, discountCodes, siteSettings, cartItems, productVariants;
+var users, categories, products, productCategories, researchCitations, productResearch, orders, orderItems, discountCodes, giftCards, siteSettings, cartItems, productVariants;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -179,6 +179,17 @@ var init_schema = __esm({
       startsAt: timestamp("startsAt"),
       expiresAt: timestamp("expiresAt"),
       createdAt: timestamp("createdAt").defaultNow().notNull()
+    });
+    giftCards = mysqlTable("giftCards", {
+      id: int("id").autoincrement().primaryKey(),
+      code: varchar("code", { length: 9 }).notNull().unique(),
+      originalAmount: decimal("originalAmount", { precision: 10, scale: 2 }).notNull(),
+      balance: decimal("balance", { precision: 10, scale: 2 }).notNull(),
+      purchaserEmail: varchar("purchaserEmail", { length: 320 }),
+      orderId: int("orderId"),
+      isActive: boolean("isActive").default(true).notNull(),
+      createdAt: timestamp("createdAt").defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
     });
     siteSettings = mysqlTable("siteSettings", {
       id: int("id").autoincrement().primaryKey(),
@@ -662,6 +673,19 @@ var init_db_init = __esm({
   PRIMARY KEY (id),
   UNIQUE KEY discountCodes_code_unique (code)
 )`,
+      `CREATE TABLE IF NOT EXISTS giftCards (
+  id int AUTO_INCREMENT NOT NULL,
+  code varchar(9) NOT NULL,
+  originalAmount decimal(10,2) NOT NULL,
+  balance decimal(10,2) NOT NULL,
+  purchaserEmail varchar(320),
+  orderId int,
+  isActive boolean NOT NULL DEFAULT true,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY giftCards_code_unique (code)
+)`,
       `CREATE TABLE IF NOT EXISTS siteSettings (
   id int AUTO_INCREMENT NOT NULL,
   settingKey varchar(100) NOT NULL,
@@ -969,10 +993,12 @@ var init_db_init = __esm({
 var db_exports = {};
 __export(db_exports, {
   addToCart: () => addToCart,
+  applyGiftCard: () => applyGiftCard,
   clearCart: () => clearCart,
   createCategory: () => createCategory,
   createCitation: () => createCitation,
   createDiscount: () => createDiscount,
+  createGiftCard: () => createGiftCard,
   createLocalUser: () => createLocalUser,
   createOrder: () => createOrder,
   createProduct: () => createProduct,
@@ -995,6 +1021,7 @@ __export(db_exports, {
   getDb: () => getDb,
   getDiscountByCode: () => getDiscountByCode,
   getFeaturedProducts: () => getFeaturedProducts,
+  getGiftCardByCode: () => getGiftCardByCode,
   getOrderById: () => getOrderById,
   getOrderByNumber: () => getOrderByNumber,
   getOrderItems: () => getOrderItems,
@@ -1013,6 +1040,7 @@ __export(db_exports, {
   getUserOrders: () => getUserOrders,
   getVariantById: () => getVariantById,
   incrementDiscountUse: () => incrementDiscountUse,
+  issueGiftCardsForOrder: () => issueGiftCardsForOrder,
   removeFromCart: () => removeFromCart,
   replaceProductVariants: () => replaceProductVariants,
   updateCartItem: () => updateCartItem,
@@ -1473,6 +1501,57 @@ async function updateOrderPayment(paymentId, paymentStatus) {
   const updateData = { paymentStatus };
   if (newStatus) updateData.status = newStatus;
   await db.update(orders).set(updateData).where(eq(orders.paymentId, paymentId));
+  if (newStatus === "paid") {
+    const paidOrders = await db.select().from(orders).where(eq(orders.paymentId, paymentId)).limit(1);
+    const order = paidOrders[0];
+    if (order) await issueGiftCardsForOrder(order.id, order.guestEmail || void 0);
+  }
+}
+async function issueGiftCardsForOrder(orderId, purchaserEmail) {
+  const db = await getDb();
+  if (!db) return;
+  const items = await getOrderItems(orderId);
+  for (const item of items) {
+    if (!String(item.productName || "").toLowerCase().includes("gift card")) continue;
+    const amount = Number(item.unitPrice || item.totalPrice || 0);
+    for (let i = 0; i < item.quantity; i += 1) {
+      let code = "";
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const raw = Math.random().toString(36).slice(2, 10).toUpperCase().replace(/[^A-Z0-9]/g, "").padEnd(8, "X").slice(0, 8);
+        code = `${raw.slice(0, 4)}-${raw.slice(4)}`;
+        const existing = await getGiftCardByCode(code);
+        if (!existing) break;
+      }
+      await createGiftCard({ code, originalAmount: amount.toFixed(2), balance: amount.toFixed(2), purchaserEmail, orderId, isActive: true });
+      console.log(`[Gift Card] Issued ${code} for order ${orderId}`);
+    }
+  }
+}
+function normalizeGiftCardCode(code) {
+  return String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^(.{4})(.+)$/, "$1-$2").slice(0, 9);
+}
+async function getGiftCardByCode(code) {
+  const db = await getDb();
+  if (!db) return void 0;
+  const normalized = normalizeGiftCardCode(code);
+  const result = await db.select().from(giftCards).where(eq(giftCards.code, normalized)).limit(1);
+  return result[0];
+}
+async function createGiftCard(data) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(giftCards).values({ ...data, code: normalizeGiftCardCode(data.code) });
+}
+async function applyGiftCard(code, amount) {
+  const db = await getDb();
+  if (!db) return { applied: 0, remainingBalance: 0 };
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive) return { applied: 0, remainingBalance: 0 };
+  const balance = Number(card.balance || 0);
+  const applied = Math.max(0, Math.min(balance, amount));
+  const remainingBalance = Math.max(0, balance - applied);
+  await db.update(giftCards).set({ balance: remainingBalance.toFixed(2), isActive: remainingBalance > 0 }).where(eq(giftCards.id, card.id));
+  return { applied, remainingBalance };
 }
 async function getAllDiscountCodes() {
   const db = await getDb();
@@ -2887,6 +2966,7 @@ var appRouter = router({
       shippingZip: z2.string(),
       shippingCountry: z2.string().default("US"),
       discountCode: z2.string().optional(),
+      giftCardCode: z2.string().optional(),
       items: z2.array(z2.object({
         productId: z2.number(),
         quantity: z2.number().min(1),
@@ -2923,6 +3003,13 @@ var appRouter = router({
           }
           await incrementDiscountUse(discount.id);
         }
+      }
+      let giftCardApplied = 0;
+      if (input.giftCardCode) {
+        const gift = await applyGiftCard(input.giftCardCode, Math.max(0, subtotal - discountAmount));
+        giftCardApplied = gift.applied;
+        if (giftCardApplied <= 0) throw new TRPCError3({ code: "BAD_REQUEST", message: "Invalid or depleted gift card code" });
+        discountAmount += giftCardApplied;
       }
       const freeShippingThreshold = Number(await getSetting("free_shipping_threshold") || "200");
       const flatRateShipping = Number(await getSetting("flat_rate_shipping") || "9.99");
@@ -2967,6 +3054,23 @@ var appRouter = router({
         amount = Number(discount.value);
       }
       return { valid: true, type: discount.type, value: Number(discount.value), discountAmount: amount, message: `${discount.type === "percentage" ? `${discount.value}%` : `$${discount.value}`} off applied!` };
+    })
+  }),
+  // ─── Gift Cards ────────────────────────────────────────────────
+  giftCards: router({
+    validate: publicProcedure.input(z2.object({ code: z2.string(), subtotal: z2.number() })).query(async ({ input }) => {
+      const card = await getGiftCardByCode(input.code);
+      if (!card || !card.isActive || Number(card.balance) <= 0) {
+        return { valid: false, message: "Invalid or depleted gift card" };
+      }
+      const balance = Number(card.balance);
+      return {
+        valid: true,
+        balance,
+        appliedAmount: Math.min(balance, input.subtotal),
+        remainingDue: Math.max(0, input.subtotal - balance),
+        message: `Gift card balance: $${balance.toFixed(2)}`
+      };
     })
   }),
   // ─── Site Settings (public) ────────────────────────────────────
@@ -3458,6 +3562,57 @@ async function startServer() {
       res.status(500).send(err?.message || "Unable to list assets");
     }
   });
+  app.get("/api/nih-report", async (req, res) => {
+    try {
+      const name = String(req.query?.name || "").trim();
+      if (!name) {
+        res.status(400).send("Product name is required");
+        return;
+      }
+      const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
+      searchUrl.searchParams.set("db", "pubmed");
+      searchUrl.searchParams.set("retmode", "json");
+      searchUrl.searchParams.set("retmax", "8");
+      searchUrl.searchParams.set("sort", "relevance");
+      searchUrl.searchParams.set("term", `${name} peptide OR ${name}`);
+      const searchResponse = await fetch(searchUrl);
+      if (!searchResponse.ok) throw new Error("NIH search failed");
+      const searchJson = await searchResponse.json();
+      const ids = searchJson?.esearchresult?.idlist || [];
+      if (!ids.length) {
+        res.status(404).send(`No NIH/PubMed report found for ${name}`);
+        return;
+      }
+      const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
+      summaryUrl.searchParams.set("db", "pubmed");
+      summaryUrl.searchParams.set("retmode", "json");
+      summaryUrl.searchParams.set("id", ids.join(","));
+      const summaryResponse = await fetch(summaryUrl);
+      if (!summaryResponse.ok) throw new Error("NIH summary failed");
+      const summaryJson = await summaryResponse.json();
+      const articles = ids.map((id) => summaryJson?.result?.[id]).filter(Boolean).map((item, index) => {
+        const authors = Array.isArray(item.authors) ? item.authors.map((author) => author.name).filter(Boolean).join(", ") : "";
+        return [
+          `${index + 1}. ${item.title || "Untitled NIH/PubMed record"}`,
+          authors ? `Authors: ${authors}` : "",
+          item.fulljournalname ? `Journal: ${item.fulljournalname}${item.pubdate ? ` (${item.pubdate})` : ""}` : "",
+          `NIH/PubMed: https://pubmed.ncbi.nlm.nih.gov/${item.uid}/`
+        ].filter(Boolean).join("\n");
+      });
+      res.json({
+        description: [
+          `NIH/PubMed Research Report for ${name}`,
+          "",
+          "The following NIH-indexed PubMed records were found for this product name. Review for accuracy before publishing.",
+          "",
+          ...articles
+        ].join("\n\n")
+      });
+    } catch (err) {
+      console.error("[NIH Report Error]", err);
+      res.status(500).send(err?.message || "Unable to pull NIH report");
+    }
+  });
   app.post("/api/product-image/upload", async (req, res) => {
     try {
       const makeSafeSlug = (value) => String(value || "product-image").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "product-image";
@@ -3467,7 +3622,22 @@ async function startServer() {
         res.status(400).send("Invalid image upload");
         return;
       }
+      const mimeType = match[1].toLowerCase();
       const buffer = Buffer.from(match[2], "base64");
+      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
+      fs6.mkdirSync(assetsDir, { recursive: true });
+      const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
+      if (mimeType === "image/svg+xml" || mimeType === "image/svg") {
+        const svgText = buffer.toString("utf8").trim();
+        if (!/<svg[\s>]/i.test(svgText) || /<script[\s>]/i.test(svgText) || /on\w+\s*=/i.test(svgText)) {
+          res.status(400).send("SVG uploads must be valid, safe SVG files. Please upload a PNG, JPG, WEBP, or a clean SVG.");
+          return;
+        }
+        const filename2 = `${baseSlug}-${Date.now()}.svg`;
+        fs6.writeFileSync(path6.join(assetsDir, filename2), svgText, "utf8");
+        res.json({ name: filename2, url: `/assets/${filename2}` });
+        return;
+      }
       const { createCanvas: createCanvas2, loadImage: loadImage2 } = await import("@napi-rs/canvas");
       const image = await loadImage2(buffer);
       const canvas = createCanvas2(image.width, image.height);
@@ -3487,9 +3657,6 @@ async function startServer() {
       }
       context.putImageData(imageData, 0, 0);
       const processedBuffer = await canvas.encode("png");
-      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
-      fs6.mkdirSync(assetsDir, { recursive: true });
-      const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
       const filename = `${baseSlug}-${Date.now()}.png`;
       fs6.writeFileSync(path6.join(assetsDir, filename), processedBuffer);
       res.json({ name: filename, url: `/assets/${filename}` });
@@ -3515,6 +3682,8 @@ async function startServer() {
         buffer = fs6.readFileSync(path6.join(assetsDir, "lotion-bottle-blank-hd-tube.png"));
       } else if (type === "face-mask") {
         buffer = fs6.readFileSync(path6.join(assetsDir, "face-mask-blank-hd.png"));
+      } else if (type === "gift-card") {
+        buffer = fs6.readFileSync(path6.join(assetsDir, "Gift-Card.png"));
       } else {
         const { generateVialBuffer: generateVialBuffer3 } = await Promise.resolve().then(() => (init_vialGenerator(), vialGenerator_exports));
         buffer = await generateVialBuffer3(displayName);

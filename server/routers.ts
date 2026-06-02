@@ -316,6 +316,7 @@ export const appRouter = router({
       shippingZip: z.string(),
       shippingCountry: z.string().default("US"),
       discountCode: z.string().optional(),
+      giftCardCode: z.string().optional(),
       items: z.array(z.object({
         productId: z.number(),
         quantity: z.number().min(1),
@@ -355,6 +356,15 @@ export const appRouter = router({
           }
           await db.incrementDiscountUse(discount.id);
         }
+      }
+
+      // Apply gift card after discount. If balance is partial, it reduces the remaining amount due.
+      let giftCardApplied = 0;
+      if (input.giftCardCode) {
+        const gift = await db.applyGiftCard(input.giftCardCode, Math.max(0, subtotal - discountAmount));
+        giftCardApplied = gift.applied;
+        if (giftCardApplied <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or depleted gift card code" });
+        discountAmount += giftCardApplied;
       }
 
       // Shipping
@@ -406,6 +416,26 @@ export const appRouter = router({
         amount = Number(discount.value);
       }
       return { valid: true, type: discount.type, value: Number(discount.value), discountAmount: amount, message: `${discount.type === "percentage" ? `${discount.value}%` : `$${discount.value}`} off applied!` };
+    }),
+  }),
+
+
+
+  // ─── Gift Cards ────────────────────────────────────────────────
+  giftCards: router({
+    validate: publicProcedure.input(z.object({ code: z.string(), subtotal: z.number() })).query(async ({ input }) => {
+      const card = await db.getGiftCardByCode(input.code);
+      if (!card || !card.isActive || Number(card.balance) <= 0) {
+        return { valid: false, message: "Invalid or depleted gift card" };
+      }
+      const balance = Number(card.balance);
+      return {
+        valid: true,
+        balance,
+        appliedAmount: Math.min(balance, input.subtotal),
+        remainingDue: Math.max(0, input.subtotal - balance),
+        message: `Gift card balance: $${balance.toFixed(2)}`,
+      };
     }),
   }),
 

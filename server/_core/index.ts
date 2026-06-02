@@ -82,6 +82,68 @@ async function startServer() {
     }
   });
 
+
+  app.get("/api/nih-report", async (req, res) => {
+    try {
+      const name = String(req.query?.name || "").trim();
+      if (!name) {
+        res.status(400).send("Product name is required");
+        return;
+      }
+
+      const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
+      searchUrl.searchParams.set("db", "pubmed");
+      searchUrl.searchParams.set("retmode", "json");
+      searchUrl.searchParams.set("retmax", "8");
+      searchUrl.searchParams.set("sort", "relevance");
+      searchUrl.searchParams.set("term", `${name} peptide OR ${name}`);
+
+      const searchResponse = await fetch(searchUrl);
+      if (!searchResponse.ok) throw new Error("NIH search failed");
+      const searchJson: any = await searchResponse.json();
+      const ids = searchJson?.esearchresult?.idlist || [];
+      if (!ids.length) {
+        res.status(404).send(`No NIH/PubMed report found for ${name}`);
+        return;
+      }
+
+      const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
+      summaryUrl.searchParams.set("db", "pubmed");
+      summaryUrl.searchParams.set("retmode", "json");
+      summaryUrl.searchParams.set("id", ids.join(","));
+
+      const summaryResponse = await fetch(summaryUrl);
+      if (!summaryResponse.ok) throw new Error("NIH summary failed");
+      const summaryJson: any = await summaryResponse.json();
+
+      const articles = ids
+        .map((id: string) => summaryJson?.result?.[id])
+        .filter(Boolean)
+        .map((item: any, index: number) => {
+          const authors = Array.isArray(item.authors) ? item.authors.map((author: any) => author.name).filter(Boolean).join(", ") : "";
+          return [
+            `${index + 1}. ${item.title || "Untitled NIH/PubMed record"}`,
+            authors ? `Authors: ${authors}` : "",
+            item.fulljournalname ? `Journal: ${item.fulljournalname}${item.pubdate ? ` (${item.pubdate})` : ""}` : "",
+            `NIH/PubMed: https://pubmed.ncbi.nlm.nih.gov/${item.uid}/`,
+          ].filter(Boolean).join("\n");
+        });
+
+      res.json({
+        description: [
+          `NIH/PubMed Research Report for ${name}`,
+          "",
+          "The following NIH-indexed PubMed records were found for this product name. Review for accuracy before publishing.",
+          "",
+          ...articles,
+        ].join("\n\n"),
+      });
+    } catch (err: any) {
+      console.error("[NIH Report Error]", err);
+      res.status(500).send(err?.message || "Unable to pull NIH report");
+    }
+  });
+
   app.post("/api/product-image/upload", async (req, res) => {
     try {
       const makeSafeSlug = (value: string) => String(value || "product-image").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "product-image";
@@ -99,7 +161,7 @@ async function startServer() {
 
       if (mimeType === "image/svg+xml" || mimeType === "image/svg") {
         const svgText = buffer.toString("utf8").trim();
-        if (!/^<svg[\s>]/i.test(svgText) || /<script[\s>]/i.test(svgText) || /on\w+\s*=/i.test(svgText)) {
+        if (!/<svg[\s>]/i.test(svgText) || /<script[\s>]/i.test(svgText) || /on\w+\s*=/i.test(svgText)) {
           res.status(400).send("SVG uploads must be valid, safe SVG files. Please upload a PNG, JPG, WEBP, or a clean SVG.");
           return;
         }
@@ -161,6 +223,8 @@ async function startServer() {
         buffer = fs.readFileSync(path.join(assetsDir, "lotion-bottle-blank-hd-tube.png"));
       } else if (type === "face-mask") {
         buffer = fs.readFileSync(path.join(assetsDir, "face-mask-blank-hd.png"));
+      } else if (type === "gift-card") {
+        buffer = fs.readFileSync(path.join(assetsDir, "Gift-Card.png"));
       } else {
         const { generateVialBuffer } = await import("../vialGenerator");
         buffer = await generateVialBuffer(displayName);

@@ -27,6 +27,8 @@ export default function Checkout() {
   const [createAccount, setCreateAccount] = useState(false);
   const [accountPassword, setAccountPassword] = useState("");
   const [accountUsername, setAccountUsername] = useState("");
+  const [useGiftCard, setUseGiftCard] = useState(false);
+  const [giftCardCode, setGiftCardCode] = useState("");
 
   // Authenticated cart
   const cartQuery = trpc.cart.get.useQuery(undefined, { enabled: isAuthenticated });
@@ -132,6 +134,7 @@ export default function Checkout() {
         shippingZip: form.shippingZip,
         shippingCountry: form.shippingCountry,
         discountCode: discountCode || undefined,
+        giftCardCode: useGiftCard && giftCardCode.trim() ? giftCardCode.trim() : undefined,
         items: items.map(item => ({ productId: item.productId, quantity: item.quantity, variantId: (item as any).variantId, variantLabel: (item as any).variantLabel })),
         notes: form.notes || undefined,
       });
@@ -250,6 +253,34 @@ export default function Checkout() {
                   </div>
                 </div>
               )}
+
+
+              {/* Gift Card */}
+              <div className="bg-white rounded-xl p-6 border border-slate-200">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="use-gift-card"
+                    checked={useGiftCard}
+                    onCheckedChange={(checked) => setUseGiftCard(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="use-gift-card" className="text-sm font-semibold text-slate-800 cursor-pointer">
+                      Use gift card
+                    </label>
+                    <p className="text-xs text-slate-500 mt-1">Enter your 8-digit code in XXXX-XXXX format. Available balances can cover full or partial payment.</p>
+                    {useGiftCard && (
+                      <Input
+                        value={giftCardCode}
+                        onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                        className="mt-3 max-w-xs"
+                        placeholder="XXXX-XXXX"
+                        maxLength={9}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Shipping */}
               <div className="bg-white rounded-xl p-6 border border-slate-200">

@@ -317,23 +317,29 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 };
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
-type PreviewProductType = "" | "vial" | "cream" | "face-mask";
+type PreviewProductType = "" | "vial" | "cream" | "face-mask" | "gift-card";
 const PRODUCT_PREVIEW_TYPES: Array<{ value: PreviewProductType; label: string }> = [
   { value: "", label: "None (File Upload)" },
   { value: "vial", label: "Vial" },
   { value: "cream", label: "Cream" },
   { value: "face-mask", label: "Face Mask" },
+  { value: "gift-card", label: "Gift Card" },
 ];
 
 const blankPreviewSrc = (type: PreviewProductType, slug: string, name: string, size?: string) => {
   if (type === "cream") return "/assets/lotion-bottle-blank-hd-tube.png";
   if (type === "face-mask") return "/assets/face-mask-blank-hd.png";
+  if (type === "gift-card") return "/assets/Gift-Card.png";
   return generatedVialPreviewUrl(slug, name || "Preview Product", size);
 };
 
 function ProductVialPreview({ name, slug, size, previewType, imageUrl }: { name: string; slug: string; size?: string; previewType: PreviewProductType; imageUrl?: string }) {
   const previewSrc = previewType ? blankPreviewSrc(previewType, slug, name || "Preview Product", size) : imageUrl;
-  const title = previewType === "cream" ? "Live Cream Preview" : previewType === "face-mask" ? "Live Face Mask Preview" : "Live Vial Preview";
+  const title =
+    previewType === "cream" ? "Live Cream Preview" :
+    previewType === "face-mask" ? "Live Face Mask Preview" :
+    previewType === "gift-card" ? "Live Gift Card Preview" :
+    "Live Vial Preview";
 
   if (!previewSrc) {
     return (
@@ -399,6 +405,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   const [linkingPreview, setLinkingPreview] = useState(false);
   const [imageAssets, setImageAssets] = useState<Array<{ name: string; url: string }>>([]);
   const [multipleProducts, setMultipleProducts] = useState(Boolean(product?.variants?.length));
+  const [pullingNih, setPullingNih] = useState(false);
 
   useEffect(() => {
     fetch("/api/product-assets")
@@ -433,10 +440,24 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   const handlePreviewTypeChange = (value: string) => {
     const nextType = (value === "none" ? "" : value) as PreviewProductType;
     setPreviewType(nextType);
+    if (nextType === "gift-card") {
+      setForm(prev => ({
+        ...prev,
+        name: "Gift Card",
+        slug: "gift-card",
+        sku: "GIFT-CARD",
+        price: prev.price || "10",
+        compareAtPrice: prev.compareAtPrice || "",
+        size: prev.size || "$10 minimum",
+        stockQuantity: prev.stockQuantity || 9999,
+        imageUrl: "/assets/Gift-Card.png",
+      }));
+      return;
+    }
     if (nextType) {
       const slug = autoSlug || makeSlug(form.slug || form.name || "preview-product");
       updateField("imageUrl", blankPreviewSrc(nextType, slug, form.name || "Preview Product", form.size));
-    } else if (form.imageUrl?.startsWith("/api/vial/") || form.imageUrl?.startsWith("/assets/lotion-bottle-blank") || form.imageUrl?.startsWith("/assets/face-mask-blank")) {
+    } else if (form.imageUrl?.startsWith("/api/vial/") || form.imageUrl?.startsWith("/assets/lotion-bottle-blank") || form.imageUrl?.startsWith("/assets/face-mask-blank") || form.imageUrl?.includes("Gift-Card.png")) {
       updateField("imageUrl", "");
     }
   };
@@ -464,6 +485,27 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+
+
+  const pullDescriptionFromNih = async () => {
+    const productName = String(form.name || "").trim();
+    if (!productName) {
+      alert("Enter a product name first.");
+      return;
+    }
+    setPullingNih(true);
+    try {
+      const response = await fetch(`/api/nih-report?name=${encodeURIComponent(productName)}`);
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      updateField("description", data.description || data.report || "");
+    } catch (error: any) {
+      alert(error?.message || "Unable to pull NIH report.");
+    } finally {
+      setPullingNih(false);
+    }
   };
 
   const updateField = (field: string, value: any) => {
@@ -566,12 +608,12 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                   <Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" />
                 </div>
                 <div>
-                  <Label>Price ($) *</Label>
+                  <Label>{previewType === "gift-card" ? "Minimum Amount ($)" : "Price ($) *"}</Label>
                   <Input type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" />
                 </div>
                 <div>
-                  <Label>Stock</Label>
-                  <Input type="number" value={form.stockQuantity} onChange={(e) => updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" />
+                  <Label>{previewType === "gift-card" ? "Maximum Amount ($)" : "Stock"}</Label>
+                  <Input type="number" value={previewType === "gift-card" ? (form.compareAtPrice || "") : form.stockQuantity} onChange={(e) => previewType === "gift-card" ? updateField("compareAtPrice", e.target.value) : updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" placeholder={previewType === "gift-card" ? "No max" : undefined} />
                 </div>
               </div>
 
@@ -666,7 +708,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} imageUrl={form.imageUrl} />
             </div>
 
-            <div className="xl:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
+            <div className="xl:col-span-2"><div className="mb-1.5 flex items-center gap-3"><Label>Full Description</Label><Button type="button" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700" onClick={pullDescriptionFromNih} disabled={pullingNih}>{pullingNih ? "Pulling..." : "Pull from NIH"}</Button></div><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
 
             <div className="xl:col-span-2">
               <h2 className="font-semibold text-slate-800 mb-4">Categories</h2>

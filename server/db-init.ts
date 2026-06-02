@@ -154,6 +154,19 @@ const TABLES = [
   PRIMARY KEY (id),
   UNIQUE KEY discountCodes_code_unique (code)
 )`,
+`CREATE TABLE IF NOT EXISTS giftCards (
+  id int AUTO_INCREMENT NOT NULL,
+  code varchar(9) NOT NULL,
+  originalAmount decimal(10,2) NOT NULL,
+  balance decimal(10,2) NOT NULL,
+  purchaserEmail varchar(320),
+  orderId int,
+  isActive boolean NOT NULL DEFAULT true,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY giftCards_code_unique (code)
+)`,
 `CREATE TABLE IF NOT EXISTS siteSettings (
   id int AUTO_INCREMENT NOT NULL,
   settingKey varchar(100) NOT NULL,

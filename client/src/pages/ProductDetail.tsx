@@ -4,6 +4,7 @@ import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShoppingCart, Minus, Plus, ExternalLink, FlaskConical, Shield, Check } from "lucide-react";
@@ -12,6 +13,8 @@ import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { useGuestCart } from "@/hooks/useGuestCart";
 import { productImageUrl } from "@/lib/vialDisplay";
+
+const makeProductSlug = (value: string) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -22,6 +25,7 @@ export default function ProductDetail() {
   const { isAuthenticated } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [giftCardAmount, setGiftCardAmount] = useState("");
   const [activeTab, setActiveTab] = useState("description");
   const productQuery = trpc.products.bySlug.useQuery({ slug: slug || "" });
   const addToCart = trpc.cart.add.useMutation({
@@ -98,6 +102,7 @@ export default function ProductDetail() {
     );
   }
 
+  const isGiftCard = makeProductSlug(product.slug || product.name) === "gift-card" || String(product.name || "").toLowerCase().includes("gift card");
   const variants = product.variants || [];
   const hasVariants = variants.length > 1;
   
@@ -105,15 +110,24 @@ export default function ProductDetail() {
     ? variants.find((v: any) => v.id === selectedVariantId) || variants[0]
     : null;
   
-  const price = activeVariant ? Number(activeVariant.price) : Number(product.price);
+  const price = isGiftCard ? Number(giftCardAmount || product.price || 10) : (activeVariant ? Number(activeVariant.price) : Number(product.price));
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
 
   const handleAddToCart = () => {
-    const cartPrice = activeVariant ? activeVariant.price : product.price;
-    const cartName = activeVariant ? `${product.name} (${activeVariant.label})` : product.name;
+    const cartPrice = isGiftCard ? String(Number(giftCardAmount || product.price || 10).toFixed(2)) : (activeVariant ? activeVariant.price : product.price);
+    const cartName = isGiftCard ? `${product.name} ($${Number(giftCardAmount || product.price || 10).toFixed(2)})` : (activeVariant ? `${product.name} (${activeVariant.label})` : product.name);
     const cartImage = productImageUrl(product, activeVariant) || activeVariant?.imageUrl || product.imageUrl;
-    
+    if (isGiftCard) {
+      const minAmount = Number(product.price || 10);
+      const maxAmount = Number(product.compareAtPrice || 0);
+      const amount = Number(giftCardAmount || 0);
+      if (!amount || amount < minAmount || (maxAmount > 0 && amount > maxAmount)) {
+        toast.error(`Enter a gift card amount${maxAmount > 0 ? ` between $${minAmount.toFixed(2)} and $${maxAmount.toFixed(2)}` : ` of at least $${minAmount.toFixed(2)}`}.`);
+        return;
+      }
+    }
+
     if (!isAuthenticated) {
       guestCart.addItem({
         id: product.id,
@@ -186,6 +200,24 @@ export default function ProductDetail() {
               {product.purity && <span><strong>Purity:</strong> {product.purity}</span>}
               {product.sku && <span><strong>SKU:</strong> {product.sku}</span>}
             </div>
+
+            {/* Gift Card Amount */}
+            {isGiftCard && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Gift Card Amount</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={Number(product.price || 10)}
+                  max={Number(product.compareAtPrice || undefined)}
+                  value={giftCardAmount}
+                  onChange={(e) => setGiftCardAmount(e.target.value)}
+                  placeholder={`Minimum $${Number(product.price || 10).toFixed(2)}`}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-slate-500">Enter the amount you would like loaded onto the gift card.</p>
+              </div>
+            )}
 
             {/* Dose Selector Dropdown */}
             {hasVariants && (

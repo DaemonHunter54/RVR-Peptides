@@ -206,6 +206,23 @@ export const discountCodes = mysqlTable("discountCodes", {
 export type DiscountCode = typeof discountCodes.$inferSelect;
 export type InsertDiscountCode = typeof discountCodes.$inferInsert;
 
+
+// ─── Gift Cards ─────────────────────────────────────────────────────
+export const giftCards = mysqlTable("giftCards", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 9 }).notNull().unique(),
+  originalAmount: decimal("originalAmount", { precision: 10, scale: 2 }).notNull(),
+  balance: decimal("balance", { precision: 10, scale: 2 }).notNull(),
+  purchaserEmail: varchar("purchaserEmail", { length: 320 }),
+  orderId: int("orderId"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GiftCard = typeof giftCards.$inferSelect;
+export type InsertGiftCard = typeof giftCards.$inferInsert;
+
 // ─── Site Settings ───────────────────────────────────────────────────
 export const siteSettings = mysqlTable("siteSettings", {
   id: int("id").autoincrement().primaryKey(),
