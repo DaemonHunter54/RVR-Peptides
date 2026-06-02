@@ -319,7 +319,7 @@ const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "",
 
 type PreviewProductType = "" | "vial" | "cream" | "face-mask";
 const PRODUCT_PREVIEW_TYPES: Array<{ value: PreviewProductType; label: string }> = [
-  { value: "", label: "None - use uploaded/asset image" },
+  { value: "", label: "None (File Upload)" },
   { value: "vial", label: "Vial" },
   { value: "cream", label: "Cream" },
   { value: "face-mask", label: "Face Mask" },
@@ -336,11 +336,11 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl }: { name:
   const title = previewType === "cream" ? "Live Cream Preview" : previewType === "face-mask" ? "Live Face Mask Preview" : "Live Vial Preview";
 
   return (
-    <div className="h-full min-h-[285px] flex items-start justify-center bg-transparent pt-1">
+    <div className="h-full min-h-[255px] flex items-start justify-center bg-transparent pt-0">
       <img
         src={previewSrc}
         alt={title}
-        className="h-[250px] w-auto max-w-full object-contain drop-shadow-sm"
+        className="h-[245px] w-auto max-w-full object-contain drop-shadow-sm"
       />
     </div>
   );
