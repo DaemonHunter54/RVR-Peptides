@@ -13,7 +13,8 @@ COPY package.json pnpm-lock.yaml .npmrc .pnpmrc.json ./
 COPY patches ./patches
 RUN corepack enable \
   && corepack prepare pnpm@10.4.1 --activate \
-  && pnpm install --frozen-lockfile
+  && pnpm install --frozen-lockfile \
+  && node -e "require('@rollup/rollup-linux-x64-gnu'); console.log('Rollup Linux native package present')" || npm install --no-save --no-audit --no-fund @rollup/rollup-linux-x64-gnu@4.52.4
 
 COPY . .
 RUN pnpm run build
