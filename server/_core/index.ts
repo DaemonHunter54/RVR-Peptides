@@ -15,14 +15,44 @@ import { storagePut } from "../storage";
 
 
 
+function getProductAssetDirs(): string[] {
+  const cwd = process.cwd();
+  const dirs = [
+    path.join(cwd, "dist", "public", "assets"),
+    path.join(cwd, "client", "public", "assets"),
+  ];
+
+  // In the bundled production server, import.meta.dirname is usually /app/dist.
+  // Static assets are served from `${import.meta.dirname}/public`, so uploaded
+  // files must also be written there or the browser will receive a broken URL.
+  dirs.push(path.join(import.meta.dirname, "public", "assets"));
+
+  return Array.from(new Set(dirs));
+}
+
+function getPrimaryProductAssetDir(): string {
+  const productionDir = path.join(import.meta.dirname, "public", "assets");
+  if (process.env.NODE_ENV === "production") return productionDir;
+  return path.join(process.cwd(), "client", "public", "assets");
+}
+
+function writeProductAssetToServedLocations(
+  relativeName: string,
+  data: Buffer | Uint8Array | string,
+) {
+  for (const assetsDir of getProductAssetDirs()) {
+    fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(path.join(assetsDir, relativeName), data as any);
+  }
+}
+
 async function saveProductAsset(
   relativeName: string,
   data: Buffer | Uint8Array | string,
   contentType: string,
 ): Promise<{ name: string; url: string }> {
-  const assetsDir = path.join(process.cwd(), "client", "public", "assets");
-  fs.mkdirSync(assetsDir, { recursive: true });
-  fs.writeFileSync(path.join(assetsDir, relativeName), data as any);
+  writeProductAssetToServedLocations(relativeName, data);
+
   try {
     const stored = await storagePut(`assets/${relativeName}`, data, contentType);
     return { name: relativeName, url: stored.url };
@@ -91,12 +121,19 @@ async function startServer() {
 
   app.get("/api/product-assets", async (req, res) => {
     try {
-      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
-      const files = fs.existsSync(assetsDir) ? fs.readdirSync(assetsDir) : [];
-      res.json(files
+      const seen = new Set<string>();
+      const assets = getProductAssetDirs()
+        .flatMap((assetsDir) => fs.existsSync(assetsDir) ? fs.readdirSync(assetsDir) : [])
         .filter((file) => /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file))
+        .filter((file) => {
+          if (seen.has(file)) return false;
+          seen.add(file);
+          return true;
+        })
         .map((file) => ({ name: file, url: `/assets/${file}` }))
-        .sort((a, b) => a.name.localeCompare(b.name)));
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      res.json(assets);
     } catch (err: any) {
       res.status(500).send(err?.message || "Unable to list assets");
     }

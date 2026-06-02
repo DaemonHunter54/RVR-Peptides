@@ -3553,11 +3553,29 @@ async function startServer() {
       res.status(500).send("Error");
     }
   });
+  const getRuntimeProductAssetDirs = () => {
+    const dirs = [
+      path6.join(process.cwd(), "dist", "public", "assets"),
+      path6.join(process.cwd(), "client", "public", "assets"),
+      path6.join(import.meta.dirname, "public", "assets")
+    ];
+    return Array.from(new Set(dirs));
+  };
+  const writeRuntimeProductAsset = (relativeName, data) => {
+    for (const assetsDir of getRuntimeProductAssetDirs()) {
+      fs6.mkdirSync(assetsDir, { recursive: true });
+      fs6.writeFileSync(path6.join(assetsDir, relativeName), data);
+    }
+  };
   app.get("/api/product-assets", async (req, res) => {
     try {
-      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
-      const files = fs6.existsSync(assetsDir) ? fs6.readdirSync(assetsDir) : [];
-      res.json(files.filter((file) => /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file)).map((file) => ({ name: file, url: `/assets/${file}` })).sort((a, b) => a.name.localeCompare(b.name)));
+      const seen = /* @__PURE__ */ new Set();
+      const assets = getRuntimeProductAssetDirs().flatMap((assetsDir) => fs6.existsSync(assetsDir) ? fs6.readdirSync(assetsDir) : []).filter((file) => /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file)).filter((file) => {
+        if (seen.has(file)) return false;
+        seen.add(file);
+        return true;
+      }).map((file) => ({ name: file, url: `/assets/${file}` })).sort((a, b) => a.name.localeCompare(b.name));
+      res.json(assets);
     } catch (err) {
       res.status(500).send(err?.message || "Unable to list assets");
     }
@@ -3624,8 +3642,6 @@ async function startServer() {
       }
       const mimeType = match[1].toLowerCase();
       const buffer = Buffer.from(match[2], "base64");
-      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
-      fs6.mkdirSync(assetsDir, { recursive: true });
       const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
       if (mimeType === "image/svg+xml" || mimeType === "image/svg") {
         const svgText = buffer.toString("utf8").trim();
@@ -3634,7 +3650,7 @@ async function startServer() {
           return;
         }
         const filename2 = `${baseSlug}-${Date.now()}.svg`;
-        fs6.writeFileSync(path6.join(assetsDir, filename2), svgText, "utf8");
+        writeRuntimeProductAsset(filename2, svgText);
         res.json({ name: filename2, url: `/assets/${filename2}` });
         return;
       }
@@ -3658,7 +3674,7 @@ async function startServer() {
       context.putImageData(imageData, 0, 0);
       const processedBuffer = await canvas.encode("png");
       const filename = `${baseSlug}-${Date.now()}.png`;
-      fs6.writeFileSync(path6.join(assetsDir, filename), processedBuffer);
+      writeRuntimeProductAsset(filename, processedBuffer);
       res.json({ name: filename, url: `/assets/${filename}` });
     } catch (err) {
       console.error("[Product Image Upload Error]", err);
@@ -3689,7 +3705,7 @@ async function startServer() {
         buffer = await generateVialBuffer3(displayName);
       }
       const filename = `${slug}-${type}-preview.${extension}`;
-      fs6.writeFileSync(path6.join(assetsDir, filename), buffer);
+      writeRuntimeProductAsset(filename, buffer);
       res.json({ url: `/assets/${filename}`, contentType });
     } catch (err) {
       console.error("[Product Preview Link Error]", err);
