@@ -50,15 +50,15 @@ export default function ProductCard({ product }: ProductCardProps) {
                 isReconstitutionKit
                   ? { maxWidth: "82%", maxHeight: "230px", transform: "translateY(-8px)" }
                   : isBpcCapsules
-                  ? { maxWidth: "102%", maxHeight: "270px", transform: "scale(1.05)" }
+                  ? { maxWidth: "88%", maxHeight: "220px", transform: "scale(0.92)" }
                   : isStorageContainer
                   ? { maxWidth: "92%", maxHeight: "250px", transform: "scale(1.12)" }
                   : isVialCap
-                  ? { maxWidth: "90%", maxHeight: "245px", transform: "scale(1.15)" }
+                  ? { maxWidth: "90%", maxHeight: "245px", transform: "scale(1.08)" }
                   : isVialCapOpener
                   ? { maxWidth: "90%", maxHeight: "245px", transform: "scale(1.12)" }
                   : isGiftCard
-                  ? { transform: "translateY(-18px) scale(1.04)" }
+                  ? { transform: "translateY(-40px) scale(1.04)" }
                   : undefined
               }
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
