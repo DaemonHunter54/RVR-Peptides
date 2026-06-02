@@ -134,7 +134,6 @@ function DashboardSection() {
   const statsQuery = trpc.admin.dashboard.useQuery();
   const stats = statsQuery.data;
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -252,7 +251,6 @@ function ProductsSection() {
     );
   }
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -386,7 +384,7 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
           className="h-[245px] w-auto max-w-full object-contain"
         />
         {giftCardRange ? (
-          <div className="absolute right-[18%] top-[8%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+          <div className="absolute right-[26%] top-[8%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
             {giftCardRange}
           </div>
         ) : null}
@@ -1059,7 +1057,6 @@ function OrdersSection() {
   const result = ordersQuery.data;
   const orders = result?.orders || (Array.isArray(result) ? result : []);
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1164,7 +1161,6 @@ function DiscountsSection() {
   const [form, setForm] = useState({ code: "", type: "percentage" as const, value: "", minOrderAmount: "", maxUses: "", isActive: true, expiresAt: "" });
   const discounts = Array.isArray(discountsQuery.data) ? discountsQuery.data : [];
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1265,7 +1261,6 @@ function CustomersSection() {
     return "bg-slate-100 text-slate-600";
   };
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1390,7 +1385,6 @@ function PaymentsSection() {
     }
   }, [settings.nowpayments_api_key, settings.nowpayments_ipn_secret, settings.nowpayments_webhook_url, settings.nowpayments_sandbox_mode]);
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1716,7 +1710,6 @@ function CustomizationSection() {
     toast.success("All changes saved!");
   };
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
@@ -1917,7 +1910,6 @@ function SettingsSection() {
     },
   ];
 
-  const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
 
   return (
     <div>
