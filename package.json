@@ -114,26 +114,7 @@
       "tailwindcss>nanoid": "3.3.7"
     },
     "onlyBuiltDependencies": [
-      "@tailwindcss/oxide",
-      "canvas",
-      "esbuild"
-    ],
-    "supportedArchitectures": {
-      "os": [
-        "linux",
-        "current"
-      ],
-      "cpu": [
-        "x64",
-        "current"
-      ],
-      "libc": [
-        "glibc",
-        "current"
-      ]
-    }
-  },
-  "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.52.4"
+      "canvas"
+    ]
   }
 }

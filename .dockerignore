@@ -3,7 +3,3 @@ node_modules
 .manus-logs
 *.log
 .env*
-
-dist
-.env
-.env.*

@@ -214,10 +214,6 @@ importers:
       zod:
         specifier: ^4.1.12
         version: 4.1.12
-    optionalDependencies:
-      '@rollup/rollup-linux-x64-gnu':
-        specifier: 4.52.4
-        version: 4.52.4
     devDependencies:
       '@tailwindcss/typography':
         specifier: ^0.5.15

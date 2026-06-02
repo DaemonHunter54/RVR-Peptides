@@ -3,7 +3,6 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 ENV NODE_ENV=development
-ENV npm_config_optional=true
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates python3 make g++ libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libatomic1 \
@@ -13,8 +12,7 @@ COPY package.json pnpm-lock.yaml .npmrc .pnpmrc.json ./
 COPY patches ./patches
 RUN corepack enable \
   && corepack prepare pnpm@10.4.1 --activate \
-  && pnpm config set registry https://registry.npmjs.org/ \
-  && pnpm install --frozen-lockfile --config.optional=true
+  && pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm run build
