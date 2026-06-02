@@ -507,6 +507,40 @@ async function addColumnIfMissing(conn, table, column, definition) {
     await conn.execute(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
   }
 }
+async function ensureDefaultSiteSettings(conn) {
+  const defaults = [
+    ["nowpayments_api_key", "", "text", "NowPayments API Key", "payments"],
+    ["nowpayments_ipn_secret", "", "text", "NowPayments IPN Secret", "payments"],
+    ["nowpayments_webhook_url", "", "text", "NowPayments Webhook URL", "payments"],
+    ["nowpayments_sandbox_mode", "false", "boolean", "NowPayments Sandbox Mode", "payments"],
+    ["flat_rate_shipping", "0", "text", "Flat Rate Shipping", "shipping"],
+    ["contact_email", "", "text", "Contact Email", "contact"],
+    ["contact_phone", "", "text", "Contact Phone", "contact"],
+    ["logo_url", "", "image", "Logo URL", "branding"],
+    ["site_description", "", "text", "Site Description", "general"],
+    ["site_tagline", "", "text", "Site Tagline", "general"],
+    ["footer_disclaimer", "", "text", "Footer Disclaimer", "general"],
+    ["hero_bg_color", "", "text", "Hero Background Color", "branding"],
+    ["hero_text_color", "", "text", "Hero Text Color", "branding"],
+    ["accent_color", "", "text", "Accent Color", "branding"],
+    ["banner_enabled", "false", "boolean", "Banner Enabled", "branding"],
+    ["banner_text", "", "text", "Banner Text", "branding"],
+    ["banner_bg_color", "", "text", "Banner Background Color", "branding"],
+    ["banner_text_color", "", "text", "Banner Text Color", "branding"]
+  ];
+  for (const [key, value, type, label, groupName] of defaults) {
+    await conn.execute(
+      `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         settingType = COALESCE(settingType, VALUES(settingType)),
+         label = COALESCE(label, VALUES(label)),
+         groupName = COALESCE(groupName, VALUES(groupName))`,
+      [key, value, type, label, groupName]
+    );
+  }
+}
+
 async function ensureDatabaseReady() {
   if (initialized) return;
   if (initPromise) return initPromise;
@@ -527,6 +561,7 @@ async function ensureDatabaseReady() {
         await addColumnIfMissing(conn, table, column, definition);
       }
       await ensureProductColumnTypes(conn);
+      await ensureDefaultSiteSettings(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
         console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
@@ -1635,10 +1670,41 @@ async function getSettingsByGroup(groupName) {
   if (!db) return [];
   return db.select().from(siteSettings).where(eq(siteSettings.groupName, groupName));
 }
+function inferSettingType(key, value) {
+  if (value === "true" || value === "false" || key.endsWith("_enabled") || key.endsWith("_mode")) return "boolean";
+  if (key.endsWith("_url") || key.includes("logo")) return "image";
+  if (key.includes("html")) return "html";
+  if (value.trim().startsWith("{") && value.trim().endsWith("}") || value.trim().startsWith("[") && value.trim().endsWith("]")) return "json";
+  return "text";
+}
+function inferSettingGroup(key) {
+  if (key.startsWith("nowpayments_")) return "payments";
+  if (key.includes("shipping")) return "shipping";
+  if (key.includes("tax")) return "tax";
+  if (key.includes("logo") || key.includes("color") || key.includes("hero") || key.includes("banner")) return "branding";
+  if (key.includes("contact")) return "contact";
+  return "general";
+}
+function settingLabel(key) {
+  return key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
 async function updateSetting(key, value) {
   const db = await getDb();
   if (!db) return;
-  await db.update(siteSettings).set({ settingValue: value }).where(eq(siteSettings.settingKey, key));
+  await db.insert(siteSettings).values({
+    settingKey: key,
+    settingValue: value,
+    settingType: inferSettingType(key, value),
+    label: settingLabel(key),
+    groupName: inferSettingGroup(key)
+  }).onDuplicateKeyUpdate({
+    set: {
+      settingValue: value,
+      settingType: inferSettingType(key, value),
+      label: settingLabel(key),
+      groupName: inferSettingGroup(key)
+    }
+  });
 }
 async function getCartItems(userId) {
   const db = await getDb();

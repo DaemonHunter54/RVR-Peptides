@@ -941,6 +941,45 @@ async function addColumnIfMissing(conn: mysql.Connection, table: string, column:
   }
 }
 
+
+async function ensureDefaultSiteSettings(conn: mysql.Connection) {
+  // Seed known admin settings only when missing. Never overwrite existing values;
+  // admin changes must survive restarts, deploys, and redeploys.
+  const defaults: Array<[string, string, string, string, string]> = [
+    ["nowpayments_api_key", "", "text", "NowPayments API Key", "payments"],
+    ["nowpayments_ipn_secret", "", "text", "NowPayments IPN Secret", "payments"],
+    ["nowpayments_webhook_url", "", "text", "NowPayments Webhook URL", "payments"],
+    ["nowpayments_sandbox_mode", "false", "boolean", "NowPayments Sandbox Mode", "payments"],
+    ["flat_rate_shipping", "0", "text", "Flat Rate Shipping", "shipping"],
+    ["contact_email", "", "text", "Contact Email", "contact"],
+    ["contact_phone", "", "text", "Contact Phone", "contact"],
+    ["logo_url", "", "image", "Logo URL", "branding"],
+    ["site_description", "", "text", "Site Description", "general"],
+    ["site_tagline", "", "text", "Site Tagline", "general"],
+    ["footer_disclaimer", "", "text", "Footer Disclaimer", "general"],
+    ["hero_bg_color", "", "text", "Hero Background Color", "branding"],
+    ["hero_text_color", "", "text", "Hero Text Color", "branding"],
+    ["accent_color", "", "text", "Accent Color", "branding"],
+    ["banner_enabled", "false", "boolean", "Banner Enabled", "branding"],
+    ["banner_text", "", "text", "Banner Text", "branding"],
+    ["banner_bg_color", "", "text", "Banner Background Color", "branding"],
+    ["banner_text_color", "", "text", "Banner Text Color", "branding"],
+  ];
+
+  for (const [key, value, type, label, groupName] of defaults) {
+    await conn.execute(
+      `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         settingType = COALESCE(settingType, VALUES(settingType)),
+         label = COALESCE(label, VALUES(label)),
+         groupName = COALESCE(groupName, VALUES(groupName))`,
+      [key, value, type, label, groupName]
+    );
+  }
+}
+
+
 export async function ensureDatabaseReady() {
   if (initialized) return;
   if (initPromise) return initPromise;
@@ -965,6 +1004,7 @@ export async function ensureDatabaseReady() {
       await ensureUserRoleEnum(conn);
       await ensureConfiguredSuperAdmin(conn);
       await ensureProductColumnTypes(conn);
+      await ensureDefaultSiteSettings(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
       console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");

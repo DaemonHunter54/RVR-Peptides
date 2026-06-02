@@ -910,10 +910,50 @@ export async function getSettingsByGroup(groupName: string) {
   return db.select().from(siteSettings).where(eq(siteSettings.groupName, groupName));
 }
 
+function inferSettingType(key: string, value: string): "text" | "image" | "boolean" | "json" | "html" {
+  if (value === "true" || value === "false" || key.endsWith("_enabled") || key.endsWith("_mode")) return "boolean";
+  if (key.endsWith("_url") || key.includes("logo")) return "image";
+  if (key.includes("html")) return "html";
+  if ((value.trim().startsWith("{") && value.trim().endsWith("}")) || (value.trim().startsWith("[") && value.trim().endsWith("]"))) return "json";
+  return "text";
+}
+
+function inferSettingGroup(key: string): string {
+  if (key.startsWith("nowpayments_")) return "payments";
+  if (key.includes("shipping")) return "shipping";
+  if (key.includes("tax")) return "tax";
+  if (key.includes("logo") || key.includes("color") || key.includes("hero") || key.includes("banner")) return "branding";
+  if (key.includes("contact")) return "contact";
+  return "general";
+}
+
+function settingLabel(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export async function updateSetting(key: string, value: string) {
   const db = await getDb();
   if (!db) return;
-  await db.update(siteSettings).set({ settingValue: value }).where(eq(siteSettings.settingKey, key));
+
+  // Settings must survive Railway restarts/redeploys. Use a DB upsert instead of
+  // update-only behavior, because update-only silently does nothing when a new
+  // setting key has not been seeded yet.
+  await db.insert(siteSettings).values({
+    settingKey: key,
+    settingValue: value,
+    settingType: inferSettingType(key, value),
+    label: settingLabel(key),
+    groupName: inferSettingGroup(key),
+  }).onDuplicateKeyUpdate({
+    set: {
+      settingValue: value,
+      settingType: inferSettingType(key, value),
+      label: settingLabel(key),
+      groupName: inferSettingGroup(key),
+    },
+  });
 }
 
 // ─── Cart ────────────────────────────────────────────────────────────
