@@ -546,7 +546,7 @@ async function startServer() {
             context.shadowBlur = Math.round(fontSize * 0.16);
             context.shadowOffsetY = Math.max(1, Math.round(fontSize * 0.035));
             context.fillStyle = "#ffffff";
-            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.18), Math.round(image.height * 0.08));
+            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.30), Math.round(image.height * 0.08));
             buffer = await canvas.encode("png");
           } catch (giftCardError) {
             console.warn("[Gift Card Preview] Amount-range rendering failed; saving base gift card image.", giftCardError);
