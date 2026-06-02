@@ -382,7 +382,7 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
           className="h-[245px] w-auto max-w-full object-contain"
         />
         {giftCardRange ? (
-          <div className="absolute left-[64%] top-[11%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+          <div className="absolute left-[64%] top-[21%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
             {giftCardRange}
           </div>
         ) : null}
