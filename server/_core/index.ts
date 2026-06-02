@@ -506,20 +506,12 @@ async function startServer() {
       const name = String(req.body?.name || slug.replace(/-/g, " ")).trim();
       const size = String(req.body?.size || "").trim();
       const minAmount = String(req.body?.minAmount || "").trim();
-      const maxAmount = String(req.body?.maxAmount || "").trim();
       const displayName = size && !name.toLowerCase().includes(size.toLowerCase()) ? `${name} ${size}` : name;
       const formatGiftCardAmount = (value: string) => {
         const parsed = Number(String(value || "").replace(/[^0-9.]/g, ""));
-        return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "";
+        return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString("en-US", { maximumFractionDigits: 2 })}+` : "";
       };
-      const giftCardRange = (() => {
-        const min = formatGiftCardAmount(minAmount);
-        const max = formatGiftCardAmount(maxAmount);
-        if (min && max) return `${min} - ${max}`;
-        if (min) return `${min}+`;
-        if (max) return `Up to ${max}`;
-        return "";
-      })();
+      const giftCardRange = formatGiftCardAmount(minAmount);
 
       let buffer: Buffer;
       let extension = "png";

@@ -343,17 +343,11 @@ const blankPreviewSrc = (type: PreviewProductType, slug: string, name: string, s
   return generatedVialPreviewUrl(slug, name || "Preview Product", size);
 };
 
-function formatGiftCardRange(minAmount?: string, maxAmount?: string) {
-  const formatAmount = (value?: string) => {
-    const parsed = Number(String(value || "").replace(/[^0-9.]/g, ""));
-    return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "";
-  };
-  const min = formatAmount(minAmount);
-  const max = formatAmount(maxAmount);
-  if (min && max) return `${min} - ${max}`;
-  if (min) return `${min}+`;
-  if (max) return `Up to ${max}`;
-  return "";
+function formatGiftCardMinimum(minAmount?: string) {
+  const parsed = Number(String(minAmount || "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(parsed) && parsed > 0
+    ? `$${parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}+`
+    : "";
 }
 
 function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount, maxAmount }: { name: string; slug: string; size?: string; previewType: PreviewProductType; imageUrl?: string; minAmount?: string; maxAmount?: string }) {
@@ -363,7 +357,7 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
     previewType === "face-mask" ? "Live Face Mask Preview" :
     previewType === "gift-card" ? "Live Gift Card Preview" :
     "Live Vial Preview";
-  const giftCardRange = previewType === "gift-card" ? formatGiftCardRange(minAmount, maxAmount) : "";
+  const giftCardRange = previewType === "gift-card" ? formatGiftCardMinimum(minAmount) : "";
 
   if (!previewSrc) {
     return (
@@ -471,7 +465,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           name: form.name || "Preview Product",
           size: form.size || "",
           minAmount: form.price || "",
-          maxAmount: form.compareAtPrice || "",
+          maxAmount: "",
         }),
       });
       if (!response.ok) throw new Error(await response.text());
@@ -496,7 +490,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         slug: "gift-card",
         sku: "GIFT-CARD",
         price: prev.price || "10",
-        compareAtPrice: prev.compareAtPrice || "500",
+        compareAtPrice: "",
         size: "",
         stockQuantity: 9999,
         imageUrl: "/assets/Gift-Card.png",
@@ -601,16 +595,16 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     const linkedImageUrl = previewType ? (await linkPreviewToUrl()) : form.imageUrl;
 
     const variants = (form.variants || [])
-      .filter((v: any) => String(v.label || "").trim() || String(v.price || "").trim() || String(v.compareAtPrice || "").trim())
+      .filter((v: any) => String(v.label || "").trim() || String(v.price || "").trim() || (!previewType && String(v.compareAtPrice || "").trim()))
       .map((v: any, index: number) => {
         const cleanLabel = previewType === "gift-card"
-          ? `$${String(v.price || form.price || "10").trim()} minimum${String(v.compareAtPrice || form.compareAtPrice || "").trim() ? ` / $${String(v.compareAtPrice || form.compareAtPrice).trim()} maximum` : ""}`
+          ? `$${String(v.price || form.price || "10").trim()} minimum`
           : String(v.label || "").trim();
         return {
           ...v,
           label: cleanLabel,
           price: String(v.price || form.price || "0").trim(),
-          compareAtPrice: String(v.compareAtPrice || "").trim() || null,
+          compareAtPrice: previewType === "gift-card" ? null : (String(v.compareAtPrice || "").trim() || null),
           stockQuantity: previewType === "gift-card" ? 9999 : (v.stockQuantity ?? form.stockQuantity ?? 100),
           sortOrder: index,
           imageUrl: v.imageUrl || linkedImageUrl || imageUrlForVariant(form.slug, cleanLabel) || imageUrlForSlug(form.slug),
@@ -622,6 +616,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       slug,
       sku: slug ? slug.toUpperCase().replace(/-/g, "-") : form.sku,
       size: previewType === "gift-card" ? "" : form.size,
+      compareAtPrice: previewType === "gift-card" ? "" : form.compareAtPrice,
       stockQuantity: previewType === "gift-card" ? 9999 : form.stockQuantity,
       imageUrl: linkedImageUrl || form.imageUrl || imageUrlForSlug(slug),
       variants,
@@ -642,7 +637,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           <h2 className="font-semibold text-slate-800 mb-4">Basic Information</h2>
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,780px)_1fr] gap-8 items-start">
             <div className="space-y-4">
-              <div className={`grid grid-cols-1 gap-4 items-end ${previewType === "gift-card" ? "md:grid-cols-[minmax(260px,1.45fr)_repeat(2,minmax(150px,0.55fr))]" : "md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))]"}`}>
+              <div className={`grid grid-cols-1 gap-4 items-end ${previewType === "gift-card" ? "md:grid-cols-[minmax(260px,1.45fr)_minmax(150px,0.55fr)]" : "md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))]"}`}>
                 <div>
                   <Label>Product Name *</Label>
                   <Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" />
@@ -657,10 +652,12 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                   <Label>{previewType === "gift-card" ? "Minimum Amount ($)" : "Price ($) *"}</Label>
                   <Input type="number" step="0.01" min="0" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" />
                 </div>
-                <div>
-                  <Label>{previewType === "gift-card" ? "Maximum Amount ($)" : "Stock"}</Label>
-                  <Input type="number" min="0" value={previewType === "gift-card" ? (form.compareAtPrice || "") : form.stockQuantity} onChange={(e) => previewType === "gift-card" ? updateField("compareAtPrice", e.target.value) : updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" placeholder={previewType === "gift-card" ? "No max" : undefined} />
-                </div>
+                {previewType !== "gift-card" ? (
+                  <div>
+                    <Label>Stock</Label>
+                    <Input type="number" min="0" value={form.stockQuantity} onChange={(e) => updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" />
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex items-center gap-3 pt-1">
@@ -672,9 +669,9 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               {multipleProducts ? (
                 <div className="space-y-3 rounded-xl bg-slate-50/80 p-3">
                   {form.variants.map((variant: any, index: number) => (
-                    <div key={index} className={`grid grid-cols-1 gap-4 items-end ${previewType === "gift-card" ? "md:grid-cols-[minmax(260px,1.45fr)_repeat(2,minmax(150px,0.55fr))_auto]" : "md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))_auto]"}`}>
+                    <div key={index} className={`grid grid-cols-1 gap-4 items-end ${previewType === "gift-card" ? "md:grid-cols-[minmax(260px,1.45fr)_minmax(150px,0.55fr)_auto]" : "md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))_auto]"}`}>
                       <div className="hidden md:block text-xs font-medium text-slate-500 pb-3">
-                        {previewType === "gift-card" ? `Gift Card Range ${index + 1}` : `Additional Dose ${index + 1}`}
+                        {previewType === "gift-card" ? `Additional Minimum ${index + 1}` : `Additional Dose ${index + 1}`}
                       </div>
                       {previewType !== "gift-card" ? (
                         <div>
@@ -683,20 +680,22 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                         </div>
                       ) : null}
                       <div>
-                        <Label>{previewType === "gift-card" ? "Lowest Amount Allowed ($)" : "Price ($)"}</Label>
+                        <Label>{previewType === "gift-card" ? "Minimum Amount ($)" : "Price ($)"}</Label>
                         <Input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, "price", e.target.value)} className="mt-1.5 bg-white" placeholder={form.price || "10.00"} />
                       </div>
-                      <div>
-                        <Label>{previewType === "gift-card" ? "Highest Amount Allowed ($)" : "Stock"}</Label>
-                        <Input type="number" min="0" value={previewType === "gift-card" ? (variant.compareAtPrice || "") : variant.stockQuantity} onChange={(e) => previewType === "gift-card" ? updateVariant(index, "compareAtPrice", e.target.value) : updateVariant(index, "stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5 bg-white" placeholder={previewType === "gift-card" ? form.compareAtPrice || "No max" : undefined} />
-                      </div>
+                      {previewType !== "gift-card" ? (
+                        <div>
+                          <Label>Stock</Label>
+                          <Input type="number" min="0" value={variant.stockQuantity} onChange={(e) => updateVariant(index, "stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5 bg-white" />
+                        </div>
+                      ) : null}
                       <Button type="button" variant="ghost" size="sm" className="text-red-500 mb-0.5" onClick={() => removeVariant(index)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
                   <Button type="button" variant="outline" size="sm" onClick={addVariant} className="gap-1.5">
-                    <Plus className="h-3.5 w-3.5" /> {previewType === "gift-card" ? "Add Range" : "Add Dose"}
+                    <Plus className="h-3.5 w-3.5" /> {previewType === "gift-card" ? "Add Minimum" : "Add Dose"}
                   </Button>
                 </div>
               ) : null}

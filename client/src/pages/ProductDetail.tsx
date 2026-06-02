@@ -17,17 +17,17 @@ import { productImageUrl } from "@/lib/vialDisplay";
 const makeProductSlug = (value: string) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 
-function formatGiftCardRange(minAmount?: string | number, maxAmount?: string | number) {
-  const formatAmount = (value?: string | number) => {
-    const parsed = Number(String(value ?? "").replace(/[^0-9.]/g, ""));
-    return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "";
-  };
-  const min = formatAmount(minAmount);
-  const max = formatAmount(maxAmount);
-  if (min && max) return `${min} - ${max}`;
-  if (min) return `${min}+`;
-  if (max) return `Up to ${max}`;
-  return "";
+function formatGiftCardMinimum(minAmount?: string | number) {
+  const parsed = Number(String(minAmount ?? "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(parsed) && parsed > 0
+    ? `$${parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}+`
+    : "";
+}
+
+function clampGiftCardAmount(rawAmount: string | number, minAmount: number) {
+  const parsed = Number(String(rawAmount ?? "").replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(parsed) || parsed <= 0) return minAmount;
+  return Math.max(parsed, minAmount);
 }
 
 
@@ -58,8 +58,11 @@ export default function ProductDetail() {
   // Determine which tabs to show based on available data
   const availableTabs = useMemo(() => {
     if (!product) return [];
+    const productIsGiftCard = makeProductSlug(product.slug || product.name) === "gift-card" || String(product.name || "").toLowerCase().includes("gift card");
+    if (productIsGiftCard) return [];
+
     const tabs: { id: string; label: string }[] = [];
-    // Description tab always shows if there's description or research content
+    // Description tab shows only when this product has visible product/research content.
     if (product.description || product.research?.overview || product.research?.researchContent) {
       tabs.push({ id: "description", label: "Description" });
     }
@@ -126,24 +129,26 @@ export default function ProductDetail() {
     ? variants.find((v: any) => v.id === selectedVariantId) || variants[0]
     : null;
   
-  const price = isGiftCard ? Number(giftCardAmount || product.price || 10) : (activeVariant ? Number(activeVariant.price) : Number(product.price));
+  const giftCardMinimumAmount = Number(product.price || 10);
+  const normalizedGiftCardAmount = clampGiftCardAmount(giftCardAmount || giftCardMinimumAmount, giftCardMinimumAmount);
+  const price = isGiftCard ? normalizedGiftCardAmount : (activeVariant ? Number(activeVariant.price) : Number(product.price));
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
   const displayImageUrl = productImageUrl(product, activeVariant) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`;
-  const giftCardRange = isGiftCard ? formatGiftCardRange(product.price, product.compareAtPrice) : "";
+  const giftCardRange = isGiftCard ? formatGiftCardMinimum(product.price) : "";
   const shouldOverlayGiftCardRange = isGiftCard && giftCardRange && String(displayImageUrl || "").includes("Gift-Card.png");
 
   const handleAddToCart = () => {
-    const cartPrice = isGiftCard ? String(Number(giftCardAmount || product.price || 10).toFixed(2)) : (activeVariant ? activeVariant.price : product.price);
-    const cartName = isGiftCard ? `${product.name} ($${Number(giftCardAmount || product.price || 10).toFixed(2)})` : (activeVariant ? `${product.name} (${activeVariant.label})` : product.name);
+    const selectedGiftCardAmount = clampGiftCardAmount(giftCardAmount || giftCardMinimumAmount, giftCardMinimumAmount);
+    const cartPrice = isGiftCard ? String(selectedGiftCardAmount.toFixed(2)) : (activeVariant ? activeVariant.price : product.price);
+    const cartName = isGiftCard ? `${product.name} ($${selectedGiftCardAmount.toFixed(2)})` : (activeVariant ? `${product.name} (${activeVariant.label})` : product.name);
     const cartImage = productImageUrl(product, activeVariant) || activeVariant?.imageUrl || product.imageUrl;
     if (isGiftCard) {
-      const minAmount = Number(product.price || 10);
-      const maxAmount = Number(product.compareAtPrice || 0);
-      const amount = Number(giftCardAmount || 0);
+      const typedAmount = Number(String(giftCardAmount || "").replace(/[^0-9.]/g, ""));
       const recipientEmail = giftCardRecipientEmail.trim();
-      if (!amount || amount < minAmount || (maxAmount > 0 && amount > maxAmount)) {
-        toast.error(`Enter a gift card amount${maxAmount > 0 ? ` between $${minAmount.toFixed(2)} and $${maxAmount.toFixed(2)}` : ` of at least $${minAmount.toFixed(2)}`}.`);
+      if (giftCardAmount && Number.isFinite(typedAmount) && typedAmount < giftCardMinimumAmount) {
+        toast.error(`Enter a gift card amount of at least $${giftCardMinimumAmount.toFixed(2)}.`);
+        setGiftCardAmount(giftCardMinimumAmount.toFixed(2));
         return;
       }
       if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
@@ -153,7 +158,7 @@ export default function ProductDetail() {
     }
 
     const giftCardVariant = isGiftCard
-      ? `Gift Card $${Number(giftCardAmount || product.price || 10).toFixed(2)} | Recipient: ${giftCardRecipientEmail.trim()}`
+      ? `Gift Card $${selectedGiftCardAmount.toFixed(2)} | Recipient: ${giftCardRecipientEmail.trim()}`
       : activeVariant?.label;
 
     if (!isAuthenticated) {
@@ -249,11 +254,11 @@ export default function ProductDetail() {
                   <Input
                     type="number"
                     step="0.01"
-                    min={Number(product.price || 10)}
-                    max={Number(product.compareAtPrice || undefined)}
+                    min={giftCardMinimumAmount}
                     value={giftCardAmount}
                     onChange={(e) => setGiftCardAmount(e.target.value)}
-                    placeholder={`Minimum $${Number(product.price || 10).toFixed(2)}`}
+                    onBlur={() => setGiftCardAmount(clampGiftCardAmount(giftCardAmount || giftCardMinimumAmount, giftCardMinimumAmount).toFixed(2))}
+                    placeholder={`Minimum $${giftCardMinimumAmount.toFixed(2)}`}
                     className="max-w-xs"
                   />
                   <p className="text-xs text-slate-500">Enter the amount you would like loaded onto the gift card.</p>
