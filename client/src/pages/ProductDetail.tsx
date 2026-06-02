@@ -278,6 +278,9 @@ export default function ProductDetail() {
                   </div>
                   <p className="text-xs text-slate-500 pl-[166px]">The gift card code will be sent to this email after payment is verified.</p>
                 </div>
+                <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  Gift cards are delivered by email, cannot be reloaded, and expire 1 year from the purchase date.
+                </div>
               </div>
             )}
 

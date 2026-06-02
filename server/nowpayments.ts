@@ -95,13 +95,30 @@ export async function handleIpnWebhook(body: any, signature: string) {
 
   console.log(`[NowPayments] IPN received: order=${orderId}, status=${paymentStatus}, paymentId=${paymentId}`);
 
-  // Map NowPayments statuses to our order statuses
+  // Map NowPayments statuses to our order statuses. Prefer our orderNumber from order_id;
+  // invoice/payment IDs can differ by NowPayments event type.
+  const order = await db.getOrderByNumber(orderId);
   if (paymentStatus === "finished" || paymentStatus === "confirmed") {
-    await db.updateOrderPayment(paymentId, "finished");
+    if (order) {
+      await db.updateOrder(order.id, { status: "paid", paymentStatus: "finished", paymentId } as any);
+      await db.finalizeGiftCardRedemptionForOrder(order.id);
+      await db.issueGiftCardsForOrder(order.id, order.guestEmail || undefined);
+    } else {
+      await db.updateOrderPayment(paymentId, "finished");
+    }
   } else if (paymentStatus === "failed" || paymentStatus === "expired" || paymentStatus === "refunded") {
-    await db.updateOrderPayment(paymentId, "failed");
+    if (order) {
+      await db.updateOrder(order.id, { status: "cancelled", paymentStatus: "failed", paymentId } as any);
+      await db.releaseGiftCardReservationForOrder(order.id);
+    } else {
+      await db.updateOrderPayment(paymentId, "failed");
+    }
   } else if (paymentStatus === "partially_paid") {
-    await db.updateOrderPayment(paymentId, "partially_paid");
+    if (order) {
+      await db.updateOrder(order.id, { paymentStatus: "partially_paid", paymentId } as any);
+    } else {
+      await db.updateOrderPayment(paymentId, "partially_paid");
+    }
   }
   // "waiting", "confirming", "sending" are intermediate states - no action needed
 

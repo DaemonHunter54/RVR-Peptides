@@ -162,6 +162,8 @@ export const orders = mysqlTable("orders", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   // Discount code used
   discountCode: varchar("discountCode", { length: 50 }),
+  giftCardCode: varchar("giftCardCode", { length: 9 }),
+  giftCardAmount: decimal("giftCardAmount", { precision: 10, scale: 2 }).default("0.00"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -214,14 +216,33 @@ export const giftCards = mysqlTable("giftCards", {
   originalAmount: decimal("originalAmount", { precision: 10, scale: 2 }).notNull(),
   balance: decimal("balance", { precision: 10, scale: 2 }).notNull(),
   purchaserEmail: varchar("purchaserEmail", { length: 320 }),
+  recipientEmail: varchar("recipientEmail", { length: 320 }),
   orderId: int("orderId"),
   isActive: boolean("isActive").default(true).notNull(),
+  emailStatus: varchar("emailStatus", { length: 50 }).default("pending"),
+  expiresAt: timestamp("expiresAt"),
+  lastUsedAt: timestamp("lastUsedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type GiftCard = typeof giftCards.$inferSelect;
 export type InsertGiftCard = typeof giftCards.$inferInsert;
+
+export const giftCardTransactions = mysqlTable("giftCardTransactions", {
+  id: int("id").autoincrement().primaryKey(),
+  giftCardId: int("giftCardId").notNull(),
+  orderId: int("orderId"),
+  type: mysqlEnum("type", ["issue", "reserve", "redeem", "release", "void"]).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  balanceAfter: decimal("balanceAfter", { precision: 10, scale: 2 }),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type GiftCardTransaction = typeof giftCardTransactions.$inferSelect;
+export type InsertGiftCardTransaction = typeof giftCardTransactions.$inferInsert;
+
 
 // ─── Site Settings ───────────────────────────────────────────────────
 export const siteSettings = mysqlTable("siteSettings", {

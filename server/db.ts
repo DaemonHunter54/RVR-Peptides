@@ -14,8 +14,10 @@ import {
   cartItems,
   productVariants,
   giftCards, InsertGiftCard,
+  giftCardTransactions, InsertGiftCardTransaction,
 } from "../drizzle/schema";
 import { ensureDatabaseReady } from "./db-init";
+import crypto from "crypto";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -554,12 +556,18 @@ export async function updateOrderPayment(paymentId: string, paymentStatus: strin
   if (newStatus) updateData.status = newStatus;
   await db.update(orders).set(updateData).where(eq(orders.paymentId, paymentId));
 
+  const matchedOrders = await db.select().from(orders).where(eq(orders.paymentId, paymentId)).limit(1);
+  const order = matchedOrders[0];
+  if (!order) return;
+
   if (newStatus === "paid") {
-    const paidOrders = await db.select().from(orders).where(eq(orders.paymentId, paymentId)).limit(1);
-    const order = paidOrders[0];
-    if (order) await issueGiftCardsForOrder(order.id, order.guestEmail || undefined);
+    await finalizeGiftCardRedemptionForOrder(order.id);
+    await issueGiftCardsForOrder(order.id, order.guestEmail || undefined);
+  } else if (newStatus === "cancelled") {
+    await releaseGiftCardReservationForOrder(order.id);
   }
 }
+
 
 
 
@@ -569,14 +577,35 @@ function parseGiftCardRecipientEmail(label?: string | null) {
   return match ? match[1].trim() : undefined;
 }
 
-async function sendGiftCardEmail(to: string | undefined, code: string, amount: number) {
-  if (!to) return;
+function normalizeGiftCardCode(code: string) {
+  const alnum = String(code || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 8);
+  return alnum.length > 4 ? `${alnum.slice(0, 4)}-${alnum.slice(4)}` : alnum;
+}
+
+function generateGiftCardCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let raw = "";
+  for (let i = 0; i < 8; i += 1) {
+    raw += alphabet[crypto.randomInt(0, alphabet.length)];
+  }
+  return `${raw.slice(0, 4)}-${raw.slice(4)}`;
+}
+
+function giftCardExpiryDate(from = new Date()) {
+  const expiresAt = new Date(from);
+  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  return expiresAt;
+}
+
+async function sendGiftCardEmail(to: string | undefined, code: string, amount: number, expiresAt?: Date) {
+  if (!to) return false;
   const subject = "Your River Valley Research Peptides Gift Card";
   const text = [
     "Thank you for your gift card purchase.",
     "",
     `Gift card code: ${code}`,
     `Amount: $${amount.toFixed(2)}`,
+    expiresAt ? `Expires: ${expiresAt.toLocaleDateString()}` : "Expires: 1 year from purchase date",
     "",
     "Use this code during checkout in the Use gift card field.",
   ].join("\n");
@@ -590,7 +619,7 @@ async function sendGiftCardEmail(to: string | undefined, code: string, amount: n
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from: fromEmail, to, subject, text }),
       });
-      return;
+      return true;
     } catch (error) {
       console.warn("[Gift Card Email] Resend delivery failed.", error);
     }
@@ -602,15 +631,169 @@ async function sendGiftCardEmail(to: string | undefined, code: string, amount: n
       await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, subject, text, code, amount }),
+        body: JSON.stringify({ to, subject, text, code, amount, expiresAt }),
       });
-      return;
+      return true;
     } catch (error) {
       console.warn("[Gift Card Email] Webhook delivery failed.", error);
     }
   }
 
   console.log(`[Gift Card Email Pending] ${to}: ${code} for $${amount.toFixed(2)}`);
+  return false;
+}
+
+async function addGiftCardTransaction(data: InsertGiftCardTransaction) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(giftCardTransactions).values(data);
+}
+
+export async function getGiftCardTransactions(giftCardId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(giftCardTransactions).where(eq(giftCardTransactions.giftCardId, giftCardId)).orderBy(desc(giftCardTransactions.createdAt));
+}
+
+async function getOpenReservedAmount(giftCardId: number) {
+  const txns = await getGiftCardTransactions(giftCardId);
+  const reserves = new Map<number, number>();
+  const closed = new Set<number>();
+  for (const txn of txns) {
+    const orderId = Number(txn.orderId || 0);
+    if (!orderId) continue;
+    if (txn.type === "reserve") {
+      reserves.set(orderId, (reserves.get(orderId) || 0) + Number(txn.amount || 0));
+    }
+    if (txn.type === "redeem" || txn.type === "release" || txn.type === "void") {
+      closed.add(orderId);
+    }
+  }
+  let total = 0;
+  for (const [orderId, amount] of reserves.entries()) {
+    if (!closed.has(orderId)) total += amount;
+  }
+  return total;
+}
+
+function giftCardExpired(card: any) {
+  return card?.expiresAt && new Date(card.expiresAt).getTime() < Date.now();
+}
+
+export async function getGiftCardByCode(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const normalized = normalizeGiftCardCode(code);
+  const result = await db.select().from(giftCards).where(eq(giftCards.code, normalized)).limit(1);
+  return result[0];
+}
+
+export async function getAllGiftCards() {
+  const db = await getDb();
+  if (!db) return [];
+  const cards = await db.select().from(giftCards).orderBy(desc(giftCards.createdAt));
+  return Promise.all(cards.map(async (card) => {
+    const reservedAmount = await getOpenReservedAmount(card.id);
+    const balance = Number(card.balance || 0);
+    return {
+      ...card,
+      reservedAmount: reservedAmount.toFixed(2),
+      availableBalance: Math.max(0, balance - reservedAmount).toFixed(2),
+      expired: giftCardExpired(card),
+    };
+  }));
+}
+
+export async function createGiftCard(data: InsertGiftCard) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(giftCards).values({ ...data, code: normalizeGiftCardCode(data.code) });
+}
+
+export async function previewGiftCardApplication(code: string, amountDue: number) {
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive || giftCardExpired(card)) {
+    return { valid: false, applied: 0, availableBalance: 0, remainingDue: amountDue, message: "Invalid, expired, or depleted gift card" };
+  }
+  const reserved = await getOpenReservedAmount(card.id);
+  const balance = Number(card.balance || 0);
+  const availableBalance = Math.max(0, balance - reserved);
+  if (availableBalance <= 0) {
+    return { valid: false, applied: 0, availableBalance: 0, remainingDue: amountDue, message: "Gift card has no available balance" };
+  }
+  const applied = Math.max(0, Math.min(availableBalance, amountDue));
+  return {
+    valid: applied > 0,
+    applied,
+    availableBalance,
+    remainingDue: Math.max(0, amountDue - applied),
+    message: `Gift card available balance: $${availableBalance.toFixed(2)}`,
+  };
+}
+
+export async function reserveGiftCardForOrder(code: string, amount: number, orderId: number) {
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive || giftCardExpired(card)) return { applied: 0, remainingBalance: 0 };
+  const preview = await previewGiftCardApplication(code, amount);
+  const applied = Math.min(preview.applied, amount);
+  if (applied <= 0) return { applied: 0, remainingBalance: preview.availableBalance };
+  await addGiftCardTransaction({
+    giftCardId: card.id,
+    orderId,
+    type: "reserve",
+    amount: applied.toFixed(2),
+    balanceAfter: Number(card.balance || 0).toFixed(2),
+    note: "Reserved for pending checkout",
+  });
+  return { applied, remainingBalance: Math.max(0, preview.availableBalance - applied) };
+}
+
+export async function releaseGiftCardReservationForOrder(orderId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const order = await getOrderById(orderId);
+  const code = (order as any)?.giftCardCode;
+  const amount = Number((order as any)?.giftCardAmount || 0);
+  if (!code || amount <= 0) return;
+  const card = await getGiftCardByCode(code);
+  if (!card) return;
+  await addGiftCardTransaction({
+    giftCardId: card.id,
+    orderId,
+    type: "release",
+    amount: amount.toFixed(2),
+    balanceAfter: Number(card.balance || 0).toFixed(2),
+    note: "Released because checkout payment did not complete",
+  });
+}
+
+export async function finalizeGiftCardRedemptionForOrder(orderId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const order = await getOrderById(orderId);
+  const code = (order as any)?.giftCardCode;
+  const amount = Number((order as any)?.giftCardAmount || 0);
+  if (!code || amount <= 0) return;
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive || giftCardExpired(card)) return;
+  const existing = await getGiftCardTransactions(card.id);
+  if (existing.some((txn) => txn.orderId === orderId && txn.type === "redeem")) return;
+  const currentBalance = Number(card.balance || 0);
+  const applied = Math.max(0, Math.min(currentBalance, amount));
+  const remainingBalance = Math.max(0, currentBalance - applied);
+  await db.update(giftCards).set({
+    balance: remainingBalance.toFixed(2),
+    isActive: remainingBalance > 0,
+    lastUsedAt: new Date(),
+  }).where(eq(giftCards.id, card.id));
+  await addGiftCardTransaction({
+    giftCardId: card.id,
+    orderId,
+    type: "redeem",
+    amount: applied.toFixed(2),
+    balanceAfter: remainingBalance.toFixed(2),
+    note: "Redeemed after verified payment",
+  });
 }
 
 export async function issueGiftCardsForOrder(orderId: number, purchaserEmail?: string) {
@@ -622,50 +805,49 @@ export async function issueGiftCardsForOrder(orderId: number, purchaserEmail?: s
     const amount = Number(item.unitPrice || item.totalPrice || 0);
     for (let i = 0; i < item.quantity; i += 1) {
       let code = "";
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const raw = Math.random().toString(36).slice(2, 10).toUpperCase().replace(/[^A-Z0-9]/g, "").padEnd(8, "X").slice(0, 8);
-        code = `${raw.slice(0, 4)}-${raw.slice(4)}`;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        code = generateGiftCardCode();
         const existing = await getGiftCardByCode(code);
         if (!existing) break;
       }
       const recipientEmail = parseGiftCardRecipientEmail((item as any).variantLabel) || purchaserEmail;
-      await createGiftCard({ code, originalAmount: amount.toFixed(2), balance: amount.toFixed(2), purchaserEmail, orderId, isActive: true });
-      await sendGiftCardEmail(recipientEmail, code, amount);
+      const expiresAt = giftCardExpiryDate();
+      await createGiftCard({
+        code,
+        originalAmount: amount.toFixed(2),
+        balance: amount.toFixed(2),
+        purchaserEmail,
+        recipientEmail,
+        orderId,
+        isActive: true,
+        emailStatus: "pending",
+        expiresAt,
+      } as any);
+      const created = await getGiftCardByCode(code);
+      if (created) {
+        await addGiftCardTransaction({
+          giftCardId: created.id,
+          orderId,
+          type: "issue",
+          amount: amount.toFixed(2),
+          balanceAfter: amount.toFixed(2),
+          note: "Issued after verified payment",
+        });
+      }
+      const delivered = await sendGiftCardEmail(recipientEmail, code, amount, expiresAt);
+      if (created) {
+        await db.update(giftCards).set({ emailStatus: delivered ? "sent" : "pending" }).where(eq(giftCards.id, created.id));
+      }
       console.log(`[Gift Card] Issued ${code} for order ${orderId}`);
     }
   }
 }
 
-
-// ─── Gift Cards ─────────────────────────────────────────────────────
-function normalizeGiftCardCode(code: string) {
-  return String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^(.{4})(.+)$/, "$1-$2").slice(0, 9);
-}
-
-export async function getGiftCardByCode(code: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const normalized = normalizeGiftCardCode(code);
-  const result = await db.select().from(giftCards).where(eq(giftCards.code, normalized)).limit(1);
-  return result[0];
-}
-
-export async function createGiftCard(data: InsertGiftCard) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  await db.insert(giftCards).values({ ...data, code: normalizeGiftCardCode(data.code) });
-}
-
 export async function applyGiftCard(code: string, amount: number) {
-  const db = await getDb();
-  if (!db) return { applied: 0, remainingBalance: 0 };
-  const card = await getGiftCardByCode(code);
-  if (!card || !card.isActive) return { applied: 0, remainingBalance: 0 };
-  const balance = Number(card.balance || 0);
-  const applied = Math.max(0, Math.min(balance, amount));
-  const remainingBalance = Math.max(0, balance - applied);
-  await db.update(giftCards).set({ balance: remainingBalance.toFixed(2), isActive: remainingBalance > 0 }).where(eq(giftCards.id, card.id));
-  return { applied, remainingBalance };
+  // Backward-compatible wrapper. New checkouts use reserve/finalize so card balances
+  // are only depleted after payment is verified.
+  const preview = await previewGiftCardApplication(code, amount);
+  return { applied: preview.applied, remainingBalance: Math.max(0, preview.availableBalance - preview.applied) };
 }
 
 

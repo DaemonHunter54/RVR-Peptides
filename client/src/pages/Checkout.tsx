@@ -24,6 +24,24 @@ const isGiftCardProduct = (product: any) =>
   String(product?.name || "").toLowerCase().includes("gift card") ||
   String(product?.sku || "").toLowerCase() === "gift-card";
 
+const parseGiftCardAmountFromLabel = (label?: string | null) => {
+  const match = String(label || "").match(/(?:gift\s*card\s*)?\$?([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const amount = match ? Number(match[1]) : NaN;
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+};
+
+const lineItemUnitPrice = (item: any) => {
+  if (isGiftCardProduct(item.product)) {
+    const amount = parseGiftCardAmountFromLabel(item.variantLabel || item.product?.variantLabel);
+    if (amount) return amount;
+  }
+  const price = Number(item.product.price);
+  return item.product.discountActive && item.product.discountPercent
+    ? price * (1 - Number(item.product.discountPercent) / 100)
+    : price;
+};
+
+
 export default function Checkout() {
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
@@ -77,10 +95,7 @@ export default function Checkout() {
   }));
 
   const subtotal = items.reduce((sum, item) => {
-    const price = Number(item.product.price);
-    const disc = item.product.discountActive && item.product.discountPercent
-      ? price * (1 - Number(item.product.discountPercent) / 100) : price;
-    return sum + disc * item.quantity;
+    return sum + lineItemUnitPrice(item) * item.quantity;
   }, 0);
   const hasShippableItems = items.some((item) => !isGiftCardProduct(item.product));
   const flatRateShipping = 9.99;
@@ -160,6 +175,12 @@ export default function Checkout() {
         guestCart.clearCart();
       }
 
+      if (Number(orderData.total || 0) <= 0 || orderData.paid) {
+        toast.success("Order paid with gift card.");
+        setLocation(`/order/${orderData.orderNumber}?status=success`);
+        return;
+      }
+
       // Step 2: Create NowPayments invoice
       try {
         const invoice = await createInvoice.mutateAsync({
@@ -168,8 +189,12 @@ export default function Checkout() {
         });
 
         if (invoice.invoiceUrl) {
-          // Redirect to NowPayments checkout
-          window.location.href = invoice.invoiceUrl;
+          if (String(invoice.invoiceUrl).startsWith("/")) {
+            setLocation(invoice.invoiceUrl);
+          } else {
+            // Redirect to NowPayments checkout
+            window.location.href = invoice.invoiceUrl;
+          }
           return;
         }
       } catch {
@@ -288,7 +313,7 @@ export default function Checkout() {
                     {useGiftCard && (
                       <Input
                         value={giftCardCode}
-                        onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                        onChange={(e) => setGiftCardCode(e.target.value.replace(/[^A-Za-z0-9-]/g, ""))}
                         className="mt-3 max-w-xs"
                         placeholder="XXXX-XXXX"
                         maxLength={9}

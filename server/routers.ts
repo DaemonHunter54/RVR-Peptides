@@ -10,6 +10,7 @@ import * as db from "./db";
 import { nanoid } from "nanoid";
 import { createPayment, getPaymentStatus, getApiStatus } from "./nowpayments";
 import { generateVialImage, generateHeroVialsImage, generateVialBuffer, generateHeroVialsBuffer } from "./vialGenerator";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 
@@ -417,19 +418,27 @@ export const appRouter = router({
         }
       }
 
-      // Apply gift card after discount. If balance is partial, it reduces the remaining amount due.
-      let giftCardApplied = 0;
-      if (input.giftCardCode) {
-        const gift = await db.applyGiftCard(input.giftCardCode, Math.max(0, subtotal - discountAmount));
-        giftCardApplied = gift.applied;
-        if (giftCardApplied <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or depleted gift card code" });
-        discountAmount += giftCardApplied;
+      // Gift cards cannot be used to purchase new gift cards. That prevents value-cycling/replenishment.
+      const containsGiftCardPurchase = orderItems.some((item) => String(item.productName || "").toLowerCase().includes("gift card"));
+      if (input.giftCardCode && containsGiftCardPurchase) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Gift cards cannot be used to purchase new gift cards." });
       }
 
       // Shipping: gift-card-only orders are delivered by email and do not need shipping.
       const flatRateShipping = Number(await db.getSetting("flat_rate_shipping") || "9.99");
       const shippingCost = hasShippableItems ? flatRateShipping : 0;
-      const total = subtotal - discountAmount + shippingCost;
+
+      // Reserve gift card value after discounts + shipping are known. Balance is only depleted after payment is verified.
+      let giftCardApplied = 0;
+      if (input.giftCardCode) {
+        const amountDueBeforeGiftCard = Math.max(0, subtotal - discountAmount + shippingCost);
+        const gift = await db.previewGiftCardApplication(input.giftCardCode, amountDueBeforeGiftCard);
+        giftCardApplied = gift.applied;
+        if (!gift.valid || giftCardApplied <= 0) throw new TRPCError({ code: "BAD_REQUEST", message: gift.message || "Invalid or depleted gift card code" });
+        discountAmount += giftCardApplied;
+      }
+
+      const total = Math.max(0, subtotal - discountAmount + shippingCost);
 
       const orderNumber = `RVR-${Date.now().toString(36).toUpperCase()}-${nanoid(4).toUpperCase()}`;
       const orderId = await db.createOrder({
@@ -449,13 +458,25 @@ export const appRouter = router({
         shippingCost: shippingCost.toFixed(2),
         total: total.toFixed(2),
         discountCode: input.discountCode,
+        giftCardCode: input.giftCardCode ? String(input.giftCardCode).replace(/[^A-Za-z0-9]/g, "").replace(/^(.{4})(.+)$/, "$1-$2").slice(0, 9) : null,
+        giftCardAmount: giftCardApplied.toFixed(2),
         notes: input.notes,
       }, orderItems);
+
+      if (input.giftCardCode && giftCardApplied > 0) {
+        await db.reserveGiftCardForOrder(input.giftCardCode, giftCardApplied, orderId);
+      }
+
+      if (total <= 0) {
+        await db.updateOrder(orderId, { status: "paid", paymentStatus: "gift_card_paid" } as any);
+        await db.finalizeGiftCardRedemptionForOrder(orderId);
+        await db.issueGiftCardsForOrder(orderId, input.guestEmail || undefined);
+      }
 
       // Clear cart if logged in user
       if (input.userId) await db.clearCart(input.userId);
 
-      return { orderId, orderNumber, total: total.toFixed(2), subtotal: subtotal.toFixed(2), discountAmount: discountAmount.toFixed(2), shippingCost: shippingCost.toFixed(2) };
+      return { orderId, orderNumber, total: total.toFixed(2), subtotal: subtotal.toFixed(2), discountAmount: discountAmount.toFixed(2), shippingCost: shippingCost.toFixed(2), giftCardApplied: giftCardApplied.toFixed(2), paid: total <= 0 };
     }),
   }),
 
@@ -482,17 +503,13 @@ export const appRouter = router({
   // ─── Gift Cards ────────────────────────────────────────────────
   giftCards: router({
     validate: publicProcedure.input(z.object({ code: z.string(), subtotal: z.number() })).query(async ({ input }) => {
-      const card = await db.getGiftCardByCode(input.code);
-      if (!card || !card.isActive || Number(card.balance) <= 0) {
-        return { valid: false, message: "Invalid or depleted gift card" };
-      }
-      const balance = Number(card.balance);
+      const gift = await db.previewGiftCardApplication(input.code, input.subtotal);
       return {
-        valid: true,
-        balance,
-        appliedAmount: Math.min(balance, input.subtotal),
-        remainingDue: Math.max(0, input.subtotal - balance),
-        message: `Gift card balance: $${balance.toFixed(2)}`,
+        valid: gift.valid,
+        balance: gift.availableBalance,
+        appliedAmount: gift.applied,
+        remainingDue: gift.remainingDue,
+        message: gift.message,
       };
     }),
   }),
@@ -527,7 +544,16 @@ export const appRouter = router({
     })).mutation(async ({ input }) => {
       const order = await db.getOrderByNumber(input.orderNumber);
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
-      if (order.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Order is no longer pending" });
+      if (order.status !== "pending") {
+        if (order.status === "paid") return { invoiceUrl: `/order/${order.orderNumber}?status=success`, paymentId: "gift_card_paid", invoiceId: "gift_card_paid" };
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Order is no longer pending" });
+      }
+      if (Number(order.total || 0) <= 0) {
+        await db.updateOrder(order.id, { status: "paid", paymentStatus: "gift_card_paid" } as any);
+        await db.finalizeGiftCardRedemptionForOrder(order.id);
+        await db.issueGiftCardsForOrder(order.id, input.email || order.guestEmail || undefined);
+        return { invoiceUrl: `/order/${order.orderNumber}?status=success`, paymentId: "gift_card_paid", invoiceId: "gift_card_paid" };
+      }
       const result = await createPayment(order.id, order.orderNumber, String(order.total), input.email || order.guestEmail || undefined);
       return result;
     }),
@@ -737,6 +763,18 @@ export const appRouter = router({
       updateTracking: adminProcedure.input(z.object({ id: z.number(), trackingNumber: z.string(), trackingCarrier: z.string() })).mutation(async ({ input }) => {
         await db.updateOrderTracking(input.id, input.trackingNumber, input.trackingCarrier);
         return { success: true };
+      }),
+    }),
+
+
+    // Gift Cards
+    giftCards: router({
+      list: adminProcedure.query(async () => db.getAllGiftCards()),
+      byCode: adminProcedure.input(z.object({ code: z.string() })).query(async ({ input }) => {
+        const card = await db.getGiftCardByCode(input.code);
+        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "Gift card not found" });
+        const transactions = await db.getGiftCardTransactions(card.id);
+        return { ...card, transactions };
       }),
     }),
 

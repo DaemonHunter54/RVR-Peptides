@@ -120,6 +120,8 @@ const TABLES = [
   shippingCost decimal(10,2) DEFAULT '0.00',
   total decimal(10,2) NOT NULL,
   discountCode varchar(50),
+  giftCardCode varchar(9),
+  giftCardAmount decimal(10,2) DEFAULT '0.00',
   notes text,
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -160,12 +162,27 @@ const TABLES = [
   originalAmount decimal(10,2) NOT NULL,
   balance decimal(10,2) NOT NULL,
   purchaserEmail varchar(320),
+  recipientEmail varchar(320),
   orderId int,
   isActive boolean NOT NULL DEFAULT true,
+  emailStatus varchar(50) DEFAULT 'pending',
+  expiresAt timestamp NULL,
+  lastUsedAt timestamp NULL,
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY giftCards_code_unique (code)
+)`,
+`CREATE TABLE IF NOT EXISTS giftCardTransactions (
+  id int AUTO_INCREMENT NOT NULL,
+  giftCardId int NOT NULL,
+  orderId int,
+  type enum('issue','reserve','redeem','release','void') NOT NULL,
+  amount decimal(10,2) NOT NULL,
+  balanceAfter decimal(10,2),
+  note text,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
 )`,
 `CREATE TABLE IF NOT EXISTS productAssets (
   id int AUTO_INCREMENT NOT NULL,
@@ -263,6 +280,14 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
   ["orderItems", "variantLabel", "varchar(255)"],
   ["cartItems", "variantId", "int"],
   ["cartItems", "variantLabel", "varchar(255)"],
+
+  // Gift card checkout, lifecycle, and audit columns for existing Railway DBs.
+  ["orders", "giftCardCode", "varchar(9)"],
+  ["orders", "giftCardAmount", "decimal(10,2) DEFAULT '0.00'"],
+  ["giftCards", "recipientEmail", "varchar(320)"],
+  ["giftCards", "emailStatus", "varchar(50) DEFAULT 'pending'"],
+  ["giftCards", "expiresAt", "timestamp NULL"],
+  ["giftCards", "lastUsedAt", "timestamp NULL"],
 ];
 
 

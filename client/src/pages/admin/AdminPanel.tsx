@@ -53,6 +53,7 @@ export default function AdminPanel() {
     { id: "orders", label: "Orders", icon: ShoppingCart },
     { id: "discounts", label: "Discounts", icon: Tag },
     { id: "payments", label: "Payments", icon: CreditCard },
+    { id: "gift-cards", label: "Gift Cards", icon: CreditCard },
     { id: "customers", label: "Customers", icon: Users },
     { id: "customization", label: "Website Customization", icon: Paintbrush },
     { id: "settings", label: "Site Settings", icon: Settings },
@@ -121,6 +122,7 @@ export default function AdminPanel() {
           {activeSection === "discounts" && <DiscountsSection />}
           {activeSection === "customers" && <CustomersSection />}
           {activeSection === "payments" && <PaymentsSection />}
+          {activeSection === "gift-cards" && <GiftCardsSection />}
           {activeSection === "customization" && <CustomizationSection />}
           {activeSection === "settings" && <SettingsSection />}
         </div>
@@ -1234,6 +1236,85 @@ function DiscountsSection() {
 }
 
 // ─── Customers / Admin Roles ─────────────────────────────────────────
+
+function GiftCardsSection() {
+  const cardsQuery = trpc.admin.giftCards.list.useQuery();
+  const cards = Array.isArray(cardsQuery.data) ? cardsQuery.data : [];
+
+  const money = (value: any) => `$${Number(value || 0).toFixed(2)}`;
+  const formatDate = (value: any) => value ? new Date(value).toLocaleDateString() : "—";
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Gift Cards</h1>
+          <p className="text-slate-500 mt-1">
+            Track issued gift cards, balances, codes, recipient emails, order numbers, expiration, and delivery status.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-4 py-3 font-semibold">Code</th>
+                <th className="text-left px-4 py-3 font-semibold">Original</th>
+                <th className="text-left px-4 py-3 font-semibold">Balance</th>
+                <th className="text-left px-4 py-3 font-semibold">Reserved</th>
+                <th className="text-left px-4 py-3 font-semibold">Available</th>
+                <th className="text-left px-4 py-3 font-semibold">Recipient</th>
+                <th className="text-left px-4 py-3 font-semibold">Order #</th>
+                <th className="text-left px-4 py-3 font-semibold">Expires</th>
+                <th className="text-left px-4 py-3 font-semibold">Email</th>
+                <th className="text-left px-4 py-3 font-semibold">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cards.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
+                    No gift cards have been issued yet.
+                  </td>
+                </tr>
+              )}
+              {cards.map((card: any) => (
+                <tr key={card.id} className="border-t border-slate-100">
+                  <td className="px-4 py-3 font-mono font-semibold text-slate-900">{card.code}</td>
+                  <td className="px-4 py-3">{money(card.originalAmount)}</td>
+                  <td className="px-4 py-3 font-semibold">{money(card.balance)}</td>
+                  <td className="px-4 py-3 text-amber-700">{money(card.reservedAmount)}</td>
+                  <td className="px-4 py-3 text-blue-700 font-semibold">{money(card.availableBalance)}</td>
+                  <td className="px-4 py-3">{card.recipientEmail || card.purchaserEmail || "—"}</td>
+                  <td className="px-4 py-3">{card.orderId ? `#${card.orderId}` : "—"}</td>
+                  <td className="px-4 py-3">{formatDate(card.expiresAt)}</td>
+                  <td className="px-4 py-3">
+                    <Badge className={card.emailStatus === "sent" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
+                      {card.emailStatus || "pending"}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge className={!card.isActive || card.expired ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}>
+                      {!card.isActive ? "Depleted" : card.expired ? "Expired" : "Active"}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+        Gift cards are issued only after payment is verified, use unique mixed-case 8-character codes in XXXX-XXXX format,
+        deplete as they are redeemed, cannot be reloaded, and expire 1 year from purchase.
+      </div>
+    </div>
+  );
+}
+
 function CustomersSection() {
   const { user } = useAuth();
   const customersQuery = trpc.admin.users.list.useQuery();

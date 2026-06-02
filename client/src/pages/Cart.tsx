@@ -18,6 +18,24 @@ const isGiftCardProduct = (product: any) =>
   String(product?.name || "").toLowerCase().includes("gift card") ||
   String(product?.sku || "").toLowerCase() === "gift-card";
 
+const parseGiftCardAmountFromLabel = (label?: string | null) => {
+  const match = String(label || "").match(/(?:gift\s*card\s*)?\$?([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const amount = match ? Number(match[1]) : NaN;
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+};
+
+const lineItemUnitPrice = (item: any) => {
+  if (isGiftCardProduct(item.product)) {
+    const amount = parseGiftCardAmountFromLabel(item.variantLabel || item.product?.variantLabel);
+    if (amount) return amount;
+  }
+  const price = Number(item.product.price);
+  return item.product.discountActive && item.product.discountPercent
+    ? price * (1 - Number(item.product.discountPercent) / 100)
+    : price;
+};
+
+
 export default function Cart() {
   const { isAuthenticated } = useAuth();
   const [discountCode, setDiscountCode] = useState("");
@@ -41,11 +59,7 @@ export default function Cart() {
   }));
 
   const subtotal = items.reduce((sum, item) => {
-    const price = Number(item.product.price);
-    const discount = item.product.discountActive && item.product.discountPercent
-      ? price * (1 - Number(item.product.discountPercent) / 100)
-      : price;
-    return sum + discount * item.quantity;
+    return sum + lineItemUnitPrice(item) * item.quantity;
   }, 0);
 
   const discountAmount = appliedDiscount?.discountAmount || 0;
