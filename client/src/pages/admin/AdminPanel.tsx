@@ -401,7 +401,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     imageUrl: product?.imageUrl || "",
     inStock: product?.inStock ?? true,
     stockQuantity: product?.stockQuantity ?? 100,
-    isFeatured: product?.isFeatured ?? false,
+    isFeatured: false,
     isActive: product?.isActive ?? true,
     purity: product?.purity || "",
     size: product?.size || "",
@@ -433,6 +433,13 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     researchContent: string;
     citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
   }>({ chemicalMakeup: "", researchContent: "", citations: [] });
+  const [editResearchDraft, setEditResearchDraft] = useState<{
+    chemicalMakeup: string;
+    researchContent: string;
+    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
+  }>({ chemicalMakeup: "", researchContent: "", citations: [] });
+  const [showTestingDocuments, setShowTestingDocuments] = useState(Boolean(product?.coaUrl || product?.hplcUrl || product?.massSpecUrl));
+  const [showSpecifications, setShowSpecifications] = useState(Boolean(product?.purity || product?.contents || product?.form || product?.molecularFormula || product?.molecularWeight || product?.otherNames));
 
   const initialPreviewType: PreviewProductType =
     (product?.previewType as PreviewProductType) ||
@@ -628,7 +635,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       stockQuantity: previewType === "gift-card" ? 9999 : form.stockQuantity,
       imageUrl: linkedImageUrl || form.imageUrl || imageUrlForSlug(slug),
       variants,
-      researchDraft: !product?.id && previewType !== "gift-card" ? draftResearch : undefined,
+      researchDraft: previewType !== "gift-card" ? (product?.id ? editResearchDraft : draftResearch) : undefined,
     };
 
     onSave(payload);
@@ -754,7 +761,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                 <div className="flex items-center gap-5 flex-wrap pb-2">
                   <div className="flex items-center gap-2"><Switch checked={form.discountActive} onCheckedChange={(v) => updateField("discountActive", v)} /><Label>Discount Active</Label></div>
                   <div className="flex items-center gap-2"><Switch checked={form.inStock} onCheckedChange={(v) => updateField("inStock", v)} /><Label>In Stock</Label></div>
-                  <div className="flex items-center gap-2"><Switch checked={form.isFeatured} onCheckedChange={(v) => updateField("isFeatured", v)} /><Label>Featured</Label></div>
+                  <div className="flex items-center gap-2"><Switch checked={false} disabled /><Label className="text-slate-400">Featured</Label></div>
                   <div className="flex items-center gap-2"><Switch checked={form.isActive} onCheckedChange={(v) => updateField("isActive", v)} /><Label>Active</Label></div>
                 </div>
               </div>
@@ -793,18 +800,38 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           <>
         {/* Testing Documents */}
         <div className="bg-white rounded-xl p-6 border border-slate-200">
-          <h2 className="font-semibold text-slate-800 mb-4">Testing Documents</h2>
-          <p className="text-sm text-slate-500 mb-4">Leave blank if not available — the tab won't show on the product page.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div><Label>CoA URL</Label><Input value={form.coaUrl} onChange={(e) => updateField("coaUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
-            <div><Label>HPLC URL</Label><Input value={form.hplcUrl} onChange={(e) => updateField("hplcUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
-            <div><Label>Mass Spectrometry URL</Label><Input value={form.massSpecUrl} onChange={(e) => updateField("massSpecUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-semibold text-slate-800">Testing Documents</h2>
+              <p className="text-sm text-slate-500 mt-1">Turn on only when CoA, HPLC, or Mass Spectrometry links are available.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={showTestingDocuments} onCheckedChange={setShowTestingDocuments} />
+              <Label className="font-medium">{showTestingDocuments ? "Shown" : "Hidden"}</Label>
+            </div>
           </div>
+          {showTestingDocuments && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div><Label>CoA URL</Label><Input value={form.coaUrl} onChange={(e) => updateField("coaUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
+              <div><Label>HPLC URL</Label><Input value={form.hplcUrl} onChange={(e) => updateField("hplcUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
+              <div><Label>Mass Spectrometry URL</Label><Input value={form.massSpecUrl} onChange={(e) => updateField("massSpecUrl", e.target.value)} className="mt-1.5" placeholder="https://..." /></div>
+            </div>
+          )}
         </div>
 
         {/* Specs */}
         <div className="bg-white rounded-xl p-6 border border-slate-200">
-          <h2 className="font-semibold text-slate-800 mb-4">Specifications</h2>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="font-semibold text-slate-800">Specifications</h2>
+              <p className="text-sm text-slate-500 mt-1">Turn on only when product specification details are available.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={showSpecifications} onCheckedChange={setShowSpecifications} />
+              <Label className="font-medium">{showSpecifications ? "Shown" : "Hidden"}</Label>
+            </div>
+          </div>
+          {showSpecifications && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><Label>Purity</Label><Input value={form.purity} onChange={(e) => updateField("purity", e.target.value)} className="mt-1.5" placeholder="e.g. >99%" /></div>
             {previewType !== "gift-card" ? (
@@ -816,6 +843,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
             <div><Label>Molecular Weight</Label><Input value={form.molecularWeight} onChange={(e) => updateField("molecularWeight", e.target.value)} className="mt-1.5" /></div>
             <div className="md:col-span-3"><Label>Other Names / Aliases</Label><Input value={form.otherNames} onChange={(e) => updateField("otherNames", e.target.value)} className="mt-1.5" /></div>
           </div>
+          )}
         </div>
 
           </>
@@ -823,7 +851,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
         {!isGiftCardTemplate && (
           product?.id ? (
-            <ResearchCitationsEditor productId={product.id} productName={form.name} />
+            <ResearchCitationsEditor productId={product.id} productName={form.name} onDraftChange={setEditResearchDraft} />
           ) : (
             <DraftResearchEditor productName={form.name} value={draftResearch} onChange={setDraftResearch} />
           )
@@ -989,7 +1017,19 @@ function DraftResearchEditor({
 }
 
 // ─── Research Citations Editor ──────────────────────────────────────
-function ResearchCitationsEditor({ productId, productName }: { productId: number; productName: string }) {
+function ResearchCitationsEditor({
+  productId,
+  productName,
+  onDraftChange,
+}: {
+  productId: number;
+  productName: string;
+  onDraftChange?: (next: {
+    chemicalMakeup: string;
+    researchContent: string;
+    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
+  }) => void;
+}) {
   const researchQuery = trpc.admin.research.get.useQuery({ productId });
   const upsertResearch = trpc.admin.research.upsert.useMutation({
     onSuccess: () => { toast.success("Research saved!"); researchQuery.refetch(); },
@@ -1026,8 +1066,28 @@ function ResearchCitationsEditor({ productId, productName }: { productId: number
       setChemicalMakeup(research.chemicalMakeup || "");
       setResearchContent(research.researchContent || "");
       setResearchChanged(false);
+    } else {
+      setOverview("");
+      setChemicalMakeup("");
+      setResearchContent("");
+      setResearchChanged(false);
     }
   }, [research]);
+
+  useEffect(() => {
+    onDraftChange?.({
+      chemicalMakeup,
+      researchContent,
+      citations: citations.map((citation: any) => ({
+        title: citation.title || "",
+        authors: citation.authors || "",
+        journal: citation.journal || "",
+        year: citation.year || "",
+        url: citation.url || "",
+        summary: citation.summary || "",
+      })),
+    });
+  }, [chemicalMakeup, researchContent, citations.length]);
 
   const getResearchDetails = async () => {
     const name = String(productName || "").trim();
@@ -1097,11 +1157,6 @@ function ResearchCitationsEditor({ productId, productName }: { productId: number
             <Label>Research Content</Label>
             <Textarea value={researchContent} onChange={(e) => { setResearchContent(e.target.value); setResearchChanged(true); }} className="mt-1.5" rows={5} placeholder="Detailed research findings, studies, and applications..." />
           </div>
-          {researchChanged && (
-            <Button onClick={() => { upsertResearch.mutate({ productId, overview: "", chemicalMakeup, researchContent }); setResearchChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
-              <Save className="h-4 w-4" /> Save Research
-            </Button>
-          )}
         </div>
       </div>
 

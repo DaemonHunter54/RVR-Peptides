@@ -481,6 +481,12 @@ export async function deleteCitation(id: number) {
   await db.delete(researchCitations).where(eq(researchCitations.id, id));
 }
 
+export async function deleteProductCitations(productId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(researchCitations).where(eq(researchCitations.productId, productId));
+}
+
 // ─── Orders ──────────────────────────────────────────────────────────
 export async function createOrder(data: InsertOrder, items: { productId: number; productName: string; variantId?: number | null; variantLabel?: string | null; quantity: number; unitPrice: string; totalPrice: string }[]) {
   const db = await getDb();

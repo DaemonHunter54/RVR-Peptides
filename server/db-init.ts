@@ -985,7 +985,7 @@ async function clearLegacyResearchDefaultsOnce(conn: mysql.Connection) {
   // One-time cleanup requested for existing catalog records:
   // remove seeded/default research content and citations so admin-provided
   // research starts clean and is not re-populated on restarts/redeploys.
-  const cleanupKey = "research_content_citations_cleared_2026_06_02";
+  const cleanupKey = "research_content_citations_cleared_2026_06_02_v2";
   const [existing] = await conn.execute<RowDataPacket[]>(
     `SELECT id FROM siteSettings WHERE settingKey = ? LIMIT 1`,
     [cleanupKey]
@@ -1004,6 +1004,30 @@ async function clearLegacyResearchDefaultsOnce(conn: mysql.Connection) {
   );
 
   console.log("[DB init] Cleared legacy research content and citations once.");
+}
+
+
+async function disableFeaturedProductsOnce(conn: mysql.Connection) {
+  // The site does not currently use featured products. Turn existing featured flags off once
+  // and leave future admin saves under owner control.
+  const cleanupKey = "featured_products_disabled_2026_06_02";
+  const [existing] = await conn.execute<RowDataPacket[]>(
+    `SELECT id FROM siteSettings WHERE settingKey = ? LIMIT 1`,
+    [cleanupKey]
+  );
+
+  if (existing.length) return;
+
+  await conn.execute(`UPDATE products SET isFeatured = false`);
+
+  await conn.execute(
+    `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE settingValue = settingValue`,
+    [cleanupKey, "true", "boolean", "Featured Products Disabled", "general"]
+  );
+
+  console.log("[DB init] Disabled featured product flags once.");
 }
 
 
@@ -1033,6 +1057,7 @@ export async function ensureDatabaseReady() {
       await ensureProductColumnTypes(conn);
       await ensureDefaultSiteSettings(conn);
       await clearLegacyResearchDefaultsOnce(conn);
+      await disableFeaturedProductsOnce(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
       console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
