@@ -39,26 +39,26 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="group flex flex-col items-center cursor-pointer h-full">
         {/* Vial Image */}
         <div className="relative w-full h-[205px] sm:h-[220px] lg:h-[235px] flex items-end justify-center mb-1 overflow-visible">
-          <div className="relative w-full h-full flex items-end justify-center p-0">
+          <div className="relative z-0 w-full h-full flex items-end justify-center p-0">
             <img
               src={productImageUrl(product) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
               alt={product.name}
               loading="lazy"
               decoding="async"
-              className="w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500"
+              className="relative z-0 w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500"
               style={
                 isReconstitutionKit
                   ? { maxWidth: "82%", maxHeight: "230px", transform: "translateY(-8px)" }
                   : isBpcCapsules
-                  ? { maxWidth: "88%", maxHeight: "220px", transform: "scale(0.92)" }
+                  ? { maxWidth: "92%", maxHeight: "235px", transform: "scale(0.98)" }
                   : isStorageContainer
                   ? { maxWidth: "92%", maxHeight: "250px", transform: "scale(1.12)" }
                   : isVialCap
                   ? { maxWidth: "90%", maxHeight: "245px", transform: "scale(1.08)" }
                   : isVialCapOpener
-                  ? { maxWidth: "90%", maxHeight: "245px", transform: "scale(1.12)" }
+                  ? { maxWidth: "94%", maxHeight: "255px", transform: "scale(1.22)" }
                   : isGiftCard
-                  ? { transform: "translateY(-40px) scale(1.04)" }
+                  ? { transform: "translateY(-55px) scale(1.04)" }
                   : undefined
               }
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
@@ -67,33 +67,33 @@ export default function ProductCard({ product }: ProductCardProps) {
 
           {/* Out of Stock badge */}
           {!product.inStock && (
-            <div className="absolute top-3 right-3 bg-pink-500 text-white text-xs font-bold px-3 py-1 rounded-sm">
+            <div className="absolute z-30 top-3 right-3 bg-pink-500 text-white text-xs font-bold px-3 py-1 rounded-sm">
               Out of Stock
             </div>
           )}
 
           {/* Discount badge */}
           {hasDiscount && product.inStock && (
-            <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-sm">
+            <div className="absolute z-30 top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-sm">
               {Number(product.discountPercent)}% OFF
             </div>
           )}
         </div>
 
         {/* Product Name */}
-        <h3 className="text-center text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors leading-snug mb-1 px-2 line-clamp-2">
+        <h3 className="relative z-20 text-center text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors leading-snug mb-1 px-2 line-clamp-2">
           {product.name}
         </h3>
 
         {/* Multiple doses available indicator */}
         {product.hasVariants && (
-          <p className="text-center text-xs text-gray-500 italic mb-1">
+          <p className="relative z-20 text-center text-xs text-gray-500 italic mb-1">
             Multiple doses available
           </p>
         )}
 
         {/* Price */}
-        <div className="flex items-baseline gap-2 justify-center">
+        <div className="relative z-20 flex items-baseline gap-2 justify-center">
           {product.hasVariants ? (
             <span className="font-bold text-base text-[#4a9eff]">
               From ${price.toFixed(2)}
