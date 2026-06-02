@@ -65,6 +65,81 @@ async function startServer() {
     }
   });
 
+
+
+  app.get("/api/product-assets", async (req, res) => {
+    try {
+      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+      const files = fs.existsSync(assetsDir) ? fs.readdirSync(assetsDir) : [];
+      res.json(files
+        .filter((file) => /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file))
+        .map((file) => ({ name: file, url: `/assets/${file}` }))
+        .sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (err: any) {
+      res.status(500).send(err?.message || "Unable to list assets");
+    }
+  });
+
+  app.post("/api/product-image/upload", async (req, res) => {
+    try {
+      const makeSafeSlug = (value: string) => String(value || "product-image").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "product-image";
+      const dataUrl = String(req.body?.dataUrl || "");
+      const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!match) {
+        res.status(400).send("Invalid image upload");
+        return;
+      }
+      const mime = match[1].toLowerCase();
+      const ext = mime.includes("jpeg") ? "jpg" : mime.split("/")[1].replace(/[^a-z0-9]/g, "") || "png";
+      const buffer = Buffer.from(match[2], "base64");
+      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+      fs.mkdirSync(assetsDir, { recursive: true });
+      const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
+      const filename = `${baseSlug}-${Date.now()}.${ext}`;
+      fs.writeFileSync(path.join(assetsDir, filename), buffer);
+      res.json({ name: filename, url: `/assets/${filename}` });
+    } catch (err: any) {
+      console.error("[Product Image Upload Error]", err);
+      res.status(500).send(err?.message || "Unable to upload product image");
+    }
+  });
+
+
+  app.post("/api/product-preview/link", async (req, res) => {
+    try {
+      const makeSafeSlug = (value: string) => String(value || "preview-product").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "preview-product";
+      const type = String(req.body?.type || "vial");
+      const slug = makeSafeSlug(req.body?.slug || req.body?.name);
+      const name = String(req.body?.name || slug.replace(/-/g, " ")).trim();
+      const size = String(req.body?.size || "").trim();
+      const displayName = size && !name.toLowerCase().includes(size.toLowerCase()) ? `${name} ${size}` : name;
+
+      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
+      fs.mkdirSync(assetsDir, { recursive: true });
+
+      let buffer: Buffer;
+      let extension = "png";
+      let contentType = "image/png";
+
+      if (type === "cream") {
+        buffer = fs.readFileSync(path.join(assetsDir, "lotion-bottle-blank-hd-tube.png"));
+      } else if (type === "face-mask") {
+        buffer = fs.readFileSync(path.join(assetsDir, "face-mask-blank-hd.png"));
+      } else {
+        const { generateVialBuffer } = await import("../vialGenerator");
+        buffer = await generateVialBuffer(displayName);
+      }
+
+      const filename = `${slug}-${type}-preview.${extension}`;
+      fs.writeFileSync(path.join(assetsDir, filename), buffer);
+      res.json({ url: `/assets/${filename}`, contentType });
+    } catch (err: any) {
+      console.error("[Product Preview Link Error]", err);
+      res.status(500).send(err?.message || "Unable to link preview image");
+    }
+  });
+
+
   // NowPayments IPN webhook endpoint
   app.post("/api/nowpayments/ipn", async (req, res) => {
     try {

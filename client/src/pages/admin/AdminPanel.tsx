@@ -317,25 +317,45 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 };
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
-function ProductVialPreview({ name, slug, size }: { name: string; slug: string; size?: string }) {
-  const previewSrc = generatedVialPreviewUrl(slug, name || "Preview Product", size);
+type PreviewProductType = "" | "vial" | "cream" | "face-mask";
+const PRODUCT_PREVIEW_TYPES: Array<{ value: PreviewProductType; label: string }> = [
+  { value: "", label: "None - use uploaded/asset image" },
+  { value: "vial", label: "Vial" },
+  { value: "cream", label: "Cream" },
+  { value: "face-mask", label: "Face Mask" },
+];
+
+const blankPreviewSrc = (type: PreviewProductType, slug: string, name: string, size?: string) => {
+  if (type === "cream") return "/assets/lotion-bottle-blank-hd-tube.png";
+  if (type === "face-mask") return "/assets/face-mask-blank-hd.png";
+  return generatedVialPreviewUrl(slug, name || "Preview Product", size);
+};
+
+function ProductVialPreview({ name, slug, size, previewType, onLink, linking }: { name: string; slug: string; size?: string; previewType: PreviewProductType; onLink: () => void; linking: boolean }) {
+  const previewSrc = blankPreviewSrc(previewType || "vial", slug, name || "Preview Product", size);
+  const title = previewType === "cream" ? "Live Cream Preview" : previewType === "face-mask" ? "Live Face Mask Preview" : "Live Vial Preview";
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 h-full">
+      <div className="flex items-center justify-between gap-3 mb-3">
         <div>
-          <h3 className="font-semibold text-slate-800 text-sm">Live Vial Preview</h3>
+          <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
           <p className="text-xs text-slate-500">Auto-updates from product name and dose/size.</p>
         </div>
-        <Badge variant="outline">Dynamic company vial</Badge>
+        {previewType ? <Badge variant="outline">Dynamic company asset</Badge> : null}
       </div>
-      <div className="flex justify-center rounded-lg bg-white p-4 min-h-[300px] overflow-hidden">
+      <div className="flex justify-center rounded-lg bg-white p-4 min-h-[230px] overflow-hidden">
         <img
           src={previewSrc}
-          alt="Live vial preview"
-          className="h-[300px] w-auto object-contain"
+          alt={title}
+          className="h-[230px] w-auto max-w-full object-contain"
         />
       </div>
+      {previewType ? (
+        <Button type="button" variant="outline" size="sm" className="mt-3 w-full" onClick={onLink} disabled={linking}>
+          {linking ? "Linking..." : "Link to URL"}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -381,19 +401,91 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       sortOrder: v.sortOrder ?? 0,
     })) : [],
   });
+  const [previewType, setPreviewType] = useState<PreviewProductType>((product?.previewType as PreviewProductType) || (product?.imageUrl?.includes("/api/vial/") ? "vial" : ""));
+  const [linkingPreview, setLinkingPreview] = useState(false);
+  const [imageAssets, setImageAssets] = useState<Array<{ name: string; url: string }>>([]);
+
+  useEffect(() => {
+    fetch("/api/product-assets")
+      .then((response) => response.ok ? response.json() : [])
+      .then((assets) => setImageAssets(Array.isArray(assets) ? assets : []))
+      .catch(() => setImageAssets([]));
+  }, []);
+
+  const autoSlug = makeSlug(form.name);
+  const autoSku = autoSlug ? autoSlug.toUpperCase().replace(/-/g, "-") : "";
+
+  const linkPreviewToUrl = async () => {
+    if (!previewType) return;
+    const slug = autoSlug || makeSlug(form.slug || "preview-product");
+    setLinkingPreview(true);
+    try {
+      const response = await fetch("/api/product-preview/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: previewType, slug, name: form.name || "Preview Product", size: form.size || "" }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      updateField("imageUrl", data.url);
+    } catch (error: any) {
+      alert(error?.message || "Unable to link preview image.");
+    } finally {
+      setLinkingPreview(false);
+    }
+  };
+
+  const handlePreviewTypeChange = (value: string) => {
+    const nextType = (value === "none" ? "" : value) as PreviewProductType;
+    setPreviewType(nextType);
+    if (nextType) {
+      const slug = autoSlug || makeSlug(form.slug || form.name || "preview-product");
+      updateField("imageUrl", blankPreviewSrc(nextType, slug, form.name || "Preview Product", form.size));
+    } else if (form.imageUrl?.startsWith("/api/vial/") || form.imageUrl?.startsWith("/assets/lotion-bottle-blank") || form.imageUrl?.startsWith("/assets/face-mask-blank")) {
+      updateField("imageUrl", "");
+    }
+  };
+
+  const handleAssetFile = async (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const response = await fetch("/api/product-image/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            dataUrl: String(reader.result || ""),
+            slug: autoSlug || makeSlug(form.name || file.name),
+          }),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        updateField("imageUrl", data.url);
+        setImageAssets((prev) => [{ name: data.name || file.name, url: data.url }, ...prev.filter((asset) => asset.url !== data.url)]);
+      } catch (error: any) {
+        alert(error?.message || "Unable to upload image asset.");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const updateField = (field: string, value: any) => {
     setForm(prev => {
       const next = { ...prev, [field]: value };
-      if (field === "name" && !product?.id) {
+      if (field === "name") {
         const slug = makeSlug(value);
         next.slug = slug;
-        if (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/")) {
+        next.sku = slug ? slug.toUpperCase().replace(/-/g, "-") : "";
+        if (previewType) {
+          next.imageUrl = blankPreviewSrc(previewType, slug, value || "Preview Product", next.size);
+        } else if (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/")) {
           next.imageUrl = imageUrlForSlug(slug);
         }
       }
-      if (field === "slug" && !product?.id && (!prev.imageUrl || prev.imageUrl.startsWith("/api/vial/"))) {
-        next.imageUrl = imageUrlForSlug(makeSlug(value));
+      if (field === "size" && previewType) {
+        next.imageUrl = blankPreviewSrc(previewType, next.slug || makeSlug(next.name), next.name || "Preview Product", value);
       }
       return next;
     });
@@ -425,9 +517,12 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         imageUrl: v.imageUrl || imageUrlForVariant(form.slug, String(v.label || "")) || form.imageUrl || imageUrlForSlug(form.slug),
       }));
 
+    const slug = makeSlug(form.name || form.slug);
     const payload = {
       ...form,
-      imageUrl: form.imageUrl || imageUrlForSlug(form.slug),
+      slug,
+      sku: slug ? slug.toUpperCase().replace(/-/g, "-") : form.sku,
+      imageUrl: form.imageUrl || imageUrlForSlug(slug),
       variants,
     };
 
@@ -444,17 +539,45 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         {/* Basic Info */}
         <div className="bg-white rounded-xl p-6 border border-slate-200">
           <h2 className="font-semibold text-slate-800 mb-4">Basic Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><Label>Product Name *</Label><Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" /></div>
-            <div><Label>URL Slug *</Label><Input value={form.slug} onChange={(e) => updateField("slug", e.target.value)} className="mt-1.5" /></div>
-            <div><Label>SKU</Label><Input value={form.sku} onChange={(e) => updateField("sku", e.target.value)} className="mt-1.5" /></div>
-            <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
-            <div><Label>Image URL</Label><Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} className="mt-1.5" placeholder="Auto-filled from bundled company asset or generated company vial" /></div>
-            <div className="md:col-span-2"><Label>Short Description</Label><Input value={form.shortDescription} onChange={(e) => updateField("shortDescription", e.target.value)} className="mt-1.5" /></div>
-            <div className="md:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
-          </div>
-          <div className="mt-5">
-            <ProductVialPreview name={form.name} slug={form.slug} size={form.size} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><Label>Product Name *</Label><Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" /></div>
+                <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
+              </div>
+              <div><Label>Short Description</Label><Input value={form.shortDescription} onChange={(e) => updateField("shortDescription", e.target.value)} className="mt-1.5" /></div>
+              <div>
+                <Label>Image URL</Label>
+                <div className="mt-1.5 grid grid-cols-1 md:grid-cols-[220px_1fr] gap-2">
+                  <Select value={previewType || "none"} onValueChange={handlePreviewTypeChange}>
+                    <SelectTrigger><SelectValue placeholder="Preview type" /></SelectTrigger>
+                    <SelectContent>
+                      {PRODUCT_PREVIEW_TYPES.map((option) => (
+                        <SelectItem key={option.label} value={option.value || "none"}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} placeholder="Paste URL, generated link, or asset path" disabled={!!previewType} />
+                </div>
+                {!previewType ? (
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2">
+                    <Input type="file" accept="image/*" onChange={(e) => handleAssetFile(e.target.files?.[0])} />
+                    <Select value={form.imageUrl || "none"} onValueChange={(value) => value !== "none" && updateField("imageUrl", value)}>
+                      <SelectTrigger><SelectValue placeholder="Select asset" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select asset file</SelectItem>
+                        {imageAssets.map((asset) => (
+                          <SelectItem key={asset.url} value={asset.url}>{asset.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <p className="mt-1 text-xs text-slate-500">URL Slug and SKU are auto-generated in the background: {autoSlug || "waiting for product name"} / {autoSku || "waiting for product name"}</p>
+              </div>
+            </div>
+            <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} onLink={linkPreviewToUrl} linking={linkingPreview} />
+            <div className="lg:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
           </div>
         </div>
 
