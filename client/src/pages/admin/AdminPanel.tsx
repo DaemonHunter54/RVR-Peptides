@@ -80,7 +80,7 @@ export default function AdminPanel() {
         <nav className="p-3 space-y-1">
           {menuItems.map((item) => (
             <Link key={item.id} href={item.id === "dashboard" ? "/admin" : `/admin/${item.id}`}>
-              <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeSection === item.id ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"}`}>
+              <button onClick={() => item.id === "products" && window.dispatchEvent(new CustomEvent("rvr-admin-products-list"))} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeSection === item.id ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"}`}>
                 <item.icon className="h-4 w-4" />
                 {item.label}
               </button>
@@ -107,7 +107,7 @@ export default function AdminPanel() {
           <div className="flex gap-1 overflow-x-auto">
             {menuItems.map((item) => (
               <Link key={item.id} href={item.id === "dashboard" ? "/admin" : `/admin/${item.id}`}>
-                <button className={`p-2 rounded-lg ${activeSection === item.id ? "bg-blue-50 text-blue-700" : "text-slate-500"}`}>
+                <button onClick={() => item.id === "products" && window.dispatchEvent(new CustomEvent("rvr-admin-products-list"))} className={`p-2 rounded-lg ${activeSection === item.id ? "bg-blue-50 text-blue-700" : "text-slate-500"}`}>
                   <item.icon className="h-4 w-4" />
                 </button>
               </Link>
@@ -205,6 +205,16 @@ function ProductsSection() {
   const [search, setSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
+  useEffect(() => {
+    const showProductList = () => {
+      setShowForm(false);
+      setEditingProduct(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("rvr-admin-products-list", showProductList);
+    return () => window.removeEventListener("rvr-admin-products-list", showProductList);
+  }, []);
+
   const productsQuery = trpc.admin.products.list.useQuery({ search: search || undefined });
   const createProduct = trpc.admin.products.create.useMutation({
     onSuccess: () => { toast.success("Product created!"); productsQuery.refetch(); setShowForm(false); setEditingProduct(null); },
@@ -372,7 +382,7 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
           className="h-[245px] w-auto max-w-full object-contain"
         />
         {giftCardRange ? (
-          <div className="absolute right-[7%] top-[18%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+          <div className="absolute right-[10%] top-[12%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
             {giftCardRange}
           </div>
         ) : null}
@@ -431,6 +441,10 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   const [imageAssets, setImageAssets] = useState<Array<{ name: string; url: string }>>([]);
   const [multipleProducts, setMultipleProducts] = useState(Boolean(product?.variants?.length));
   const [pullingNih, setPullingNih] = useState(false);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [product?.id]);
+
 
   useEffect(() => {
     fetch("/api/product-assets")
@@ -522,25 +536,6 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   };
 
 
-
-  const pullDescriptionFromNih = async () => {
-    const productName = String(form.name || "").trim();
-    if (!productName) {
-      alert("Enter a product name first.");
-      return;
-    }
-    setPullingNih(true);
-    try {
-      const response = await fetch(`/api/nih-report?name=${encodeURIComponent(productName)}`);
-      if (!response.ok) throw new Error(await response.text());
-      const data = await response.json();
-      updateField("description", data.description || data.report || "");
-    } catch (error: any) {
-      alert(error?.message || "Unable to pull NIH report.");
-    } finally {
-      setPullingNih(false);
-    }
-  };
 
   const updateField = (field: string, value: any) => {
     setForm(prev => {
@@ -768,8 +763,6 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               />
             </div>
 
-            <div className="xl:col-span-2"><div className="mb-1.5 flex items-center gap-3"><Label>Full Description</Label><Button type="button" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700" onClick={pullDescriptionFromNih} disabled={pullingNih}>{pullingNih ? "Pulling..." : "Pull from NIH"}</Button></div><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
-
             <div className="xl:col-span-2">
               <h2 className="font-semibold text-slate-800 mb-4">Categories</h2>
               <div className="flex flex-wrap gap-2">
@@ -823,14 +816,14 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         </div>
 
         {/* Research Citations - only for existing products */}
-        {product?.id && <ResearchCitationsEditor productId={product.id} />}
+        {product?.id && <ResearchCitationsEditor productId={product.id} productName={form.name} />}
       </div>
     </div>
   );
 }
 
 // ─── Research Citations Editor ──────────────────────────────────────
-function ResearchCitationsEditor({ productId }: { productId: number }) {
+function ResearchCitationsEditor({ productId, productName }: { productId: number; productName: string }) {
   const researchQuery = trpc.admin.research.get.useQuery({ productId });
   const upsertResearch = trpc.admin.research.upsert.useMutation({
     onSuccess: () => { toast.success("Research saved!"); researchQuery.refetch(); },
@@ -859,6 +852,7 @@ function ResearchCitationsEditor({ productId }: { productId: number }) {
   const [showAddCitation, setShowAddCitation] = useState(false);
   const [newCitation, setNewCitation] = useState({ citationNumber: 1, title: "", authors: "", journal: "", year: "", url: "", summary: "" });
   const [researchChanged, setResearchChanged] = useState(false);
+  const [gettingResearchDetails, setGettingResearchDetails] = useState(false);
 
   useEffect(() => {
     if (research) {
@@ -869,17 +863,66 @@ function ResearchCitationsEditor({ productId }: { productId: number }) {
     }
   }, [research]);
 
+  const getResearchDetails = async () => {
+    const name = String(productName || "").trim();
+    if (!name) {
+      toast.error("Enter a product name before getting research details.");
+      return;
+    }
+    setGettingResearchDetails(true);
+    try {
+      const response = await fetch(`/api/product-research-details?name=${encodeURIComponent(name)}`);
+      if (!response.ok) throw new Error(await response.text());
+      const details = await response.json();
+      const nextOverview = "";
+      const nextChemicalMakeup = details.chemicalMakeup || "";
+      const nextResearchContent = details.researchContent || "";
+      setOverview(nextOverview);
+      setChemicalMakeup(nextChemicalMakeup);
+      setResearchContent(nextResearchContent);
+      await upsertResearch.mutateAsync({ productId, overview: nextOverview, chemicalMakeup: nextChemicalMakeup, researchContent: nextResearchContent });
+
+      for (const citation of citations) {
+        await deleteCitation.mutateAsync({ id: citation.id });
+      }
+
+      const sourceList = Array.isArray(details.citations) ? details.citations.slice(0, 3) : [];
+      for (let index = 0; index < sourceList.length; index++) {
+        const citation = sourceList[index];
+        await addCitation.mutateAsync({
+          productId,
+          citationNumber: index + 1,
+          title: citation.title || `${name} research source`,
+          authors: citation.authors || "",
+          journal: citation.journal || "NIH/PubMed",
+          year: citation.year || "",
+          url: citation.url || "",
+          summary: citation.summary || "",
+        });
+      }
+
+      setResearchChanged(false);
+      await researchQuery.refetch();
+      toast.success("Research details added.");
+    } catch (error: any) {
+      toast.error(error?.message || "Unable to get research details.");
+    } finally {
+      setGettingResearchDetails(false);
+    }
+  };
+
   return (
     <div className="space-y-6 mt-6">
       {/* Research Overview */}
       <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <h2 className="font-semibold text-slate-800 mb-1">Research Information</h2>
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <h2 className="font-semibold text-slate-800">Research Information</h2>
+          <Button type="button" size="sm" onClick={getResearchDetails} disabled={gettingResearchDetails} className="bg-blue-600 hover:bg-blue-700 text-white">
+            {gettingResearchDetails ? "Researching..." : "Get Research Details"}
+          </Button>
+        </div>
         <p className="text-xs text-slate-400 mb-4">Add research background, chemical makeup, and study summaries. This appears on the product detail page.</p>
         <div className="space-y-4">
-          <div>
-            <Label>Overview</Label>
-            <Textarea value={overview} onChange={(e) => { setOverview(e.target.value); setResearchChanged(true); }} className="mt-1.5" rows={3} placeholder="Brief overview of the peptide and its research applications..." />
-          </div>
           <div>
             <Label>Chemical Makeup</Label>
             <Textarea value={chemicalMakeup} onChange={(e) => { setChemicalMakeup(e.target.value); setResearchChanged(true); }} className="mt-1.5" rows={3} placeholder="Chemical structure, amino acid sequence, etc." />
@@ -889,7 +932,7 @@ function ResearchCitationsEditor({ productId }: { productId: number }) {
             <Textarea value={researchContent} onChange={(e) => { setResearchContent(e.target.value); setResearchChanged(true); }} className="mt-1.5" rows={5} placeholder="Detailed research findings, studies, and applications..." />
           </div>
           {researchChanged && (
-            <Button onClick={() => { upsertResearch.mutate({ productId, overview, chemicalMakeup, researchContent }); setResearchChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+            <Button onClick={() => { upsertResearch.mutate({ productId, overview: "", chemicalMakeup, researchContent }); setResearchChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
               <Save className="h-4 w-4" /> Save Research
             </Button>
           )}
@@ -1085,6 +1128,16 @@ function OrderRow({ order, onUpdateStatus, onUpdateTracking }: { order: any; onU
 // ─── Discounts ───────────────────────────────────────────────────────
 function DiscountsSection() {
   const [showForm, setShowForm] = useState(false);
+  useEffect(() => {
+    const showProductList = () => {
+      setShowForm(false);
+      setEditingProduct(null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("rvr-admin-products-list", showProductList);
+    return () => window.removeEventListener("rvr-admin-products-list", showProductList);
+  }, []);
+
   const discountsQuery = trpc.admin.discounts.list.useQuery();
   const createDiscount = trpc.admin.discounts.create.useMutation({
     onSuccess: () => { toast.success("Discount created!"); discountsQuery.refetch(); setShowForm(false); },

@@ -940,8 +940,7 @@ export async function ensureDatabaseReady() {
       await ensureProductColumnTypes(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
-      await ensureNihResearchDescriptions(conn);
-      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified. NIH/PubMed descriptions verified.");
+      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
       initialized = true;
     } finally {
       await conn.end();

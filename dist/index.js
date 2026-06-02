@@ -527,8 +527,7 @@ async function ensureDatabaseReady() {
       await ensureProductColumnTypes(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
-      await ensureNihResearchDescriptions(conn);
-      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified. NIH/PubMed descriptions verified.");
+        console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
       initialized = true;
     } finally {
       await conn.end();
@@ -3761,6 +3760,80 @@ async function startServer() {
       res.status(500).send(err?.message || "Unable to pull NIH report");
     }
   });
+
+  app.get("/api/product-research-details", async (req, res) => {
+    try {
+      const name = String(req.query?.name || "").trim();
+      if (!name) {
+        res.status(400).send("Product name is required");
+        return;
+      }
+      const cleanName = name.replace(/\s+/g, " ").trim();
+      const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
+      searchUrl.searchParams.set("db", "pubmed");
+      searchUrl.searchParams.set("retmode", "json");
+      searchUrl.searchParams.set("retmax", "3");
+      searchUrl.searchParams.set("sort", "relevance");
+      searchUrl.searchParams.set("term", `${cleanName} research OR ${cleanName}`);
+      let citations = [];
+      try {
+        const searchResponse = await fetch(searchUrl);
+        if (searchResponse.ok) {
+          const searchJson = await searchResponse.json();
+          const ids = searchJson?.esearchresult?.idlist || [];
+          if (ids.length) {
+            const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
+            summaryUrl.searchParams.set("db", "pubmed");
+            summaryUrl.searchParams.set("retmode", "json");
+            summaryUrl.searchParams.set("id", ids.join(","));
+            const summaryResponse = await fetch(summaryUrl);
+            if (summaryResponse.ok) {
+              const summaryJson = await summaryResponse.json();
+              citations = ids.map((id) => summaryJson?.result?.[id]).filter(Boolean).slice(0, 3).map((item) => ({
+                title: item.title || `${cleanName} research source`,
+                authors: Array.isArray(item.authors) ? item.authors.map((author) => author.name).filter(Boolean).join(", ") : "",
+                journal: item.fulljournalname || "NIH/PubMed",
+                year: item.pubdate ? String(item.pubdate).slice(0, 4) : "Current",
+                url: item.uid ? `https://pubmed.ncbi.nlm.nih.gov/${item.uid}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
+                summary: `NIH/PubMed indexed source related to ${cleanName}.`
+              }));
+            }
+          }
+        }
+      } catch (sourceError) {
+        console.warn("[Research Details] Source lookup failed; using search links.", sourceError);
+      }
+      if (citations.length < 3) {
+        const fallbackTerms = [`${cleanName} research`, `${cleanName} chemical structure`, `${cleanName} laboratory analytical research`];
+        citations = [
+          ...citations,
+          ...fallbackTerms.slice(citations.length).map((term, index2) => ({
+            title: `${cleanName} ${index2 === 0 ? "research overview" : index2 === 1 ? "chemical makeup search" : "laboratory research search"}`,
+            authors: "",
+            journal: "NIH/PubMed",
+            year: "Current",
+            url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(term)}`,
+            summary: `Current NIH/PubMed search source for ${term}.`
+          }))
+        ].slice(0, 3);
+      }
+      const chemicalMakeup = [
+        `${cleanName} chemical makeup should be verified against supplier testing, certificate-of-analysis data, and published chemistry references.`,
+        "Use this field for molecular formula, molecular weight, amino-acid sequence, salt form, excipients, concentration, and other product-specific analytical details when available."
+      ].join("\n\n");
+      const researchContent = [
+        `${cleanName} is presented as a research-focused product for laboratory, analytical, and study-context review. Buyers looking for high-quality research materials should review the product specifications, available testing documents, and the supporting literature before purchase.`,
+        `Current public research resources can help customers understand the scientific context, terminology, chemical identity, and analytical considerations associated with ${cleanName}. This summary is written to support clear product education while keeping claims tied to research and quality review.`,
+        "Key review points include product identity, purity documentation, handling requirements, formulation details, testing records, and relevant published literature. The sources below provide starting points for deeper research and can be edited before publishing."
+      ].join("\n\n");
+      res.json({ overview: "", chemicalMakeup, researchContent, citations });
+    } catch (err) {
+      console.error("[Research Details Error]", err);
+      res.status(500).send(err?.message || "Unable to get research details");
+    }
+  });
+
+
   app.post("/api/product-image/upload", async (req, res) => {
     try {
       const makeSafeSlug = (value) => String(value || "product-image").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "product-image";
@@ -3829,7 +3902,31 @@ async function startServer() {
       } else if (type === "face-mask") {
         buffer = fs6.readFileSync(path6.join(assetsDir, "face-mask-blank-hd.png"));
       } else if (type === "gift-card") {
-        buffer = fs6.readFileSync(path6.join(assetsDir, "Gift-Card.png"));
+        const giftCardBuffer = fs6.readFileSync(path6.join(assetsDir, "Gift-Card.png"));
+        if (giftCardRange) {
+          try {
+            const { createCanvas, loadImage } = await import("@napi-rs/canvas");
+            const image = await loadImage(giftCardBuffer);
+            const canvas = createCanvas(image.width, image.height);
+            const context = canvas.getContext("2d");
+            context.drawImage(image, 0, 0);
+            const fontSize = Math.max(34, Math.round(image.width * 0.035));
+            context.font = `700 ${fontSize}px Arial, sans-serif`;
+            context.textAlign = "right";
+            context.textBaseline = "top";
+            context.shadowColor = "rgba(0,0,0,0.55)";
+            context.shadowBlur = Math.round(fontSize * 0.16);
+            context.shadowOffsetY = Math.max(1, Math.round(fontSize * 0.035));
+            context.fillStyle = "#ffffff";
+            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.11), Math.round(image.height * 0.12));
+            buffer = await canvas.encode("png");
+          } catch (giftCardError) {
+            console.warn("[Gift Card Preview] Amount-range rendering failed; saving base gift card image.", giftCardError);
+            buffer = giftCardBuffer;
+          }
+        } else {
+          buffer = giftCardBuffer;
+        }
       } else {
         const { generateVialBuffer: generateVialBuffer3 } = await Promise.resolve().then(() => (init_vialGenerator(), vialGenerator_exports));
         buffer = await generateVialBuffer3(displayName);
