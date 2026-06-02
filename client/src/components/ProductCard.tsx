@@ -29,6 +29,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
   const isReconstitutionKit = product.slug === "reconstitution-kit";
   const isBpcCapsules = product.slug === "bpc-157-capsules-500mcg-30";
+  const isStorageContainer = product.slug === "3ml-storage-container";
+  const isVialCap = product.slug === "vial-cap";
+  const isVialCapOpener = product.slug === "vial-cap-opener";
+  const isGiftCard = product.slug === "gift-card";
 
   return (
     <Link href={`/product/${product.slug}`}>
@@ -42,7 +46,21 @@ export default function ProductCard({ product }: ProductCardProps) {
               loading="lazy"
               decoding="async"
               className="w-auto h-auto max-w-[74%] max-h-[205px] sm:max-h-[220px] lg:max-h-[225px] object-contain object-bottom group-hover:scale-105 transition-transform duration-500"
-              style={isReconstitutionKit ? { maxWidth: "82%", maxHeight: "230px", transform: "translateY(-8px)" } : isBpcCapsules ? { maxWidth: "102%", maxHeight: "270px", transform: "scale(1.05)" } : undefined}
+              style={
+                isReconstitutionKit
+                  ? { maxWidth: "82%", maxHeight: "230px", transform: "translateY(-8px)" }
+                  : isBpcCapsules
+                  ? { maxWidth: "102%", maxHeight: "270px", transform: "scale(1.05)" }
+                  : isStorageContainer
+                  ? { maxWidth: "92%", maxHeight: "250px", transform: "scale(1.12)" }
+                  : isVialCap
+                  ? { maxWidth: "90%", maxHeight: "245px", transform: "scale(1.15)" }
+                  : isVialCapOpener
+                  ? { maxWidth: "90%", maxHeight: "245px", transform: "scale(1.12)" }
+                  : isGiftCard
+                  ? { transform: "translateY(-18px) scale(1.04)" }
+                  : undefined
+              }
               onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
             />
           </div>
