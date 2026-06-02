@@ -3704,7 +3704,8 @@ async function startServer() {
         const { generateVialBuffer: generateVialBuffer3 } = await Promise.resolve().then(() => (init_vialGenerator(), vialGenerator_exports));
         buffer = await generateVialBuffer3(displayName);
       }
-      const filename = `${slug}-${type}-preview.${extension}`;
+      const amountSlug = type === "gift-card" && giftCardRange ? `-${makeSafeSlug(giftCardRange)}` : "";
+      const filename = `${slug}-${type}${amountSlug}-preview.${extension}`;
       writeRuntimeProductAsset(filename, buffer);
       res.json({ url: `/assets/${filename}`, contentType });
     } catch (err) {

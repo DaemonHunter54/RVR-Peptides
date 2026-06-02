@@ -45,6 +45,23 @@ function writeProductAssetToServedLocations(
     fs.writeFileSync(path.join(assetsDir, relativeName), data as any);
   }
 }
+function readServedAsset(relativeName: string): Buffer {
+  const searchDirs = [
+    ...getProductAssetDirs(),
+    path.join(process.cwd(), "public", "assets"),
+    path.join(process.cwd(), "client", "public", "assets"),
+    path.join(process.cwd(), "dist", "public", "assets"),
+    path.join(import.meta.dirname, "public", "assets"),
+  ];
+
+  for (const assetsDir of searchDirs) {
+    const fullPath = path.join(assetsDir, relativeName);
+    if (fs.existsSync(fullPath)) return fs.readFileSync(fullPath);
+  }
+
+  throw new Error(`Asset not found: ${relativeName}`);
+}
+
 
 async function saveProductAsset(
   relativeName: string,
@@ -295,19 +312,16 @@ async function startServer() {
         return "";
       })();
 
-      const assetsDir = path.join(process.cwd(), "client", "public", "assets");
-      fs.mkdirSync(assetsDir, { recursive: true });
-
       let buffer: Buffer;
       let extension = "png";
       let contentType = "image/png";
 
       if (type === "cream") {
-        buffer = fs.readFileSync(path.join(assetsDir, "lotion-bottle-blank-hd-tube.png"));
+        buffer = readServedAsset("lotion-bottle-blank-hd-tube.png");
       } else if (type === "face-mask") {
-        buffer = fs.readFileSync(path.join(assetsDir, "face-mask-blank-hd.png"));
+        buffer = readServedAsset("face-mask-blank-hd.png");
       } else if (type === "gift-card") {
-        const giftCardBuffer = fs.readFileSync(path.join(assetsDir, "Gift-Card.png"));
+        const giftCardBuffer = readServedAsset("Gift-Card.png");
         if (giftCardRange) {
           try {
             const { createCanvas, loadImage } = await import("@napi-rs/canvas");
@@ -319,10 +333,11 @@ async function startServer() {
             context.font = `700 ${fontSize}px Arial, sans-serif`;
             context.textAlign = "right";
             context.textBaseline = "top";
-            context.shadowColor = "rgba(0,0,0,0.45)";
-            context.shadowBlur = Math.round(fontSize * 0.18);
+            context.shadowColor = "rgba(0,0,0,0.55)";
+            context.shadowBlur = Math.round(fontSize * 0.16);
+            context.shadowOffsetY = Math.max(1, Math.round(fontSize * 0.035));
             context.fillStyle = "#ffffff";
-            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.07), Math.round(image.height * 0.075));
+            context.fillText(giftCardRange, image.width - Math.round(image.width * 0.072), Math.round(image.height * 0.075));
             buffer = await canvas.encode("png");
           } catch (giftCardError) {
             console.warn("[Gift Card Preview] Amount-range rendering failed; saving base gift card image.", giftCardError);
@@ -336,7 +351,10 @@ async function startServer() {
         buffer = await generateVialBuffer(displayName);
       }
 
-      const filename = `${slug}-${type}-preview.${extension}`;
+      const amountSlug = type === "gift-card" && giftCardRange
+        ? `-${makeSafeSlug(giftCardRange)}`
+        : "";
+      const filename = `${slug}-${type}${amountSlug}-preview.${extension}`;
       const saved = await saveProductAsset(filename, buffer, contentType);
       res.json({ url: saved.url, contentType });
     } catch (err: any) {

@@ -16,6 +16,21 @@ import { productImageUrl } from "@/lib/vialDisplay";
 
 const makeProductSlug = (value: string) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+
+function formatGiftCardRange(minAmount?: string | number, maxAmount?: string | number) {
+  const formatAmount = (value?: string | number) => {
+    const parsed = Number(String(value ?? "").replace(/[^0-9.]/g, ""));
+    return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "";
+  };
+  const min = formatAmount(minAmount);
+  const max = formatAmount(maxAmount);
+  if (min && max) return `${min} - ${max}`;
+  if (min) return `${min}+`;
+  if (max) return `Up to ${max}`;
+  return "";
+}
+
+
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
 
@@ -114,6 +129,9 @@ export default function ProductDetail() {
   const price = isGiftCard ? Number(giftCardAmount || product.price || 10) : (activeVariant ? Number(activeVariant.price) : Number(product.price));
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
+  const displayImageUrl = productImageUrl(product, activeVariant) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`;
+  const giftCardRange = isGiftCard ? formatGiftCardRange(product.price, product.compareAtPrice) : "";
+  const shouldOverlayGiftCardRange = isGiftCard && giftCardRange && String(displayImageUrl || "").includes("Gift-Card.png");
 
   const handleAddToCart = () => {
     const cartPrice = isGiftCard ? String(Number(giftCardAmount || product.price || 10).toFixed(2)) : (activeVariant ? activeVariant.price : product.price);
@@ -184,12 +202,19 @@ export default function ProductDetail() {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
           {/* Image */}
           <div className="rounded-2xl p-8 lg:p-12 flex items-center justify-center">
-            <img
-              src={productImageUrl(product, activeVariant) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
-              alt={product.name}
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
-              className="w-full max-w-md object-contain"
-            />
+            <div className="relative inline-flex w-full max-w-md">
+              <img
+                src={displayImageUrl}
+                alt={product.name}
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+                className="w-full object-contain"
+              />
+              {shouldOverlayGiftCardRange ? (
+                <div className="absolute right-[7.2%] top-[7.5%] whitespace-nowrap text-sm md:text-base font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+                  {giftCardRange}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {/* Info */}

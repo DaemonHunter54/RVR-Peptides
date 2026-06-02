@@ -372,7 +372,7 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
           className="h-[245px] w-auto max-w-full object-contain"
         />
         {giftCardRange ? (
-          <div className="absolute right-[12%] top-[16%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
+          <div className="absolute right-[7.2%] top-[7.5%] whitespace-nowrap text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]">
             {giftCardRange}
           </div>
         ) : null}
@@ -422,7 +422,11 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       sortOrder: v.sortOrder ?? 0,
     })) : [],
   });
-  const [previewType, setPreviewType] = useState<PreviewProductType>((product?.previewType as PreviewProductType) || (product?.imageUrl?.includes("/api/vial/") ? "vial" : ""));
+  const initialPreviewType: PreviewProductType =
+    (product?.previewType as PreviewProductType) ||
+    (makeSlug(product?.slug || product?.name || "") === "gift-card" || String(product?.imageUrl || "").toLowerCase().includes("gift-card") ? "gift-card" :
+      product?.imageUrl?.includes("/api/vial/") ? "vial" : "");
+  const [previewType, setPreviewType] = useState<PreviewProductType>(initialPreviewType);
   const [linkingPreview, setLinkingPreview] = useState(false);
   const [imageAssets, setImageAssets] = useState<Array<{ name: string; url: string }>>([]);
   const [multipleProducts, setMultipleProducts] = useState(Boolean(product?.variants?.length));
