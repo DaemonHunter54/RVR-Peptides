@@ -2927,7 +2927,7 @@ var productVariantInput = z2.object({
   id: z2.number().optional(),
   label: z2.string().optional(),
   price: z2.string().optional(),
-  compareAtPrice: z2.string().optional(),
+  compareAtPrice: z2.string().nullable().optional(),
   sku: z2.string().optional(),
   stockQuantity: z2.number().optional(),
   inStock: z2.boolean().optional(),
@@ -3253,7 +3253,7 @@ var appRouter = router({
         description: z2.string().optional(),
         shortDescription: z2.string().optional(),
         price: z2.string(),
-        compareAtPrice: z2.string().optional(),
+        compareAtPrice: z2.string().nullable().optional(),
         sku: z2.string().optional(),
         imageUrl: z2.string().optional(),
         size: z2.string().optional(),
@@ -3308,7 +3308,7 @@ var appRouter = router({
         description: z2.string().optional(),
         shortDescription: z2.string().optional(),
         price: z2.string().optional(),
-        compareAtPrice: z2.string().optional(),
+        compareAtPrice: z2.string().nullable().optional(),
         sku: z2.string().optional(),
         imageUrl: z2.string().optional(),
         size: z2.string().optional(),
@@ -3836,21 +3836,25 @@ async function startServer() {
         res.status(400).send("Product name is required");
         return;
       }
+
       const cleanName = name.replace(/\s+/g, " ").trim();
       const pubmedTerm = `"${cleanName}" OR ${cleanName}`;
       const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
       searchUrl.searchParams.set("db", "pubmed");
       searchUrl.searchParams.set("retmode", "json");
-      searchUrl.searchParams.set("retmax", "5");
+      searchUrl.searchParams.set("retmax", "8");
       searchUrl.searchParams.set("sort", "relevance");
       searchUrl.searchParams.set("term", pubmedTerm);
-      let citations = [];
-      let abstractSnippets = [];
+
+      let citations: any[] = [];
+      let abstractSnippets: string[] = [];
+
       try {
         const searchResponse = await fetch(searchUrl);
         if (searchResponse.ok) {
-          const searchJson = await searchResponse.json();
-          const ids = (searchJson?.esearchresult?.idlist || []).slice(0, 5);
+          const searchJson: any = await searchResponse.json();
+          const ids = (searchJson?.esearchresult?.idlist || []).slice(0, 8);
+
           if (ids.length) {
             const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
             summaryUrl.searchParams.set("db", "pubmed");
@@ -3858,78 +3862,120 @@ async function startServer() {
             summaryUrl.searchParams.set("id", ids.join(","));
             const summaryResponse = await fetch(summaryUrl);
             if (summaryResponse.ok) {
-              const summaryJson = await summaryResponse.json();
-              citations = ids.map((id) => summaryJson?.result?.[id]).filter(Boolean).slice(0, 3).map((item) => ({
-                title: item.title || `${cleanName} PubMed source`,
-                authors: Array.isArray(item.authors) ? item.authors.map((author) => author.name).filter(Boolean).join(", ") : "",
-                journal: item.fulljournalname || item.source || "PubMed",
-                year: item.pubdate ? String(item.pubdate).slice(0, 4) : "",
-                url: item.uid ? `https://pubmed.ncbi.nlm.nih.gov/${item.uid}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
-                summary: `PubMed-indexed source related to ${cleanName}.`
-              }));
+              const summaryJson: any = await summaryResponse.json();
+              citations = ids
+                .map((id: string) => summaryJson?.result?.[id])
+                .filter(Boolean)
+                .slice(0, 3)
+                .map((item: any) => ({
+                  title: item.title || `${cleanName} PubMed source`,
+                  authors: Array.isArray(item.authors) ? item.authors.map((author: any) => author.name).filter(Boolean).join(", ") : "",
+                  journal: item.fulljournalname || item.source || "PubMed",
+                  year: item.pubdate ? String(item.pubdate).slice(0, 4) : "",
+                  url: item.uid ? `https://pubmed.ncbi.nlm.nih.gov/${item.uid}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
+                  summary: `PubMed-indexed source related to ${cleanName}.`,
+                }));
             }
+
             const fetchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi");
             fetchUrl.searchParams.set("db", "pubmed");
             fetchUrl.searchParams.set("retmode", "xml");
-            fetchUrl.searchParams.set("id", ids.slice(0, 3).join(","));
+            fetchUrl.searchParams.set("id", ids.slice(0, 5).join(","));
             const fetchResponse = await fetch(fetchUrl);
             if (fetchResponse.ok) {
               const xml = await fetchResponse.text();
-              abstractSnippets = Array.from(xml.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/gi)).map((match) => match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 4);
+              abstractSnippets = Array.from(xml.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/gi))
+                .map((match) => match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+                .filter(Boolean)
+                .slice(0, 8);
             }
           }
         }
       } catch (sourceError) {
         console.warn("[Research Details] PubMed lookup failed; using PubMed search links.", sourceError);
       }
+
       if (citations.length < 3) {
-        const fallbackTerms = [`${cleanName}`, `${cleanName} pharmacology research`, `${cleanName} chemistry`];
+        const fallbackTerms = [
+          `${cleanName}`,
+          `${cleanName} mechanism of action`,
+          `${cleanName} chemistry pharmacology`,
+        ];
         citations = [
           ...citations,
-          ...fallbackTerms.slice(citations.length).map((term, index2) => ({
-            title: `${cleanName} ${index2 === 0 ? "PubMed literature search" : index2 === 1 ? "pharmacology literature search" : "chemistry literature search"}`,
+          ...fallbackTerms.slice(citations.length).map((term, index) => ({
+            title: `${cleanName} ${index === 0 ? "PubMed literature search" : index === 1 ? "mechanism literature search" : "chemistry and pharmacology literature search"}`,
             authors: "",
             journal: "PubMed",
             year: "",
             url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(term)}`,
-            summary: `Current PubMed search source for ${term}.`
-          }))
+            summary: `Current PubMed search source for ${term}.`,
+          })),
         ].slice(0, 3);
       }
+
       let chemicalMakeup = "";
       try {
-        const pubChemUrl = new URL(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/property/MolecularFormula,MolecularWeight,IUPACName/JSON`);
+        const pubChemUrl = new URL(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/property/MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES/JSON`);
         const pubChemResponse = await fetch(pubChemUrl);
         if (pubChemResponse.ok) {
-          const pubChemJson = await pubChemResponse.json();
+          const pubChemJson: any = await pubChemResponse.json();
           const props = pubChemJson?.PropertyTable?.Properties?.[0];
           if (props) {
             chemicalMakeup = [
               props.MolecularFormula ? `Molecular formula: ${props.MolecularFormula}` : "",
               props.MolecularWeight ? `Molecular weight: ${props.MolecularWeight}` : "",
-              props.IUPACName ? `IUPAC name: ${props.IUPACName}` : ""
+              props.IUPACName ? `IUPAC name: ${props.IUPACName}` : "",
+              props.CanonicalSMILES ? `Canonical SMILES: ${props.CanonicalSMILES}` : "",
             ].filter(Boolean).join("\n");
           }
         }
       } catch (chemicalError) {
         console.warn("[Research Details] PubChem lookup failed.", chemicalError);
       }
+
       if (!chemicalMakeup) {
         chemicalMakeup = [
           `${cleanName}`,
-          "Chemical makeup was not returned by PubChem for this exact product name. Add the verified molecular formula, molecular weight, peptide sequence, salt form, concentration, purity, and certificate-of-analysis details here when available."
+          "No exact PubChem chemistry record was returned for this product name. Verify the final molecular formula, molecular weight, peptide sequence, salt form, concentration, purity, and certificate-of-analysis details before publishing.",
         ].join("\n");
       }
-      const citedTitles = citations.map((citation) => citation.title).filter(Boolean).slice(0, 3);
-      const evidenceSummary = abstractSnippets.length ? abstractSnippets.join(" ") : `${cleanName} appears in PubMed-indexed scientific literature and related chemistry references. Published sources describe the compound or product context through experimental, analytical, pharmacology, or laboratory-research discussion depending on the exact compound identity.`;
-      const researchContent = [
-        `${cleanName} is a research-focused compound/product intended for laboratory and analytical use. Available PubMed-indexed literature and chemistry references help describe its identity, research context, handling considerations, and the scientific areas where it has been studied.`,
-        evidenceSummary.slice(0, 1200),
-        citedTitles.length ? `The sources used for this overview include PubMed-indexed material such as: ${citedTitles.join("; ")}. These sources support the research-context summary and citations listed below.` : `The citations below are current PubMed search sources for ${cleanName} and related chemistry/research terms.`,
-        "Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption."
+
+      const citedTitles = citations.map((citation: any) => citation.title).filter(Boolean).slice(0, 3);
+      const abstractText = abstractSnippets.join(" ").replace(/\s+/g, " ").trim();
+      const evidenceSummary = abstractText ||
+        `${cleanName} appears in PubMed-indexed scientific literature and related chemistry references. The available literature discusses the compound or product in experimental, analytical, pharmacology, laboratory, or formulation research depending on the exact identity of the material.`;
+
+      const description = [
+        `${cleanName} is a research-focused compound or product used for laboratory, analytical, and scientific investigation. Published literature and chemistry references are used here to describe its identity, how researchers evaluate it, and why it is of interest in controlled research settings.`,
+        `Researchers generally evaluate ${cleanName} by looking at its chemical identity, purity profile, structure-related behavior, stability, and the biological or analytical pathways described in the available literature. The mechanism of action depends on the exact compound, but the research record typically focuses on how the material interacts with the target systems, receptors, tissues, enzymes, signaling pathways, or assay conditions relevant to the study design.`,
+        `Current scientific interest in ${cleanName} centers on understanding its measurable effects, reproducibility, handling profile, and potential value in research models. Key areas of investigation may include pharmacology, analytical chemistry, peptide or compound characterization, mechanism-focused assays, stability evaluation, and comparison with related materials. These areas help researchers decide whether the product is appropriate for their laboratory workflow and study goals.`,
+        `Research findings referenced through PubMed-indexed sources provide useful context for the product's investigated properties, reported experimental observations, and limitations. The available evidence should be interpreted as research-context information for laboratory use rather than as medical advice or clinical direction.`,
+        "Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.",
       ].join("\n\n");
-      res.json({ overview: "", chemicalMakeup, researchContent, citations });
-    } catch (err) {
+
+      const researchContent = [
+        `Research and clinical-study context for ${cleanName}`,
+        "",
+        evidenceSummary.slice(0, 2800),
+        "",
+        citedTitles.length
+          ? `The sources used for this overview include PubMed-indexed material such as: ${citedTitles.join("; ")}. These publications provide research context regarding the compound/product identity, mechanism-focused investigation, reported experimental findings, and areas where the material has been studied.`
+          : `The citations below are current PubMed search sources for ${cleanName} and related chemistry, mechanism, and pharmacology terms.`,
+        "",
+        `Across the available literature, ${cleanName} should be presented as a research material whose value comes from documented identity, consistent quality control, and relevance to defined laboratory questions. The most useful product-page summary is one that explains what the material is, what researchers are investigating, which mechanisms or assay systems are relevant, and what findings have been reported without implying approved medical use.`,
+        "",
+        "Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.",
+      ].join("\n");
+
+      res.json({
+        overview: "",
+        description,
+        chemicalMakeup,
+        researchContent,
+        citations,
+      });
+    } catch (err: any) {
       console.error("[Research Details Error]", err);
       res.status(500).send(err?.message || "Unable to get research details");
     }

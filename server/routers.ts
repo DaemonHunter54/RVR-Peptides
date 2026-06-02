@@ -209,7 +209,7 @@ const productVariantInput = z.object({
   id: z.number().optional(),
   label: z.string().optional(),
   price: z.string().optional(),
-  compareAtPrice: z.string().optional(),
+  compareAtPrice: z.string().nullable().optional(),
   sku: z.string().optional(),
   stockQuantity: z.number().optional(),
   inStock: z.boolean().optional(),
@@ -590,7 +590,7 @@ export const appRouter = router({
       }),
       create: adminProcedure.input(z.object({
         name: z.string(), slug: z.string(), description: z.string().optional(), shortDescription: z.string().optional(),
-        price: z.string(), compareAtPrice: z.string().optional(), sku: z.string().optional(), imageUrl: z.string().optional(),
+        price: z.string(), compareAtPrice: z.string().nullable().optional(), sku: z.string().optional(), imageUrl: z.string().optional(),
         size: z.string().optional(), contents: z.string().optional(), form: z.string().optional(), purity: z.string().optional(),
         molecularFormula: z.string().optional(), molecularWeight: z.string().optional(), otherNames: z.string().optional(),
         stockQuantity: z.number().optional(), inStock: z.boolean().optional(), isActive: z.boolean().optional(), isFeatured: z.boolean().optional(),
@@ -661,7 +661,7 @@ export const appRouter = router({
       }),
       update: adminProcedure.input(z.object({
         id: z.number(), name: z.string().optional(), slug: z.string().optional(), description: z.string().optional(),
-        shortDescription: z.string().optional(), price: z.string().optional(), compareAtPrice: z.string().optional(),
+        shortDescription: z.string().optional(), price: z.string().optional(), compareAtPrice: z.string().nullable().optional(),
         sku: z.string().optional(), imageUrl: z.string().optional(), size: z.string().optional(), contents: z.string().optional(),
         form: z.string().optional(), purity: z.string().optional(), molecularFormula: z.string().optional(),
         molecularWeight: z.string().optional(), otherNames: z.string().optional(), stockQuantity: z.number().optional(),

@@ -429,15 +429,17 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     })) : [],
   });
   const [draftResearch, setDraftResearch] = useState<{
+    description?: string;
     chemicalMakeup: string;
     researchContent: string;
     citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
-  }>({ chemicalMakeup: "", researchContent: "", citations: [] });
+  }>({ description: "", chemicalMakeup: "", researchContent: "", citations: [] });
   const [editResearchDraft, setEditResearchDraft] = useState<{
+    description?: string;
     chemicalMakeup: string;
     researchContent: string;
     citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
-  }>({ chemicalMakeup: "", researchContent: "", citations: [] });
+  }>({ description: "", chemicalMakeup: "", researchContent: "", citations: [] });
   const [showTestingDocuments, setShowTestingDocuments] = useState(Boolean(product?.coaUrl || product?.hplcUrl || product?.massSpecUrl));
   const [showSpecifications, setShowSpecifications] = useState(Boolean(product?.purity || product?.contents || product?.form || product?.molecularFormula || product?.molecularWeight || product?.otherNames));
 
@@ -619,7 +621,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           ...v,
           label: cleanLabel,
           price: String(v.price || form.price || "0").trim(),
-          compareAtPrice: previewType === "gift-card" ? null : (String(v.compareAtPrice || "").trim() || null),
+          compareAtPrice: previewType === "gift-card" ? undefined : (String(v.compareAtPrice || "").trim() || undefined),
           stockQuantity: previewType === "gift-card" ? 9999 : (v.stockQuantity ?? form.stockQuantity ?? 100),
           sortOrder: index,
           imageUrl: v.imageUrl || linkedImageUrl || imageUrlForVariant(form.slug, cleanLabel) || imageUrlForSlug(form.slug),
@@ -779,6 +781,19 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               />
             </div>
 
+            {!isGiftCardTemplate && (
+              <div className="xl:col-span-2">
+                <Label>Product Description</Label>
+                <Textarea
+                  value={form.description}
+                  onChange={(e) => updateField("description", e.target.value)}
+                  className="mt-1.5"
+                  rows={8}
+                  placeholder="Product overview, mechanism of action, research interest, key research areas, and investigated scientific benefits..."
+                />
+              </div>
+            )}
+
             <div className="xl:col-span-2">
               <h2 className="font-semibold text-slate-800 mb-4">Categories</h2>
               <div className="flex flex-wrap gap-2">
@@ -851,9 +866,9 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
         {!isGiftCardTemplate && (
           product?.id ? (
-            <ResearchCitationsEditor productId={product.id} productName={form.name} onDraftChange={setEditResearchDraft} />
+            <ResearchCitationsEditor productId={product.id} productName={form.name} onDraftChange={setEditResearchDraft} onDescriptionChange={(description) => updateField("description", description)} />
           ) : (
-            <DraftResearchEditor productName={form.name} value={draftResearch} onChange={setDraftResearch} />
+            <DraftResearchEditor productName={form.name} value={draftResearch} onChange={setDraftResearch} onDescriptionChange={(description) => updateField("description", description)} />
           )
         )}
 
@@ -875,18 +890,22 @@ function DraftResearchEditor({
   productName,
   value,
   onChange,
+  onDescriptionChange,
 }: {
   productName: string;
   value: {
+    description?: string;
     chemicalMakeup: string;
     researchContent: string;
     citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
   };
   onChange: (next: {
+    description?: string;
     chemicalMakeup: string;
     researchContent: string;
     citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
   }) => void;
+  onDescriptionChange?: (description: string) => void;
 }) {
   const [gettingResearchDetails, setGettingResearchDetails] = useState(false);
 
@@ -902,7 +921,9 @@ function DraftResearchEditor({
       const response = await fetch(`/api/product-research-details?name=${encodeURIComponent(name)}`);
       if (!response.ok) throw new Error(await response.text());
       const details = await response.json();
+      onDescriptionChange?.(details.description || "");
       onChange({
+        description: details.description || "",
         chemicalMakeup: details.chemicalMakeup || "",
         researchContent: details.researchContent || "",
         citations: Array.isArray(details.citations) ? details.citations.slice(0, 3) : [],
@@ -1021,14 +1042,17 @@ function ResearchCitationsEditor({
   productId,
   productName,
   onDraftChange,
+  onDescriptionChange,
 }: {
   productId: number;
   productName: string;
   onDraftChange?: (next: {
+    description?: string;
     chemicalMakeup: string;
     researchContent: string;
     citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
   }) => void;
+  onDescriptionChange?: (description: string) => void;
 }) {
   const researchQuery = trpc.admin.research.get.useQuery({ productId });
   const upsertResearch = trpc.admin.research.upsert.useMutation({
@@ -1076,6 +1100,7 @@ function ResearchCitationsEditor({
 
   useEffect(() => {
     onDraftChange?.({
+      description: "",
       chemicalMakeup,
       researchContent,
       citations: citations.map((citation: any) => ({
@@ -1101,8 +1126,10 @@ function ResearchCitationsEditor({
       if (!response.ok) throw new Error(await response.text());
       const details = await response.json();
       const nextOverview = "";
+      const nextDescription = details.description || "";
       const nextChemicalMakeup = details.chemicalMakeup || "";
       const nextResearchContent = details.researchContent || "";
+      onDescriptionChange?.(nextDescription);
       setOverview(nextOverview);
       setChemicalMakeup(nextChemicalMakeup);
       setResearchContent(nextResearchContent);
