@@ -336,11 +336,11 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl }: { name:
   const title = previewType === "cream" ? "Live Cream Preview" : previewType === "face-mask" ? "Live Face Mask Preview" : "Live Vial Preview";
 
   return (
-    <div className="h-full min-h-[255px] flex items-start justify-center bg-transparent pt-0">
+    <div className="h-full min-h-[235px] flex items-start justify-end bg-transparent pt-0 pr-0">
       <img
         src={previewSrc}
         alt={title}
-        className="h-[245px] w-auto max-w-full object-contain drop-shadow-sm"
+        className="h-[245px] w-auto max-w-full object-contain"
       />
     </div>
   );
@@ -390,6 +390,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   const [previewType, setPreviewType] = useState<PreviewProductType>((product?.previewType as PreviewProductType) || (product?.imageUrl?.includes("/api/vial/") ? "vial" : ""));
   const [linkingPreview, setLinkingPreview] = useState(false);
   const [imageAssets, setImageAssets] = useState<Array<{ name: string; url: string }>>([]);
+  const [multipleProducts, setMultipleProducts] = useState(Boolean(product?.variants?.length));
 
   useEffect(() => {
     fetch("/api/product-assets")
@@ -492,6 +493,28 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     setForm(prev => ({ ...prev, variants: prev.variants.filter((_: any, i: number) => i !== index) }));
   };
 
+  const setMultipleProductMode = (enabled: boolean) => {
+    setMultipleProducts(enabled);
+    setForm(prev => {
+      if (enabled && prev.variants.length === 0) {
+        return {
+          ...prev,
+          variants: [{
+            ...blankVariant(),
+            label: prev.size || "",
+            price: prev.price || "",
+            stockQuantity: prev.stockQuantity ?? 100,
+            sortOrder: 0,
+          }],
+        };
+      }
+      if (!enabled) {
+        return { ...prev, variants: [] };
+      }
+      return prev;
+    });
+  };
+
   const saveProduct = () => {
     const variants = (form.variants || [])
       .filter((v: any) => String(v.label || "").trim() || String(v.price || "").trim())
@@ -525,16 +548,66 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         {/* Basic Info */}
         <div className="bg-white rounded-xl p-6 border border-slate-200">
           <h2 className="font-semibold text-slate-800 mb-4">Basic Information</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,780px)_1fr] gap-8 items-start">
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Product Name *</Label><Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" /></div>
-                <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))] gap-4 items-end">
+                <div>
+                  <Label>Product Name *</Label>
+                  <Input value={form.name} onChange={(e) => updateField("name", e.target.value)} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label>Dose / Size</Label>
+                  <Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" />
+                </div>
+                <div>
+                  <Label>Price ($) *</Label>
+                  <Input type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label>Stock</Label>
+                  <Input type="number" value={form.stockQuantity} onChange={(e) => updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" />
+                </div>
               </div>
+
+              <div className="flex items-center gap-3 pt-1">
+                <Switch checked={multipleProducts} onCheckedChange={setMultipleProductMode} />
+                <Label className="font-medium">Multiple Products</Label>
+                <span className="text-xs text-slate-500">Add additional dose, price, and stock options under this product.</span>
+              </div>
+
+              {multipleProducts ? (
+                <div className="space-y-3 rounded-xl bg-slate-50/80 p-3">
+                  {form.variants.map((variant: any, index: number) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-[minmax(260px,1.45fr)_repeat(3,minmax(115px,0.55fr))_auto] gap-4 items-end">
+                      <div className="hidden md:block text-xs font-medium text-slate-500 pb-3">
+                        Additional Dose {index + 1}
+                      </div>
+                      <div>
+                        <Label>Dose / Size</Label>
+                        <Input value={variant.label} onChange={(e) => updateVariant(index, "label", e.target.value)} className="mt-1.5 bg-white" placeholder={form.size || "e.g. 10mg"} />
+                      </div>
+                      <div>
+                        <Label>Price ($)</Label>
+                        <Input type="number" step="0.01" value={variant.price} onChange={(e) => updateVariant(index, "price", e.target.value)} className="mt-1.5 bg-white" placeholder={form.price || "0.00"} />
+                      </div>
+                      <div>
+                        <Label>Stock</Label>
+                        <Input type="number" value={variant.stockQuantity} onChange={(e) => updateVariant(index, "stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5 bg-white" />
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" className="text-red-500 mb-0.5" onClick={() => removeVariant(index)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={addVariant} className="gap-1.5">
+                    <Plus className="h-3.5 w-3.5" /> Add Dose
+                  </Button>
+                </div>
+              ) : null}
 
               <div>
                 <Label>Select product template</Label>
-                <div className="mt-1.5 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                <div className="mt-1.5 grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_auto] gap-3 items-center">
                   <Select value={previewType || "none"} onValueChange={handlePreviewTypeChange}>
                     <SelectTrigger><SelectValue placeholder="Select product template" /></SelectTrigger>
                     <SelectContent>
@@ -544,7 +617,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                     </SelectContent>
                   </Select>
                   {previewType ? (
-                    <Button type="button" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={linkPreviewToUrl} disabled={linkingPreview}>
+                    <Button type="button" className="bg-blue-600 hover:bg-blue-700 text-white px-6" onClick={linkPreviewToUrl} disabled={linkingPreview}>
                       {linkingPreview ? "Linking..." : "Link URL"}
                     </Button>
                   ) : null}
@@ -558,27 +631,27 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                 <p className="mt-1 text-xs text-slate-500">URL Slug and SKU are auto-generated in the background: {autoSlug || "waiting for product name"} / {autoSku || "waiting for product name"}</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Price ($) *</Label><Input type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", e.target.value)} className="mt-1.5" /></div>
-                <div><Label>Stock Quantity</Label><Input type="number" value={form.stockQuantity} onChange={(e) => updateField("stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" /></div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-[minmax(180px,260px)_1fr] gap-4 items-end">
-                <div><Label>Discount (%)</Label><Input type="number" step="1" value={form.discountPercent} onChange={(e) => updateField("discountPercent", e.target.value)} className="mt-1.5" /></div>
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(180px,280px)_1fr] gap-4 items-end pt-1">
+                <div>
+                  <Label>Discount (%)</Label>
+                  <Input type="number" step="1" value={form.discountPercent} onChange={(e) => updateField("discountPercent", e.target.value)} className="mt-1.5" />
+                </div>
                 <div className="flex items-center gap-5 flex-wrap pb-2">
+                  <div className="flex items-center gap-2"><Switch checked={form.discountActive} onCheckedChange={(v) => updateField("discountActive", v)} /><Label>Discount Active</Label></div>
                   <div className="flex items-center gap-2"><Switch checked={form.inStock} onCheckedChange={(v) => updateField("inStock", v)} /><Label>In Stock</Label></div>
                   <div className="flex items-center gap-2"><Switch checked={form.isFeatured} onCheckedChange={(v) => updateField("isFeatured", v)} /><Label>Featured</Label></div>
                   <div className="flex items-center gap-2"><Switch checked={form.isActive} onCheckedChange={(v) => updateField("isActive", v)} /><Label>Active</Label></div>
-                  <div className="flex items-center gap-2"><Switch checked={form.discountActive} onCheckedChange={(v) => updateField("discountActive", v)} /><Label>Discount Active</Label></div>
                 </div>
               </div>
             </div>
 
-            <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} imageUrl={form.imageUrl} />
+            <div className="justify-self-end w-full max-w-[360px]">
+              <ProductVialPreview name={form.name} slug={form.slug || autoSlug} size={form.size} previewType={previewType} imageUrl={form.imageUrl} />
+            </div>
 
-            <div className="lg:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
+            <div className="xl:col-span-2"><Label>Full Description</Label><Textarea value={form.description} onChange={(e) => updateField("description", e.target.value)} className="mt-1.5" rows={4} /></div>
 
-            <div className="lg:col-span-2">
+            <div className="xl:col-span-2">
               <h2 className="font-semibold text-slate-800 mb-4">Categories</h2>
               <div className="flex flex-wrap gap-2">
                 {(categoriesQuery.data || []).map((cat: any) => {
@@ -593,37 +666,6 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Variants / Dose Options */}
-        <div className="bg-white rounded-xl p-6 border border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-slate-800">Dose Options / Variants</h2>
-              <p className="text-sm text-slate-500">Add multiple sizes or mg amounts under this same product. Leave empty for a single product.</p>
-            </div>
-            <Button type="button" variant="outline" size="sm" onClick={addVariant} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> Add Option
-            </Button>
-          </div>
-          {form.variants.length === 0 ? (
-            <p className="text-sm text-slate-400">No dose options added. This product will save as a single item.</p>
-          ) : (
-            <div className="space-y-3">
-              {form.variants.map((variant: any, index: number) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                  <div className="md:col-span-2"><Label>Label / Size</Label><Input value={variant.label} onChange={(e) => updateVariant(index, "label", e.target.value)} className="mt-1.5" placeholder="5mg" /></div>
-                  <div className="md:col-span-2"><Label>Price ($)</Label><Input type="number" step="0.01" value={variant.price} onChange={(e) => updateVariant(index, "price", e.target.value)} className="mt-1.5" placeholder={form.price || "0.00"} /></div>
-                  <div className="md:col-span-2"><Label>Compare At</Label><Input type="number" step="0.01" value={variant.compareAtPrice} onChange={(e) => updateVariant(index, "compareAtPrice", e.target.value)} className="mt-1.5" /></div>
-                  <div className="md:col-span-2"><Label>SKU</Label><Input value={variant.sku} onChange={(e) => updateVariant(index, "sku", e.target.value)} className="mt-1.5" /></div>
-                  <div className="md:col-span-2"><Label>Stock</Label><Input type="number" value={variant.stockQuantity} onChange={(e) => updateVariant(index, "stockQuantity", parseInt(e.target.value) || 0)} className="mt-1.5" /></div>
-                  <div className="md:col-span-1 flex items-end gap-2 pb-2"><Switch checked={variant.inStock} onCheckedChange={(v) => updateVariant(index, "inStock", v)} /><Label>Stock</Label></div>
-                  <div className="md:col-span-1 flex items-end"><Button type="button" variant="ghost" size="sm" className="text-red-500" onClick={() => removeVariant(index)}><Trash2 className="h-4 w-4" /></Button></div>
-                  <div className="md:col-span-12"><Label>Variant Image URL</Label><Input value={variant.imageUrl} onChange={(e) => updateVariant(index, "imageUrl", e.target.value)} className="mt-1.5" placeholder="Leave blank to use main product image" /></div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Testing Documents */}
