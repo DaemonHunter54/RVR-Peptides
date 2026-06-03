@@ -202,11 +202,11 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      <div className="container py-6 lg:py-8">
+      <div className="container py-4 lg:py-5">
         {/* Product Main Section */}
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-6 items-start">
           {/* Image */}
-          <div className="rounded-2xl px-8 pb-4 pt-0 lg:px-12 lg:pb-6 lg:pt-0 flex items-start justify-center -mt-4 lg:-mt-8">
+          <div className="rounded-2xl px-8 pb-4 pt-0 lg:px-12 lg:pb-6 lg:pt-0 flex items-start justify-center -mt-8 lg:-mt-12">
             <div className="relative inline-flex w-full max-w-md">
               <img
                 src={displayImageUrl}
@@ -373,7 +373,7 @@ export default function ProductDetail() {
 
         {/* Conditional Tabs: Description, CoA, HPLC, Mass Spectrometry */}
         {availableTabs.length > 0 && (
-          <div className="mb-8">
+          <div className="mb-8 -mt-12 lg:-mt-28 relative z-10">
             {/* Tab Navigation */}
             <div className="border-b border-slate-200">
               <div className="flex gap-0">
