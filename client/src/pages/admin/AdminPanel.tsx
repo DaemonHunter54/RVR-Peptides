@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { ASSETS } from "@/lib/assets";
 import { productAssetForSlug } from "@/lib/productAssetMap";
-import { generatedVialUrl as makeDynamicVialUrl } from "@/lib/vialDisplay";
+import { generatedVialUrl as makeDynamicVialUrl, productImageUrl } from "@/lib/vialDisplay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -276,7 +276,7 @@ function ProductsSection() {
                 <tr key={product.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img src={product.imageUrl || ASSETS.peptideVial} alt="" loading="lazy" decoding="async" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
+                      <img src={productImageUrl(product) || ASSETS.peptideVial} alt="" loading="lazy" decoding="async" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-10 h-10 object-contain bg-slate-50 rounded" />
                       <div>
                         <p className="font-medium text-slate-800">{product.name}</p>
@@ -385,7 +385,9 @@ function formatGiftCardMinimum(minAmount?: string) {
 }
 
 function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount, maxAmount }: { name: string; slug: string; size?: string; previewType: PreviewProductType; imageUrl?: string; minAmount?: string; maxAmount?: string }) {
-  const previewSrc = previewType ? blankPreviewSrc(previewType, slug, name || "Preview Product", size) : imageUrl;
+  const previewSrc = previewType
+    ? blankPreviewSrc(previewType, slug, name || "Preview Product", size)
+    : productImageUrl({ name, slug, size, imageUrl }) || imageUrl;
   const title =
     previewType === "cream" ? "Live Cream Preview" :
     previewType === "face-mask" ? "Live Face Mask Preview" :

@@ -202,11 +202,11 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      <div className="container py-8 lg:py-12">
+      <div className="container py-6 lg:py-8">
         {/* Product Main Section */}
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-6 items-start">
           {/* Image */}
-          <div className="rounded-2xl p-8 lg:p-12 flex items-center justify-center">
+          <div className="rounded-2xl px-8 pb-4 pt-0 lg:px-12 lg:pb-6 lg:pt-0 flex items-start justify-center -mt-4 lg:-mt-8">
             <div className="relative inline-flex w-full max-w-md">
               <img
                 src={displayImageUrl}
@@ -223,7 +223,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Info */}
-          <div className="space-y-6">
+          <div className="space-y-6 lg:pt-2">
             {/* Categories */}
             {product.categories && product.categories.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -360,7 +360,7 @@ export default function ProductDetail() {
             )}
 
             {/* Trust */}
-            <div className="flex items-center gap-4 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-4 pt-3 border-t border-slate-100">
               <div className="flex items-center gap-1.5 text-sm text-slate-500">
                 <Shield className="h-4 w-4 text-blue-500" /> Third-party tested
               </div>
@@ -373,7 +373,7 @@ export default function ProductDetail() {
 
         {/* Conditional Tabs: Description, CoA, HPLC, Mass Spectrometry */}
         {availableTabs.length > 0 && (
-          <div className="mb-12">
+          <div className="mb-8">
             {/* Tab Navigation */}
             <div className="border-b border-slate-200">
               <div className="flex gap-0">
@@ -394,7 +394,7 @@ export default function ProductDetail() {
             </div>
 
             {/* Tab Content */}
-            <div className="pt-8">
+            <div className="pt-4">
               {/* Description Tab */}
               {activeTab === "research" && (
                 <div className="prose prose-slate max-w-none">
