@@ -351,16 +351,16 @@ async function ensureProductDisplayData(conn) {
   if (!rows.length) return;
   for (const row of rows) {
     const currentImage = String(row.imageUrl || "");
+    const exactAsset = exactAssetByProduct(row);
+    const repairAsset = exactAsset || assetByProduct(row);
     if (!rowIsNonVialProduct(row)) {
       if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset(currentImage)) {
-        const hdVialUrl = generatedVialUrlForRow(row);
-        await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [hdVialUrl, row.id]);
-        row.imageUrl = hdVialUrl;
+        const repairedVialUrl = exactAsset || generatedVialUrlForRow(row);
+        await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairedVialUrl, row.id]);
+        row.imageUrl = repairedVialUrl;
       }
       continue;
     }
-    const exactAsset = exactAssetByProduct(row);
-    const repairAsset = exactAsset || assetByProduct(row);
     if (repairAsset && isGeneratedOrFallbackImage(currentImage)) {
       await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairAsset, row.id]);
       row.imageUrl = repairAsset;
@@ -3040,10 +3040,13 @@ function productAssetForDisplay(input) {
 }
 function preserveManusImage(product) {
   if (!product) return product;
+  const mappedImage = productAssetForDisplay(product);
   if (!isNonVialProduct(product)) {
+    if (mappedImage && shouldReplaceVialImage(product, product.imageUrl)) {
+      return { ...product, imageUrl: mappedImage };
+    }
     return shouldReplaceVialImage(product, product.imageUrl) ? { ...product, imageUrl: generatedVialUrlForProduct(product) } : product;
   }
-  const mappedImage = productAssetForDisplay(product);
   if (mappedImage && shouldReplaceGeneratedImage(product.imageUrl)) {
     return { ...product, imageUrl: mappedImage };
   }
@@ -3593,11 +3596,18 @@ var appRouter = router({
         regenerateVial: z2.boolean().optional()
       })).mutation(async ({ input }) => {
         const { id, categoryIds, variants, researchDraft, regenerateVial, ...rawData } = input;
+        const existingProduct = await getProductById(id);
         const data = normalizeAdminProductInput(rawData);
-        const mappedImage = productAssetForInput(data);
-        if (!isNonVialProduct(data)) {
-          if (regenerateVial || shouldReplaceVialImage(data, data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
-        } else if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
+        const incomingImage = String(data.imageUrl || "");
+        const existingImage = String(existingProduct?.imageUrl || "");
+        const mappedImage = productAssetForInput(data) || productAssetForDisplay({ ...existingProduct, ...data });
+        if (regenerateVial) {
+          data.imageUrl = !isNonVialProduct(data) ? mappedImage || generatedVialUrlForProduct(data) : mappedImage || data.imageUrl || existingImage;
+        } else if (!incomingImage) {
+          data.imageUrl = existingImage || mappedImage || "";
+        } else if (!isNonVialProduct(data) && shouldReplaceVialImage(data, incomingImage)) {
+          data.imageUrl = mappedImage || existingImage || generatedVialUrlForProduct(data);
+        } else if (mappedImage && shouldReplaceGeneratedImage(incomingImage)) {
           data.imageUrl = mappedImage;
         }
         await updateProduct(id, data, categoryIds);

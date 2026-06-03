@@ -762,20 +762,20 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
   for (const row of rows) {
     const currentImage = String(row.imageUrl || "");
 
-    // Vial products should never be repaired back to older bundled/cached vial images.
-    // If an existing DB record points at a legacy vial asset, convert it to the
-    // approved HD vial renderer URL so it survives restarts and deploys.
+    const exactAsset = exactAssetByProduct(row);
+    const repairAsset = exactAsset || assetByProduct(row);
+
+    // Vial products with a bundled exact product image should be repaired to that
+    // product-specific asset if a previous edit saved a blank/generated preview.
+    // Products without a bundled asset fall back to the HD vial renderer.
     if (!rowIsNonVialProduct(row)) {
       if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset(currentImage)) {
-        const hdVialUrl = generatedVialUrlForRow(row);
-        await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [hdVialUrl, row.id]);
-        row.imageUrl = hdVialUrl;
+        const repairedVialUrl = exactAsset || generatedVialUrlForRow(row);
+        await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairedVialUrl, row.id]);
+        row.imageUrl = repairedVialUrl;
       }
       continue;
     }
-
-    const exactAsset = exactAssetByProduct(row);
-    const repairAsset = exactAsset || assetByProduct(row);
 
     // Never overwrite a real admin-selected product image during startup.
     // Only repair missing/generated/fallback image URLs. This keeps product
@@ -804,7 +804,7 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
     const canonical = sorted[0];
     const canonicalAsset = rowIsNonVialProduct(canonical)
       ? assetByProduct(canonical) || String(canonical.imageUrl || "")
-      : generatedVialUrlForRow(canonical);
+      : assetByProduct(canonical) || generatedVialUrlForRow(canonical);
 
     // Use one visible parent product and turn sibling dose rows into variants.
     await conn.execute(
@@ -818,7 +818,7 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
       if (!label) continue;
       const variantImage = rowIsNonVialProduct(row)
         ? assetByProduct(row) || row.imageUrl || canonicalAsset || null
-        : generatedVialUrlForRow(row);
+        : assetByProduct(row) || generatedVialUrlForRow(row);
       await conn.execute(
         `INSERT INTO product_variants (productId, label, price, imageUrl, stockQuantity, inStock, sortOrder)
          SELECT ?, ?, ?, ?, 100, true, ? FROM DUAL

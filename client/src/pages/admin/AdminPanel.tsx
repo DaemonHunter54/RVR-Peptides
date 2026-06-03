@@ -421,6 +421,12 @@ function ProductVialPreview({ name, slug, size, previewType, imageUrl, minAmount
 
 function ProductForm({ product, onSave, onCancel, saving }: any) {
   const categoriesQuery = trpc.categories.list.useQuery();
+  const originalProductImageUrl = String(product?.imageUrl || "");
+  const mappedProductImageUrl = productAssetForSlug(product?.slug || makeSlug(product?.name || ""));
+  const initialLockedImageUrl =
+    originalProductImageUrl.startsWith("/assets/products/")
+      ? originalProductImageUrl
+      : (mappedProductImageUrl || originalProductImageUrl || "");
   const [form, setForm] = useState({
     id: product?.id,
     name: product?.name || "",
@@ -430,7 +436,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     compareAtPrice: product?.compareAtPrice ? String(product.compareAtPrice) : "",
     description: "",
     shortDescription: product?.shortDescription || "",
-    imageUrl: product?.imageUrl || "",
+    imageUrl: initialLockedImageUrl,
     inStock: product?.inStock ?? true,
     stockQuantity: product?.stockQuantity ?? 100,
     isFeatured: false,
@@ -477,9 +483,9 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
   const initialPreviewType: PreviewProductType =
     (product?.previewType as PreviewProductType) ||
-    (makeSlug(product?.slug || product?.name || "") === "gift-card" || String(product?.imageUrl || "").toLowerCase().includes("gift-card") ? "gift-card" :
-      product?.imageUrl?.includes("/api/vial/") ? "vial" : "");
+    (makeSlug(product?.slug || product?.name || "") === "gift-card" || String(initialLockedImageUrl || "").toLowerCase().includes("gift-card") ? "gift-card" : "");
   const [previewType, setPreviewType] = useState<PreviewProductType>(initialPreviewType);
+  const [lockedOriginalImageUrl] = useState(initialLockedImageUrl);
   const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
   const [linkingPreview, setLinkingPreview] = useState(false);
   const [imageAssets, setImageAssets] = useState<Array<{ name: string; url: string }>>([]);
@@ -550,7 +556,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       const slug = autoSlug || makeSlug(form.slug || form.name || "preview-product");
       updateField("imageUrl", blankPreviewSrc(nextType, slug, form.name || "Preview Product", form.size));
     } else if (form.imageUrl?.startsWith("/api/vial/") || form.imageUrl?.startsWith("/assets/lotion-bottle-blank") || form.imageUrl?.startsWith("/assets/face-mask-blank") || form.imageUrl?.includes("Gift-Card.png")) {
-      updateField("imageUrl", "");
+      updateField("imageUrl", lockedOriginalImageUrl || "");
     }
   };
 

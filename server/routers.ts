@@ -123,12 +123,15 @@ function productAssetForDisplay(input: { slug?: string | null; name?: string | n
 
 function preserveManusImage(product: any): any {
   if (!product) return product;
+  const mappedImage = productAssetForDisplay(product);
   if (!isNonVialProduct(product)) {
+    if (mappedImage && shouldReplaceVialImage(product, product.imageUrl)) {
+      return { ...product, imageUrl: mappedImage };
+    }
     return shouldReplaceVialImage(product, product.imageUrl)
       ? { ...product, imageUrl: generatedVialUrlForProduct(product) }
       : product;
   }
-  const mappedImage = productAssetForDisplay(product);
   if (mappedImage && shouldReplaceGeneratedImage(product.imageUrl)) {
     return { ...product, imageUrl: mappedImage };
   }
@@ -685,11 +688,23 @@ export const appRouter = router({
         regenerateVial: z.boolean().optional(),
       })).mutation(async ({ input }) => {
         const { id, categoryIds, variants, researchDraft, regenerateVial, ...rawData } = input;
+        const existingProduct = await db.getProductById(id);
         const data = normalizeAdminProductInput(rawData);
-        const mappedImage = productAssetForInput(data);
-        if (!isNonVialProduct(data)) {
-          if (regenerateVial || shouldReplaceVialImage(data, data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
-        } else if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
+        const incomingImage = String(data.imageUrl || "");
+        const existingImage = String(existingProduct?.imageUrl || "");
+        const mappedImage = productAssetForInput(data) || productAssetForDisplay({ ...existingProduct, ...data });
+
+        if (regenerateVial) {
+          data.imageUrl = !isNonVialProduct(data)
+            ? (mappedImage || generatedVialUrlForProduct(data))
+            : (mappedImage || data.imageUrl || existingImage);
+        } else if (!incomingImage) {
+          data.imageUrl = existingImage || mappedImage || "";
+        } else if (!isNonVialProduct(data) && shouldReplaceVialImage(data, incomingImage)) {
+          // Prevent edit screens from accidentally saving a blank/generated preview over
+          // an established product image. Use the product-specific asset when available.
+          data.imageUrl = mappedImage || existingImage || generatedVialUrlForProduct(data);
+        } else if (mappedImage && shouldReplaceGeneratedImage(incomingImage)) {
           data.imageUrl = mappedImage;
         }
         await db.updateProduct(id, data as any, categoryIds);
