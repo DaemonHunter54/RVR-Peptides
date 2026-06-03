@@ -190,7 +190,7 @@ export default function ProductDetail() {
       <Navbar />
 
       {/* Breadcrumb */}
-      <div className="bg-slate-50 border-b border-slate-100">
+      <div className="relative z-30 bg-slate-50 border-b border-slate-100">
         <div className="container py-3">
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <Link href="/" className="hover:text-blue-600">Home</Link>
