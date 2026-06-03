@@ -561,6 +561,23 @@ async function disableFeaturedProductsOnce(conn) {
   );
   console.log("[DB init] Disabled featured product flags once.");
 }
+async function clearProductDescriptionsAndFeaturedOnce(conn) {
+  const cleanupKey = "product_descriptions_cleared_featured_off_2026_06_02";
+  const [existing] = await conn.execute(
+    `SELECT id FROM siteSettings WHERE settingKey = ? LIMIT 1`,
+    [cleanupKey]
+  );
+  if (existing.length) return;
+  await conn.execute(`UPDATE products SET description = '', isFeatured = false`);
+  await conn.execute(
+    `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE settingValue = settingValue`,
+    [cleanupKey, "true", "boolean", "Product Descriptions Cleared and Featured Disabled", "general"]
+  );
+  console.log("[DB init] Cleared product descriptions and disabled featured flags once.");
+}
+
 async function ensureDatabaseReady() {
   if (initialized) return;
   if (initPromise) return initPromise;
@@ -586,6 +603,7 @@ async function ensureDatabaseReady() {
       await ensureDefaultSiteSettings(conn);
       await clearLegacyResearchDefaultsOnce(conn);
       await disableFeaturedProductsOnce(conn);
+      await clearProductDescriptionsAndFeaturedOnce(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
       console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");

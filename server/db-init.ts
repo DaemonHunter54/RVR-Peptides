@@ -1031,6 +1031,31 @@ async function disableFeaturedProductsOnce(conn: mysql.Connection) {
 }
 
 
+async function clearProductDescriptionsAndFeaturedOnce(conn: mysql.Connection) {
+  // One-time cleanup requested by admin: clear pre-filled product descriptions
+  // and start all products with Featured disabled. This does not overwrite
+  // future admin-entered descriptions after the cleanup flag exists.
+  const cleanupKey = "product_descriptions_cleared_featured_off_2026_06_02";
+  const [existing] = await conn.execute<RowDataPacket[]>(
+    `SELECT id FROM siteSettings WHERE settingKey = ? LIMIT 1`,
+    [cleanupKey]
+  );
+
+  if (existing.length) return;
+
+  await conn.execute(`UPDATE products SET description = '', isFeatured = false`);
+
+  await conn.execute(
+    `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE settingValue = settingValue`,
+    [cleanupKey, "true", "boolean", "Product Descriptions Cleared and Featured Disabled", "general"]
+  );
+
+  console.log("[DB init] Cleared product descriptions and disabled featured flags once.");
+}
+
+
 export async function ensureDatabaseReady() {
   if (initialized) return;
   if (initPromise) return initPromise;
@@ -1058,6 +1083,7 @@ export async function ensureDatabaseReady() {
       await ensureDefaultSiteSettings(conn);
       await clearLegacyResearchDefaultsOnce(conn);
       await disableFeaturedProductsOnce(conn);
+      await clearProductDescriptionsAndFeaturedOnce(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
       console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");

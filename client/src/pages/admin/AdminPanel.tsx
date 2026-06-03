@@ -472,8 +472,8 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     researchContent: string;
     citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
   }>({ description: "", chemicalMakeup: "", researchContent: "", citations: [] });
-  const [showTestingDocuments, setShowTestingDocuments] = useState(Boolean(product?.coaUrl || product?.hplcUrl || product?.massSpecUrl));
-  const [showSpecifications, setShowSpecifications] = useState(Boolean(product?.purity || product?.contents || product?.form || product?.molecularFormula || product?.molecularWeight || product?.otherNames));
+  const [showTestingDocuments, setShowTestingDocuments] = useState(false);
+  const [showSpecifications, setShowSpecifications] = useState(false);
 
   const initialPreviewType: PreviewProductType =
     (product?.previewType as PreviewProductType) ||
@@ -795,7 +795,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
                 <div className="flex items-center gap-5 flex-wrap pb-2">
                   <div className="flex items-center gap-2"><Switch checked={form.discountActive} onCheckedChange={(v) => updateField("discountActive", v)} /><Label>Discount Active</Label></div>
                   <div className="flex items-center gap-2"><Switch checked={form.inStock} onCheckedChange={(v) => updateField("inStock", v)} /><Label>In Stock</Label></div>
-                  <div className="flex items-center gap-2"><Switch checked={false} disabled /><Label className="text-slate-400">Featured</Label></div>
+                  <div className="flex items-center gap-2"><Switch checked={form.isFeatured} onCheckedChange={(v) => updateField("isFeatured", v)} /><Label>Featured</Label></div>
                   <div className="flex items-center gap-2"><Switch checked={form.isActive} onCheckedChange={(v) => updateField("isActive", v)} /><Label>Active</Label></div>
                 </div>
               </div>
@@ -1113,6 +1113,10 @@ function ResearchCitationsEditor({
   const [gettingResearchDetails, setGettingResearchDetails] = useState(false);
 
   useEffect(() => {
+    // Do not repopulate research text while the admin is actively editing.
+    // Citation deletes/refetches should not restore text the admin just cleared.
+    if (researchChanged) return;
+
     if (research) {
       setOverview(research.overview || "");
       setChemicalMakeup(research.chemicalMakeup || "");
@@ -1124,7 +1128,7 @@ function ResearchCitationsEditor({
       setResearchContent("");
       setResearchChanged(false);
     }
-  }, [research]);
+  }, [research, researchChanged]);
 
   useEffect(() => {
     onDraftChange?.({
@@ -1238,7 +1242,7 @@ function ResearchCitationsEditor({
               <div className="md:col-span-2"><Label className="text-xs">Summary</Label><Textarea value={newCitation.summary} onChange={(e) => setNewCitation(p => ({ ...p, summary: e.target.value }))} className="mt-1 text-sm" rows={2} placeholder="Brief summary of findings" /></div>
             </div>
             <div className="flex gap-2 mt-3">
-              <Button size="sm" onClick={() => { addCitation.mutate({ productId, ...newCitation }); setShowAddCitation(false); setNewCitation({ citationNumber: citations.length + 2, title: "", authors: "", journal: "", year: "", url: "", summary: "" }); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-1" disabled={!newCitation.title}>
+              <Button size="sm" onClick={() => { setResearchChanged(true); addCitation.mutate({ productId, ...newCitation }); setShowAddCitation(false); setNewCitation({ citationNumber: citations.length + 2, title: "", authors: "", journal: "", year: "", url: "", summary: "" }); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-1" disabled={!newCitation.title}>
                 <Save className="h-3.5 w-3.5" /> Save Citation
               </Button>
               <Button size="sm" variant="outline" onClick={() => setShowAddCitation(false)}>Cancel</Button>
@@ -1254,7 +1258,7 @@ function ResearchCitationsEditor({
 
         <div className="space-y-3">
           {citations.map((cit: any) => (
-            <CitationRow key={cit.id} citation={cit} onUpdate={(data: any) => updateCitation.mutate(data)} onDelete={() => { if (confirm("Delete this citation?")) deleteCitation.mutate({ id: cit.id }); }} />
+            <CitationRow key={cit.id} citation={cit} onUpdate={(data: any) => { setResearchChanged(true); updateCitation.mutate(data); }} onDelete={() => { if (confirm("Delete this citation?")) { setResearchChanged(true); deleteCitation.mutate({ id: cit.id }); } }} />
           ))}
         </div>
       </div>
