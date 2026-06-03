@@ -136,6 +136,11 @@ export default function ProductDetail() {
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
   const displayImageUrl = productImageUrl(product, activeVariant) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`;
   const isStorageContainer = makeProductSlug(product.slug || product.name) === "3ml-storage-container";
+  const imageOffsetClass = isGiftCard
+    ? "mt-8 lg:mt-14"
+    : isStorageContainer
+      ? "mt-0 lg:mt-0"
+      : "-mt-8 lg:-mt-14";
   const giftCardRange = isGiftCard ? formatGiftCardMinimum(product.price) : "";
   const shouldOverlayGiftCardRange = isGiftCard && giftCardRange && String(displayImageUrl || "").includes("Gift-Card.png");
 
@@ -207,8 +212,8 @@ export default function ProductDetail() {
         {/* Product Main Section */}
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 mb-6 items-start">
           {/* Image */}
-          <div className={`rounded-2xl px-8 pb-4 pt-0 lg:px-12 lg:pb-6 lg:pt-0 flex items-start justify-center ${isStorageContainer ? "mt-0 lg:mt-0" : "-mt-8 lg:-mt-14"}`}>
-            <div className="relative inline-flex w-full max-w-md">
+          <div className={`rounded-2xl px-8 pb-4 pt-0 lg:px-12 lg:pb-6 lg:pt-0 flex items-start justify-center ${imageOffsetClass}`}>
+            <div className={`relative inline-flex w-full ${isGiftCard ? "max-w-lg" : "max-w-md"}`}>
               <img
                 src={displayImageUrl}
                 alt={product.name}
