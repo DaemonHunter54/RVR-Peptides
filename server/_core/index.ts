@@ -295,7 +295,11 @@ function rankedSources(sources: ResearchSource[]): ResearchSource[] {
       return true;
     })
     .sort((a, b) => (priority[a.database] || 99) - (priority[b.database] || 99))
-    .slice(0, 3);
+    ;
+}
+
+function chooseSourceCount(): number {
+  return 3 + Math.floor(Math.random() * 3);
 }
 
 function ensureThreeSources(sources: ResearchSource[], peptideName: string): ResearchSource[] {
@@ -321,7 +325,7 @@ function ensureThreeSources(sources: ResearchSource[], peptideName: string): Res
       supports: "Public chemistry identifier and property search when an exact compound record is available.",
     },
   ];
-  return rankedSources([...base, ...fallbacks]).slice(0, 3);
+  return rankedSources([...base, ...fallbacks]).slice(0, chooseSourceCount());
 }
 
 async function getResearchCacheConnection(): Promise<mysql.Connection | null> {
@@ -669,8 +673,6 @@ function buildResearchBlock(peptideName: string, abstracts: string[], notes: str
   const snippets = abstracts.join("\n\n").replace(/\s+/g, " ").trim();
   const noteText = notes.length ? `Additional database context: ${notes.join("; ")}.` : "";
   return [
-    `Research summary for ${peptideName}`,
-    "",
     snippets
       ? snippets.slice(0, 4200)
       : `${peptideName} currently has limited exact-name abstract text available through the queried public databases. The available source records should be used to confirm compound identity, chemistry, and literature relevance before publishing detailed mechanism-specific claims.`,
@@ -763,7 +765,7 @@ function researchDetailsToLegacyResponse(details: ResearchDetailsResult) {
     description: details.description_block,
     chemicalMakeup: details.chemical_makeup_block,
     researchContent: details.research_block,
-    citations: details.sources.slice(0, 3).map((source, index) => ({
+    citations: details.sources.map((source, index) => ({
       title: source.title,
       authors: source.authors || "",
       journal: source.database || source.journal || "",

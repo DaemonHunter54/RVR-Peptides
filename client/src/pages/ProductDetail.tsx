@@ -64,7 +64,7 @@ export default function ProductDetail() {
     const tabs: { id: string; label: string }[] = [];
     // Description tab shows only when this product has visible product/research content.
     if (product.description || product.research?.overview || product.research?.researchContent) {
-      tabs.push({ id: "description", label: "Description" });
+      tabs.push({ id: "research", label: "Research" });
     }
     if (product.coaUrl) {
       tabs.push({ id: "coa", label: "CoA" });
@@ -396,7 +396,7 @@ export default function ProductDetail() {
             {/* Tab Content */}
             <div className="pt-8">
               {/* Description Tab */}
-              {activeTab === "description" && (
+              {activeTab === "research" && (
                 <div className="prose prose-slate max-w-none">
                   {/* Overview */}
                   {product.research?.overview && (
@@ -405,14 +405,6 @@ export default function ProductDetail() {
                       <div className="text-slate-600 leading-relaxed whitespace-pre-line">
                         {product.research.overview}
                       </div>
-                    </div>
-                  )}
-
-                  {/* If no research overview, show the basic description */}
-                  {!product.research?.overview && product.description && (
-                    <div className="mb-8">
-                      <h2 className="text-xl font-bold text-slate-900 mb-4">Overview</h2>
-                      <p className="text-slate-600 leading-relaxed">{product.description}</p>
                     </div>
                   )}
 

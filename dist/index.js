@@ -343,6 +343,7 @@ function isGeneratedOrFallbackImage(value) {
   if (!image) return true;
   return image.startsWith("/api/vial/") || image.includes("generated-vials/") || image.includes("rvr-vial-template-single") || image.includes("/vials/") || image.includes("placeholder") || image.startsWith("/assets/") && !localAssetExists(image);
 }
+async function ensureDescriptionsHiddenAndFeaturedDefaults(conn){await conn.execute(`UPDATE products SET description = '', isFeatured = false`);await conn.execute(`UPDATE productResearch SET researchContent = TRIM(REPLACE(REPLACE(researchContent, CONCAT('Research summary for ', COALESCE((SELECT name FROM products WHERE products.id = productResearch.productId), '')), ''), 'Research summary for', '')) WHERE researchContent LIKE '%Research summary for%'`)}
 async function ensureProductDisplayData(conn) {
   const [rows] = await conn.execute(
     `SELECT id, name, slug, price, imageUrl, size, contents, form, isActive, sortOrder FROM products ORDER BY sortOrder ASC, id ASC`

@@ -741,6 +741,11 @@ async function ensureNihResearchDescriptions(conn: mysql.Connection) {
 }
 
 
+async function ensureDescriptionsHiddenAndFeaturedDefaults(conn: mysql.Connection) {
+  await conn.execute(`UPDATE products SET description = '', isFeatured = false`);
+  await conn.execute(`UPDATE productResearch SET researchContent = TRIM(REPLACE(REPLACE(researchContent, CONCAT('Research summary for ', COALESCE((SELECT name FROM products WHERE products.id = productResearch.productId), '')), ''), 'Research summary for', '')) WHERE researchContent LIKE '%Research summary for%'`);
+}
+
 async function ensureProductDisplayData(conn: mysql.Connection) {
   const [rows] = await conn.execute<RowDataPacket[]>(
     `SELECT id, name, slug, price, imageUrl, size, contents, form, isActive, sortOrder FROM products ORDER BY sortOrder ASC, id ASC`

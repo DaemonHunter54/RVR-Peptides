@@ -343,7 +343,7 @@ async function requestResearchDetails(payload: {
     }
   }
   const details = await response.json();
-  const sources = Array.isArray(details.sources) ? details.sources.slice(0, 3) : [];
+  const sources = Array.isArray(details.sources) ? details.sources : [];
   return {
     description: details.description_block || details.description || "",
     chemicalMakeup: details.chemical_makeup_block || details.chemicalMakeup || "",
@@ -428,7 +428,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     sku: product?.sku || "",
     price: product?.price ? String(product.price) : "",
     compareAtPrice: product?.compareAtPrice ? String(product.compareAtPrice) : "",
-    description: product?.description || "",
+    description: "",
     shortDescription: product?.shortDescription || "",
     imageUrl: product?.imageUrl || "",
     inStock: product?.inStock ?? true,
@@ -813,18 +813,6 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               />
             </div>
 
-            {!isGiftCardTemplate && (
-              <div className="xl:col-span-2">
-                <Label>Product Description</Label>
-                <Textarea
-                  value={form.description}
-                  onChange={(e) => updateField("description", e.target.value)}
-                  className="mt-1.5"
-                  rows={8}
-                  placeholder="Product overview, mechanism of action, research interest, key research areas, and investigated scientific benefits..."
-                />
-              </div>
-            )}
 
             <div className="xl:col-span-2">
               <h2 className="font-semibold text-slate-800 mb-4">Categories</h2>
@@ -949,12 +937,10 @@ function DraftResearchEditor({
     setGettingResearchDetails(true);
     try {
       const details = await requestResearchDetails({ peptideName: name });
-      onDescriptionChange?.(details.description || "");
       onChange({
-        description: details.description || "",
         chemicalMakeup: details.chemicalMakeup || "",
         researchContent: details.researchContent || "",
-        citations: Array.isArray(details.citations) ? details.citations.slice(0, 3) : [],
+        citations: Array.isArray(details.citations) ? details.citations : [],
       });
       toast.success("Research details added.");
     } catch (error: any) {
