@@ -20,6 +20,14 @@ const NON_VIAL_TERMS = [
 ];
 
 export function isNonVialProduct(product: any): boolean {
+  const slug = String(product?.slug || "").toLowerCase();
+
+  // BPC-157 is a vial product. Only the separate capsules SKU should ever use
+  // the capsule bottle artwork. This prevents grouped/multi-dose BPC-157 cards
+  // from inheriting a capsule image through saved DB imageUrl or variant data.
+  if (slug === "bpc-157") return false;
+  if (slug === "bpc-157-capsules-500mcg-30") return true;
+
   const text = [product?.slug, product?.name, product?.form, product?.category, ...(product?.categories || []).map((c: any) => c?.name)]
     .filter(Boolean)
     .join(" ")
@@ -219,6 +227,13 @@ export function productImageUrl(product: any, variant?: any): string {
   const explicitImage = explicitVariantImage || explicitProductImage;
 
   const nonVial = isNonVialProduct(product);
+
+  // Force the grouped/multiple-dose BPC-157 product to remain an HD vial.
+  // The capsule bottle belongs only to bpc-157-capsules-500mcg-30.
+  if (slug === "bpc-157") {
+    const variantLabel = variant?.label ? String(variant.label) : "";
+    return generatedVialUrl(product?.slug || "bpc-157", product?.name || "BPC-157", variantLabel || product?.size || "");
+  }
 
   // User/admin-selected images are the source of truth. Do not replace them
   // with generated or cached template assets on product cards or detail pages.

@@ -460,6 +460,9 @@ function assetByProduct(row: RowDataPacket): string | undefined {
   const normalizedSlug = slugifyValue(slug);
   const normalizedName = slugifyValue(name);
   for (const [assetSlug, assetPath] of getLocalAssetMap().entries()) {
+    // Do not let capsule bottle assets satisfy vial/grouped products.
+    // Example: bpc-157 must stay an HD vial; only the explicit capsules slug can use bottle art.
+    if (!rowIsNonVialProduct(row) && /capsule|capsules/i.test(assetSlug)) continue;
     if (assetSlug === normalizedSlug || assetSlug === normalizedName) return assetPath;
     if (normalizedSlug && assetSlug.startsWith(`${normalizedSlug}-`)) return assetPath;
     if (normalizedName && assetSlug.startsWith(`${normalizedName}-`)) return assetPath;
@@ -477,6 +480,10 @@ function localAssetExists(image: string) {
 const NON_VIAL_TERMS = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
 
 function rowIsNonVialProduct(row: RowDataPacket): boolean {
+  const slug = slugifyValue(String(row.slug || ""));
+  if (slug === "bpc-157") return false;
+  if (slug === "bpc-157-capsules-500mcg-30") return true;
+
   const text = [row.slug, row.name, row.form, row.category]
     .filter(Boolean)
     .join(" ")

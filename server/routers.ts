@@ -42,6 +42,10 @@ function getProductAssetMap(): Map<string, string> {
 
 const NON_VIAL_TERMS = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
 function isNonVialProduct(input: { slug?: string | null; name?: string | null; form?: string | null; category?: string | null; categories?: any[] | null }): boolean {
+  const slug = makeProductSlug(input.slug || "");
+  if (slug === "bpc-157") return false;
+  if (slug === "bpc-157-capsules-500mcg-30") return true;
+
   const text = [input.slug, input.name, input.form, input.category, ...(input.categories || []).map((c: any) => c?.name)]
     .filter(Boolean)
     .join(" ")
@@ -108,7 +112,13 @@ function productAssetForDisplay(input: { slug?: string | null; name?: string | n
   for (const baseKey of baseKeys) {
     if (sizeKey && assets.has(`${baseKey}-${sizeKey}`)) return assets.get(`${baseKey}-${sizeKey}`)!;
     const matches = Array.from(assets.entries())
-      .filter(([key]) => key === baseKey || key.startsWith(`${baseKey}-`))
+      .filter(([key]) => {
+        if (!(key === baseKey || key.startsWith(`${baseKey}-`))) return false;
+        // Do not let capsule bottle assets satisfy vial/grouped products.
+        // Example: bpc-157 must stay an HD vial; only the explicit capsules slug can use bottle art.
+        if (!isNonVialProduct(input) && /capsule|capsules/i.test(key)) return false;
+        return true;
+      })
       .sort(([a], [b]) => {
         const aCaps = a.includes("capsule");
         const bCaps = b.includes("capsule");

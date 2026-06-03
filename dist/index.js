@@ -297,12 +297,12 @@ function assetBySlug(slug) {
   return getLocalAssetMap().get(normalized);
 }
 const CRITICAL_PRODUCT_IMAGE_REPAIRS = {
-  "5-amino-1mq": "/assets/5-amino-1mq-50mg_06697bbc.webp",
-  "5-amino-1mq-50mg": "/assets/5-amino-1mq-50mg_06697bbc.webp",
-  "bpc-157": "/assets/bpc-157-5mg_1e10350a.webp",
-  "bpc-157-5mg": "/assets/bpc-157-5mg_1e10350a.webp",
-  "glp-1-semaglutide": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
-  "glp-1-semaglutide-5mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp"
+  "5-amino-1mq": "",
+  "5-amino-1mq-50mg": "",
+  "bpc-157": "",
+  "bpc-157-5mg": "",
+  "glp-1-semaglutide": "",
+  "glp-1-semaglutide-5mg": ""
 };
 function criticalImageRepairAsset(row) {
   const slug = slugifyValue(String(row.slug || ""));
@@ -922,54 +922,54 @@ var init_db_init = __esm({
       ["giftCards", "lastUsedAt", "timestamp NULL"]
     ];
     DEFAULT_PRODUCTS = [
-      { slug: "bpc-157-5mg", name: "BPC-157 5mg", image: "/assets/bpc-157-5mg_1e10350a.webp", category: "Peptides", price: "39.99" },
-      { slug: "bpc-157-10mg", name: "BPC-157 10mg", image: "/assets/bpc-157-5mg_1e10350a.webp", category: "Peptides", price: "69.99" },
+      { slug: "bpc-157-5mg", name: "BPC-157 5mg", image: "", category: "Peptides", price: "39.99" },
+      { slug: "bpc-157-10mg", name: "BPC-157 10mg", image: "", category: "Peptides", price: "69.99" },
       { slug: "bpc-157-capsules-500mcg-30", name: "BPC-157 Capsules 500mcg (30)", image: "/assets/bpc-157-capsules-500mcg-30_hd.webp?v=4", category: "Peptides", price: "49.99" },
       { slug: "tb-500", name: "TB-500", image: "/api/vial/tb-500.png?name=TB-500&v=rvr-photoreal-adaptive-fit-v1", category: "Peptides", price: "49.99" },
-      { slug: "cagrilintide-5mg", name: "Cagrilintide 5mg", image: "/assets/cagrilintide-5mg_f51eb3cf.webp", category: "Peptides", price: "99.99" },
-      { slug: "cagrilintide-semaglutide-5mg-5mg", name: "Cagrilintide/Semaglutide 5mg/5mg", image: "/assets/cagrilintide-semaglutide-5mg-5mg_7655c129.webp", category: "Blends", price: "129.99" },
-      { slug: "cjc-1295-no-dac-ipamorelin-5mg-5mg", name: "CJC-1295 No DAC/Ipamorelin 5mg/5mg", image: "/assets/cjc-1295-no-dac-ipamorelin-5mg-5mg_446f4b27.webp", category: "Blends", price: "79.99" },
-      { slug: "dsip-5mg", name: "DSIP 5mg", image: "/assets/dsip-5mg_72b0cefc.webp", category: "Peptides", price: "39.99" },
-      { slug: "epithalon-10mg", name: "Epithalon 10mg", image: "/assets/epithalon-10mg_dc0b8639.webp", category: "Peptides", price: "49.99" },
-      { slug: "ghk-cu-50mg", name: "GHK-Cu 50mg", image: "/assets/ghk-cu-50mg_274d06be.webp", category: "Peptides", price: "59.99" },
-      { slug: "glp-1-semaglutide-5mg", name: "GLP-1 Semaglutide 5mg", image: "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp", category: "Peptides", price: "89.99" },
-      { slug: "glp-1-semaglutide-10mg", name: "GLP-1 Semaglutide 10mg", image: "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp", category: "Peptides", price: "149.99" },
-      { slug: "kisspeptin-10mg", name: "Kisspeptin 10mg", image: "/assets/kisspeptin-10mg_55d055de.webp", category: "Peptides", price: "49.99" },
-      { slug: "kpv-10mg", name: "KPV 10mg", image: "/assets/kpv-10mg_87cf383a.webp", category: "Peptides", price: "44.99" },
-      { slug: "mazdutide-5mg", name: "Mazdutide 5mg", image: "/assets/mazdutide-5mg_6985cdd3.webp", category: "Peptides", price: "99.99" },
-      { slug: "melanotan-1-10mg", name: "Melanotan 1 10mg", image: "/assets/melanotan-1-10mg_a80a33e8.webp", category: "Peptides", price: "39.99" },
-      { slug: "melanotan-2-10mg", name: "Melanotan 2 10mg", image: "/assets/melanotan-2-10mg_be5b73dc.webp", category: "Peptides", price: "39.99" },
-      { slug: "mots-c-5mg", name: "MOTS-c 5mg", image: "/assets/mots-c-5mg_35dd3374.webp", category: "Peptides", price: "49.99" },
-      { slug: "mots-c-10mg", name: "MOTS-c 10mg", image: "/assets/mots-c-5mg_35dd3374.webp", category: "Peptides", price: "79.99" },
-      { slug: "nad-500mg", name: "NAD+ 500mg", image: "/assets/nad-500mg_d3520d40.webp", category: "Wellness", price: "79.99" },
-      { slug: "nad-1000mg", name: "NAD+ 1000mg", image: "/assets/nad-500mg_d3520d40.webp", category: "Wellness", price: "129.99" },
-      { slug: "oxytocin-acetate-5mg", name: "Oxytocin Acetate 5mg", image: "/assets/oxytocin-acetate-5mg_930aff12.webp", category: "Peptides", price: "39.99" },
-      { slug: "pe-22-28-10mg", name: "PE-22-28 10mg", image: "/assets/pe-22-28-10mg_4ae32cc2.webp", category: "Peptides", price: "49.99" },
-      { slug: "pinealon-20mg", name: "Pinealon 20mg", image: "/assets/pinealon-20mg_9c886336.webp", category: "Peptides", price: "49.99" },
-      { slug: "pt-141-10mg", name: "PT-141 10mg", image: "/assets/pt-141-10mg_15229f16.webp", category: "Peptides", price: "44.99" },
-      { slug: "retatrutide-5mg", name: "Retatrutide 5mg", image: "/assets/retatrutide-5mg_16793f06.webp", category: "Peptides", price: "99.99" },
-      { slug: "retatrutide-15mg", name: "Retatrutide 15mg", image: "/assets/retatrutide-5mg_16793f06.webp", category: "Peptides", price: "199.99" },
-      { slug: "selank-10mg", name: "Selank 10mg", image: "/assets/selank-10mg_ec5aa57c.webp", category: "Peptides", price: "39.99" },
-      { slug: "selank-semax-blend-10mg-10mg", name: "Selank/Semax Blend 10mg/10mg", image: "/assets/selank-semax-blend-10mg-10mg_f9249ead.webp", category: "Blends", price: "69.99" },
-      { slug: "semax-10mg", name: "Semax 10mg", image: "/assets/semax-10mg_24238dd4.webp", category: "Peptides", price: "39.99" },
-      { slug: "sermorelin-10mg", name: "Sermorelin 10mg", image: "/assets/sermorelin-10mg_92bb2dc6.webp", category: "Peptides", price: "49.99" },
-      { slug: "ss-31-30mg", name: "SS-31 30mg", image: "/assets/ss-31-30mg_d6fe070b.webp", category: "Peptides", price: "89.99" },
-      { slug: "super-wolf-10mg-10mg-10mg", name: "Super Wolf 10mg/10mg/10mg", image: "/assets/super-wolf-10mg-10mg-10mg_4bc7be3f.webp", category: "Blends", price: "99.99" },
-      { slug: "survodutide-5mg", name: "Survodutide 5mg", image: "/assets/survodutide-5mg_1d1a18da.webp", category: "Peptides", price: "99.99" },
-      { slug: "tesamorelin-10mg", name: "Tesamorelin 10mg", image: "/assets/tesamorelin-10mg_15b1bd0e.webp", category: "Peptides", price: "89.99" },
-      { slug: "thymosin-alpha-1-10mg", name: "Thymosin Alpha-1 10mg", image: "/assets/thymosin-alpha-1-10mg_1be0818b.webp", category: "Peptides", price: "49.99" },
-      { slug: "tirzepatide-5mg", name: "Tirzepatide 5mg", image: "/assets/tirzepatide-5mg_3d0c0d8c.webp", category: "Peptides", price: "99.99" },
-      { slug: "tirzepatide-15mg", name: "Tirzepatide 15mg", image: "/assets/tirzepatide-5mg_3d0c0d8c.webp", category: "Peptides", price: "199.99" },
-      { slug: "wolverine-blend-20mg", name: "Wolverine Blend 20mg", image: "/assets/wolverine-blend-20mg_5d66e1ac.webp", category: "Blends", price: "89.99" },
-      { slug: "5-amino-1mq-50mg", name: "5-Amino-1MQ 50mg", image: "/assets/5-amino-1mq-50mg_06697bbc.webp", category: "Peptides", price: "59.99" },
-      { slug: "bacteriostatic-water-10ml", name: "Bacteriostatic Water 10ml", image: "/assets/bacteriostatic-water-10ml_764a84d1.webp", category: "Reconstitution", price: "9.99" },
-      { slug: "bacteriostatic-water-30ml", name: "Bacteriostatic Water 30ml", image: "/assets/bacteriostatic-water-10ml_764a84d1.webp", category: "Reconstitution", price: "14.99" },
-      { slug: "hospira-bacteriostatic-water-30ml", name: "Hospira Bacteriostatic Water 30ml", image: "/assets/bacteriostatic-water-10ml_764a84d1.webp", category: "Reconstitution", price: "19.99" },
+      { slug: "cagrilintide-5mg", name: "Cagrilintide 5mg", image: "", category: "Peptides", price: "99.99" },
+      { slug: "cagrilintide-semaglutide-5mg-5mg", name: "Cagrilintide/Semaglutide 5mg/5mg", image: "", category: "Blends", price: "129.99" },
+      { slug: "cjc-1295-no-dac-ipamorelin-5mg-5mg", name: "CJC-1295 No DAC/Ipamorelin 5mg/5mg", image: "", category: "Blends", price: "79.99" },
+      { slug: "dsip-5mg", name: "DSIP 5mg", image: "", category: "Peptides", price: "39.99" },
+      { slug: "epithalon-10mg", name: "Epithalon 10mg", image: "", category: "Peptides", price: "49.99" },
+      { slug: "ghk-cu-50mg", name: "GHK-Cu 50mg", image: "", category: "Peptides", price: "59.99" },
+      { slug: "glp-1-semaglutide-5mg", name: "GLP-1 Semaglutide 5mg", image: "", category: "Peptides", price: "89.99" },
+      { slug: "glp-1-semaglutide-10mg", name: "GLP-1 Semaglutide 10mg", image: "", category: "Peptides", price: "149.99" },
+      { slug: "kisspeptin-10mg", name: "Kisspeptin 10mg", image: "", category: "Peptides", price: "49.99" },
+      { slug: "kpv-10mg", name: "KPV 10mg", image: "", category: "Peptides", price: "44.99" },
+      { slug: "mazdutide-5mg", name: "Mazdutide 5mg", image: "", category: "Peptides", price: "99.99" },
+      { slug: "melanotan-1-10mg", name: "Melanotan 1 10mg", image: "", category: "Peptides", price: "39.99" },
+      { slug: "melanotan-2-10mg", name: "Melanotan 2 10mg", image: "", category: "Peptides", price: "39.99" },
+      { slug: "mots-c-5mg", name: "MOTS-c 5mg", image: "", category: "Peptides", price: "49.99" },
+      { slug: "mots-c-10mg", name: "MOTS-c 10mg", image: "", category: "Peptides", price: "79.99" },
+      { slug: "nad-500mg", name: "NAD+ 500mg", image: "", category: "Wellness", price: "79.99" },
+      { slug: "nad-1000mg", name: "NAD+ 1000mg", image: "", category: "Wellness", price: "129.99" },
+      { slug: "oxytocin-acetate-5mg", name: "Oxytocin Acetate 5mg", image: "", category: "Peptides", price: "39.99" },
+      { slug: "pe-22-28-10mg", name: "PE-22-28 10mg", image: "", category: "Peptides", price: "49.99" },
+      { slug: "pinealon-20mg", name: "Pinealon 20mg", image: "", category: "Peptides", price: "49.99" },
+      { slug: "pt-141-10mg", name: "PT-141 10mg", image: "", category: "Peptides", price: "44.99" },
+      { slug: "retatrutide-5mg", name: "Retatrutide 5mg", image: "", category: "Peptides", price: "99.99" },
+      { slug: "retatrutide-15mg", name: "Retatrutide 15mg", image: "", category: "Peptides", price: "199.99" },
+      { slug: "selank-10mg", name: "Selank 10mg", image: "", category: "Peptides", price: "39.99" },
+      { slug: "selank-semax-blend-10mg-10mg", name: "Selank/Semax Blend 10mg/10mg", image: "", category: "Blends", price: "69.99" },
+      { slug: "semax-10mg", name: "Semax 10mg", image: "", category: "Peptides", price: "39.99" },
+      { slug: "sermorelin-10mg", name: "Sermorelin 10mg", image: "", category: "Peptides", price: "49.99" },
+      { slug: "ss-31-30mg", name: "SS-31 30mg", image: "", category: "Peptides", price: "89.99" },
+      { slug: "super-wolf-10mg-10mg-10mg", name: "Super Wolf 10mg/10mg/10mg", image: "", category: "Blends", price: "99.99" },
+      { slug: "survodutide-5mg", name: "Survodutide 5mg", image: "", category: "Peptides", price: "99.99" },
+      { slug: "tesamorelin-10mg", name: "Tesamorelin 10mg", image: "", category: "Peptides", price: "89.99" },
+      { slug: "thymosin-alpha-1-10mg", name: "Thymosin Alpha-1 10mg", image: "", category: "Peptides", price: "49.99" },
+      { slug: "tirzepatide-5mg", name: "Tirzepatide 5mg", image: "", category: "Peptides", price: "99.99" },
+      { slug: "tirzepatide-15mg", name: "Tirzepatide 15mg", image: "", category: "Peptides", price: "199.99" },
+      { slug: "wolverine-blend-20mg", name: "Wolverine Blend 20mg", image: "", category: "Blends", price: "89.99" },
+      { slug: "5-amino-1mq-50mg", name: "5-Amino-1MQ 50mg", image: "", category: "Peptides", price: "59.99" },
+      { slug: "bacteriostatic-water-10ml", name: "Bacteriostatic Water 10ml", image: "", category: "Reconstitution", price: "9.99" },
+      { slug: "bacteriostatic-water-30ml", name: "Bacteriostatic Water 30ml", image: "", category: "Reconstitution", price: "14.99" },
+      { slug: "hospira-bacteriostatic-water-30ml", name: "Hospira Bacteriostatic Water 30ml", image: "", category: "Reconstitution", price: "19.99" },
       { slug: "reconstitution-kit", name: "Reconstitution Kit", image: "/assets/reconstitution-kit-hd.png", category: "Reconstitution", price: "24.99" },
-      { slug: "glutathione-1200mg", name: "Glutathione 1200mg", image: "/assets/glutathione-1200mg_e3e41ad9.webp", category: "Wellness", price: "79.99" },
-      { slug: "l-carnitine-300mg-ml-30ml", name: "L-Carnitine 300mg/ml 30ml", image: "/assets/l-carnitine-300mg-ml-30ml_a7fbf7c4.webp", category: "Wellness", price: "59.99" },
-      { slug: "vitamin-b-complex", name: "Vitamin B Complex", image: "/assets/vitamin-b-complex_75a8cb81.webp", category: "Wellness", price: "39.99" },
-      { slug: "vitamin-d-100-000-iu-ml", name: "Vitamin D 100,000 IU/ml", image: "/assets/vitamin-d-100-000-iu-ml_ee0dac38.webp", category: "Wellness", price: "39.99" },
+      { slug: "glutathione-1200mg", name: "Glutathione 1200mg", image: "", category: "Wellness", price: "79.99" },
+      { slug: "l-carnitine-300mg-ml-30ml", name: "L-Carnitine 300mg/ml 30ml", image: "", category: "Wellness", price: "59.99" },
+      { slug: "vitamin-b-complex", name: "Vitamin B Complex", image: "", category: "Wellness", price: "39.99" },
+      { slug: "vitamin-d-100-000-iu-ml", name: "Vitamin D 100,000 IU/ml", image: "", category: "Wellness", price: "39.99" },
       { slug: "curenex-daily-care-rejuvenating-cream", name: "Curenex Daily Care Rejuvenating Cream", image: "/assets/curenex-daily-care-rejuvenating-cream-hd-tube.png", category: "Skin Care", price: "49.99" },
       { slug: "curenex-daily-care-skin-booster", name: "Curenex Daily Care Skin Booster", image: "/assets/curenex-daily-care-skin-booster-hd-tube.png", category: "Skin Care", price: "59.99" },
       { slug: "curenex-hydrating-cleanser", name: "Curenex Hydrating Cleanser", image: "/assets/curenex-hydrating-cleanser-hd-tube.png", category: "Skin Care", price: "34.99" },
@@ -3002,6 +3002,9 @@ function getProductAssetMap() {
 }
 var NON_VIAL_TERMS2 = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
 function isNonVialProduct(input) {
+  const slug = makeProductSlug(input.slug || "");
+  if (slug === "bpc-157") return false;
+  if (slug === "bpc-157-capsules-500mcg-30") return true;
   const text2 = [input.slug, input.name, input.form, input.category, ...(input.categories || []).map((c) => c?.name)].filter(Boolean).join(" ").toLowerCase();
   return NON_VIAL_TERMS2.some((term) => text2.includes(term));
 }
@@ -3043,7 +3046,11 @@ function productAssetForDisplay(input) {
   const sizeKey = makeProductSlug(input.size || input.contents || "");
   for (const baseKey of baseKeys) {
     if (sizeKey && assets.has(`${baseKey}-${sizeKey}`)) return assets.get(`${baseKey}-${sizeKey}`);
-    const matches = Array.from(assets.entries()).filter(([key]) => key === baseKey || key.startsWith(`${baseKey}-`)).sort(([a], [b]) => {
+    const matches = Array.from(assets.entries()).filter(([key]) => {
+      if (!(key === baseKey || key.startsWith(`${baseKey}-`))) return false;
+      if (!isNonVialProduct(input) && /capsule|capsules/i.test(key)) return false;
+      return true;
+    }).sort(([a], [b]) => {
       const aCaps = a.includes("capsule");
       const bCaps = b.includes("capsule");
       if (aCaps !== bCaps) return aCaps ? 1 : -1;
