@@ -482,9 +482,9 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   const [showSpecifications, setShowSpecifications] = useState(false);
 
   const initialPreviewType: PreviewProductType =
-    (product?.previewType as PreviewProductType) ||
     (makeSlug(product?.slug || product?.name || "") === "gift-card" || String(initialLockedImageUrl || "").toLowerCase().includes("gift-card") ? "gift-card" : "");
   const [previewType, setPreviewType] = useState<PreviewProductType>(initialPreviewType);
+  const [templateChanged, setTemplateChanged] = useState(false);
   const [lockedOriginalImageUrl] = useState(initialLockedImageUrl);
   const isGiftCardTemplate = previewType === "gift-card" || makeSlug(form.name) === "gift-card";
   const [linkingPreview, setLinkingPreview] = useState(false);
@@ -536,6 +536,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   };
 
   const handlePreviewTypeChange = (value: string) => {
+    setTemplateChanged(true);
     const nextType = (value === "none" ? "" : value) as PreviewProductType;
     setPreviewType(nextType);
     if (nextType === "gift-card") {
@@ -647,7 +648,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
   const saveProduct = async () => {
     const slug = makeSlug(form.name || form.slug);
-    const linkedImageUrl = previewType ? (await linkPreviewToUrl()) : form.imageUrl;
+    const linkedImageUrl = previewType && (!product?.id || templateChanged) ? (await linkPreviewToUrl()) : form.imageUrl;
 
     const variants = (form.variants || [])
       .filter((v: any) => String(v.label || "").trim() || String(v.price || "").trim() || (!previewType && String(v.compareAtPrice || "").trim()))

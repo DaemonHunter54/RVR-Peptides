@@ -781,7 +781,17 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
     const currentImage = String(row.imageUrl || "");
 
     const exactAsset = exactAssetByProduct(row);
+    const criticalAsset = criticalImageRepairAsset(row);
     const repairAsset = exactAsset || assetByProduct(row);
+
+    // These specific catalog products were previously overwritten by edit-page
+    // blank vial previews. Always repair them to their product-specific artwork
+    // during startup so the database recovers after deploy/restart.
+    if (criticalAsset && currentImage !== criticalAsset) {
+      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [criticalAsset, row.id]);
+      row.imageUrl = criticalAsset;
+      continue;
+    }
 
     // Vial products with a bundled exact product image should be repaired to that
     // product-specific asset if a previous edit saved a blank/generated preview.

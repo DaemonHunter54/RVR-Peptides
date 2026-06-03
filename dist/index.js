@@ -301,8 +301,10 @@ const CRITICAL_PRODUCT_IMAGE_REPAIRS = {
   "5-amino-1mq-50mg": "/assets/5-amino-1mq-50mg_06697bbc.webp",
   "bpc-157": "/assets/bpc-157-5mg_1e10350a.webp",
   "bpc-157-5mg": "/assets/bpc-157-5mg_1e10350a.webp",
+  "bpc-157-10mg": "/assets/bpc-157-5mg_1e10350a.webp",
   "glp-1-semaglutide": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
-  "glp-1-semaglutide-5mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp"
+  "glp-1-semaglutide-5mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
+  "glp-1-semaglutide-10mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp"
 };
 function criticalImageRepairAsset(row) {
   const slug = slugifyValue(String(row.slug || ""));
@@ -367,7 +369,13 @@ async function ensureProductDisplayData(conn) {
   for (const row of rows) {
     const currentImage = String(row.imageUrl || "");
     const exactAsset = exactAssetByProduct(row);
+    const criticalAsset = criticalImageRepairAsset(row);
     const repairAsset = exactAsset || assetByProduct(row);
+    if (criticalAsset && currentImage !== criticalAsset) {
+      await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [criticalAsset, row.id]);
+      row.imageUrl = criticalAsset;
+      continue;
+    }
     if (!rowIsNonVialProduct(row)) {
       if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset(currentImage)) {
         const repairedVialUrl = repairAsset || generatedVialUrlForRow(row);
@@ -3013,7 +3021,24 @@ function generatedVialUrlForProduct(input) {
   params.set("v", "rvr-photoreal-adaptive-fit-v1");
   return `/api/vial/${slug}.png?${params.toString()}`;
 }
+const CRITICAL_PRODUCT_IMAGE_REPAIRS_ROUTER = {
+  "5-amino-1mq": "/assets/5-amino-1mq-50mg_06697bbc.webp",
+  "5-amino-1mq-50mg": "/assets/5-amino-1mq-50mg_06697bbc.webp",
+  "bpc-157": "/assets/bpc-157-5mg_1e10350a.webp",
+  "bpc-157-5mg": "/assets/bpc-157-5mg_1e10350a.webp",
+  "bpc-157-10mg": "/assets/bpc-157-5mg_1e10350a.webp",
+  "glp-1-semaglutide": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
+  "glp-1-semaglutide-5mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
+  "glp-1-semaglutide-10mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp"
+};
+function criticalImageRepairAssetForInput(input) {
+  const slugKey = makeProductSlug(input.slug || "");
+  const nameKey = makeProductSlug(input.name || "");
+  return CRITICAL_PRODUCT_IMAGE_REPAIRS_ROUTER[slugKey] || CRITICAL_PRODUCT_IMAGE_REPAIRS_ROUTER[nameKey] || "";
+}
 function productAssetForInput(input) {
+  const critical = criticalImageRepairAssetForInput(input);
+  if (critical) return critical;
   const assets = getProductAssetMap();
   const slugKey = makeProductSlug(input.slug || "");
   if (slugKey && assets.has(slugKey)) return assets.get(slugKey);
@@ -3055,6 +3080,8 @@ function productAssetForDisplay(input) {
 }
 function preserveManusImage(product) {
   if (!product) return product;
+  const criticalImage = criticalImageRepairAssetForInput(product);
+  if (criticalImage) return { ...product, imageUrl: criticalImage };
   const mappedImage = productAssetForDisplay(product);
   if (!isNonVialProduct(product)) {
     if (mappedImage && shouldReplaceVialImage(product, product.imageUrl)) {

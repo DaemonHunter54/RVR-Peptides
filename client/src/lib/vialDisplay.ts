@@ -1,3 +1,4 @@
+import { PRODUCT_ASSET_MAP, productAssetForSlug } from "./productAssetMap";
 export function makeSlug(value: string): string {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
@@ -28,10 +29,18 @@ export function isNonVialProduct(product: any): boolean {
 }
 
 
+
+function isCanonicalBundledProductAsset(value: unknown): boolean {
+  const image = String(value || "").split("?")[0].toLowerCase();
+  if (!image) return false;
+  return Object.values(PRODUCT_ASSET_MAP).some((asset) => String(asset || "").split("?")[0].toLowerCase() === image);
+}
+
 function isLegacyBundledVialAsset(value: unknown): boolean {
   const image = String(value || "").toLowerCase();
   if (!image) return false;
   if (image.startsWith("/assets/products/")) return false;
+  if (isCanonicalBundledProductAsset(image)) return false;
 
   return (
     image.includes("rvr-vial-template-single") ||
@@ -219,11 +228,22 @@ export function productImageUrl(product: any, variant?: any): string {
   const explicitImage = explicitVariantImage || explicitProductImage;
 
   const nonVial = isNonVialProduct(product);
+  const canonicalBundledImage = productAssetForSlug(slug) || productAssetForSlug(makeSlug(product?.name || ""));
+
+  // User/admin-selected uploaded images are always the source of truth.
+  if (explicitImage && String(explicitImage).startsWith("/assets/products/")) {
+    return explicitImage;
+  }
+
+  // Existing catalog products with bundled product-specific artwork should keep
+  // that artwork. This prevents edit-page blank previews from replacing 5-Amino-1MQ,
+  // BPC-157, GLP-1 Semaglutide, and other established product images.
+  if (canonicalBundledImage && (!explicitImage || isGeneratedImageUrl(explicitImage) || isLegacyBundledVialAsset(explicitImage))) {
+    return canonicalBundledImage;
+  }
 
   // User/admin-selected images are the source of truth. Do not replace them
   // with generated or cached template assets on product cards or detail pages.
-  // For vial products, legacy bundled/cached vial assets are intentionally not
-  // treated as user-selected images; they are replaced by the approved HD vial renderer.
   if (explicitImage && !isGeneratedImageUrl(explicitImage) && (nonVial || !isLegacyBundledVialAsset(explicitImage))) {
     return explicitImage;
   }
