@@ -428,8 +428,26 @@ function assetBySlug(slug: string): string | undefined {
   return getLocalAssetMap().get(normalized);
 }
 
+const CRITICAL_PRODUCT_IMAGE_REPAIRS: Record<string, string> = {
+  "5-amino-1mq": "/assets/5-amino-1mq-50mg_06697bbc.webp",
+  "5-amino-1mq-50mg": "/assets/5-amino-1mq-50mg_06697bbc.webp",
+  "bpc-157": "/assets/bpc-157-5mg_1e10350a.webp",
+  "bpc-157-5mg": "/assets/bpc-157-5mg_1e10350a.webp",
+  "glp-1-semaglutide": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
+  "glp-1-semaglutide-5mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
+};
+
+function criticalImageRepairAsset(row: RowDataPacket): string | undefined {
+  const slug = slugifyValue(String(row.slug || ""));
+  const name = slugifyValue(String(row.name || ""));
+  return CRITICAL_PRODUCT_IMAGE_REPAIRS[slug] || CRITICAL_PRODUCT_IMAGE_REPAIRS[name];
+}
+
 
 function exactAssetByProduct(row: RowDataPacket): string | undefined {
+  const overrideAsset = criticalImageRepairAsset(row);
+  if (overrideAsset) return overrideAsset;
+
   const slug = String(row.slug || "");
   const name = String(row.name || "");
   // Only exact matches. This lets bundled Manus assets override stale/generated DB images
@@ -770,7 +788,7 @@ async function ensureProductDisplayData(conn: mysql.Connection) {
     // Products without a bundled asset fall back to the HD vial renderer.
     if (!rowIsNonVialProduct(row)) {
       if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset(currentImage)) {
-        const repairedVialUrl = exactAsset || generatedVialUrlForRow(row);
+        const repairedVialUrl = repairAsset || generatedVialUrlForRow(row);
         await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairedVialUrl, row.id]);
         row.imageUrl = repairedVialUrl;
       }

@@ -296,7 +296,22 @@ function assetBySlug(slug) {
   const normalized = slugifyValue(slug);
   return getLocalAssetMap().get(normalized);
 }
+const CRITICAL_PRODUCT_IMAGE_REPAIRS = {
+  "5-amino-1mq": "/assets/5-amino-1mq-50mg_06697bbc.webp",
+  "5-amino-1mq-50mg": "/assets/5-amino-1mq-50mg_06697bbc.webp",
+  "bpc-157": "/assets/bpc-157-5mg_1e10350a.webp",
+  "bpc-157-5mg": "/assets/bpc-157-5mg_1e10350a.webp",
+  "glp-1-semaglutide": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
+  "glp-1-semaglutide-5mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp"
+};
+function criticalImageRepairAsset(row) {
+  const slug = slugifyValue(String(row.slug || ""));
+  const name = slugifyValue(String(row.name || ""));
+  return CRITICAL_PRODUCT_IMAGE_REPAIRS[slug] || CRITICAL_PRODUCT_IMAGE_REPAIRS[name];
+}
 function exactAssetByProduct(row) {
+  const overrideAsset = criticalImageRepairAsset(row);
+  if (overrideAsset) return overrideAsset;
   const slug = String(row.slug || "");
   const name = String(row.name || "");
   return assetBySlug(slug) || assetBySlug(name);
@@ -355,7 +370,7 @@ async function ensureProductDisplayData(conn) {
     const repairAsset = exactAsset || assetByProduct(row);
     if (!rowIsNonVialProduct(row)) {
       if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset(currentImage)) {
-        const repairedVialUrl = exactAsset || generatedVialUrlForRow(row);
+        const repairedVialUrl = repairAsset || generatedVialUrlForRow(row);
         await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [repairedVialUrl, row.id]);
         row.imageUrl = repairedVialUrl;
       }
@@ -379,7 +394,7 @@ async function ensureProductDisplayData(conn) {
     const baseName = normalizeVariantGroupName(String(group[0].name)).base;
     const sorted = [...group].sort((a, b) => Number(a.price) - Number(b.price));
     const canonical = sorted[0];
-    const canonicalAsset = rowIsNonVialProduct(canonical) ? assetByProduct(canonical) || String(canonical.imageUrl || "") : generatedVialUrlForRow(canonical);
+    const canonicalAsset = rowIsNonVialProduct(canonical) ? assetByProduct(canonical) || String(canonical.imageUrl || "") : assetByProduct(canonical) || generatedVialUrlForRow(canonical);
     await conn.execute(
       `UPDATE products SET name = ?, slug = ?, price = ?, imageUrl = ?, isActive = true WHERE id = ?`,
       [baseName, baseSlug, canonical.price, canonicalAsset || canonical.imageUrl, canonical.id]
@@ -388,7 +403,7 @@ async function ensureProductDisplayData(conn) {
       const row = sorted[i];
       const { label } = normalizeVariantGroupName(String(row.name));
       if (!label) continue;
-      const variantImage = rowIsNonVialProduct(row) ? assetByProduct(row) || row.imageUrl || canonicalAsset || null : generatedVialUrlForRow(row);
+      const variantImage = rowIsNonVialProduct(row) ? assetByProduct(row) || row.imageUrl || canonicalAsset || null : assetByProduct(row) || generatedVialUrlForRow(row);
       await conn.execute(
         `INSERT INTO product_variants (productId, label, price, imageUrl, stockQuantity, inStock, sortOrder)
          SELECT ?, ?, ?, ?, 100, true, ? FROM DUAL
