@@ -180,6 +180,608 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+
+type ResearchSource = {
+  title: string;
+  url: string;
+  database: string;
+  supports: string;
+  authors?: string;
+  journal?: string;
+  year?: string;
+  abstract?: string;
+};
+
+type ResearchDetailsResult = {
+  description_block: string;
+  chemical_makeup_block: string;
+  research_block: string;
+  sources: ResearchSource[];
+  confidence: "high" | "medium" | "low";
+  missing_fields: string[];
+  raw_source_json?: Record<string, unknown>;
+};
+
+function normalizeResearchName(value: unknown): string {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/\b\d+\s*(mg|mcg|ml|iu|capsules?|caps?)\b/gi, "")
+    .trim();
+}
+
+function uniqueStrings(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
+
+function stripXml(value: string): string {
+  return String(value || "")
+    .replace(/<!\[CDATA\[/g, "")
+    .replace(/\]\]>/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchJsonWithTimeout(url: string | URL, timeoutMs = 12000): Promise<any | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "Accept": "application/json" },
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchTextWithTimeout(url: string | URL, timeoutMs = 12000): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "Accept": "application/xml,text/xml,text/plain,*/*" },
+    });
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function sourceKey(source: ResearchSource): string {
+  return `${source.database}:${source.url || source.title}`.toLowerCase();
+}
+
+function rankedSources(sources: ResearchSource[]): ResearchSource[] {
+  const priority: Record<string, number> = {
+    PubChem: 1,
+    PubMed: 2,
+    "Europe PMC": 2,
+    UniProt: 3,
+    ChEMBL: 4,
+    RCSB: 5,
+    IUPHAR: 6,
+  };
+  const seen = new Set<string>();
+  return sources
+    .filter((source) => source.title && source.url)
+    .filter((source) => {
+      const key = sourceKey(source);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => (priority[a.database] || 99) - (priority[b.database] || 99))
+    .slice(0, 3);
+}
+
+function ensureThreeSources(sources: ResearchSource[], peptideName: string): ResearchSource[] {
+  const cleanName = normalizeResearchName(peptideName) || "peptide";
+  const base = rankedSources(sources);
+  const fallbacks: ResearchSource[] = [
+    {
+      title: `${cleanName} - PubMed literature search`,
+      url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
+      database: "PubMed",
+      supports: "Peer-reviewed biomedical literature discovery for exact product-name research context.",
+    },
+    {
+      title: `${cleanName} - Europe PMC literature search`,
+      url: `https://europepmc.org/search?query=${encodeURIComponent(cleanName)}`,
+      database: "Europe PMC",
+      supports: "Additional biomedical literature metadata and abstract discovery.",
+    },
+    {
+      title: `${cleanName} - PubChem compound search`,
+      url: `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(cleanName)}`,
+      database: "PubChem",
+      supports: "Public chemistry identifier and property search when an exact compound record is available.",
+    },
+  ];
+  return rankedSources([...base, ...fallbacks]).slice(0, 3);
+}
+
+async function getResearchCacheConnection(): Promise<mysql.Connection | null> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  try {
+    return await mysql.createConnection({ uri: url, connectTimeout: 10000 });
+  } catch (error) {
+    console.warn("[Research Details] Database cache unavailable.", error);
+    return null;
+  }
+}
+
+async function ensureResearchCacheTable(conn: mysql.Connection) {
+  await conn.execute(`CREATE TABLE IF NOT EXISTS researchDetailsCache (
+    id int AUTO_INCREMENT NOT NULL,
+    cacheKey varchar(255) NOT NULL,
+    productId int,
+    peptideName varchar(255) NOT NULL,
+    researchDescription MEDIUMTEXT,
+    chemicalMakeup MEDIUMTEXT,
+    researchSummary MEDIUMTEXT,
+    source1Title text,
+    source1Url text,
+    source1Supports text,
+    source2Title text,
+    source2Url text,
+    source2Supports text,
+    source3Title text,
+    source3Url text,
+    source3Supports text,
+    researchConfidence varchar(20) DEFAULT 'low',
+    rawSourceJson LONGTEXT,
+    lastResearchedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY researchDetailsCache_cacheKey_unique (cacheKey)
+  )`);
+}
+
+function makeResearchCacheKey(peptideName: string): string {
+  return normalizeResearchName(peptideName).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "unknown";
+}
+
+async function getCachedResearchDetails(cacheKey: string): Promise<ResearchDetailsResult | null> {
+  const conn = await getResearchCacheConnection();
+  if (!conn) return null;
+  try {
+    await ensureResearchCacheTable(conn);
+    const [rows] = await conn.execute<any[]>(
+      `SELECT * FROM researchDetailsCache WHERE cacheKey = ? AND lastResearchedAt > DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 1`,
+      [cacheKey]
+    );
+    const row = rows?.[0];
+    if (!row) return null;
+    const sources = [
+      { title: row.source1Title, url: row.source1Url, database: "Cached", supports: row.source1Supports },
+      { title: row.source2Title, url: row.source2Url, database: "Cached", supports: row.source2Supports },
+      { title: row.source3Title, url: row.source3Url, database: "Cached", supports: row.source3Supports },
+    ].filter((source) => source.title && source.url) as ResearchSource[];
+    return {
+      description_block: row.researchDescription || "",
+      chemical_makeup_block: row.chemicalMakeup || "",
+      research_block: row.researchSummary || "",
+      sources,
+      confidence: (row.researchConfidence || "low") as "high" | "medium" | "low",
+      missing_fields: [],
+      raw_source_json: row.rawSourceJson ? JSON.parse(row.rawSourceJson) : undefined,
+    };
+  } catch (error) {
+    console.warn("[Research Details] Cache read failed.", error);
+    return null;
+  } finally {
+    await conn.end().catch(() => {});
+  }
+}
+
+async function saveCachedResearchDetails(cacheKey: string, productId: number | null, peptideName: string, result: ResearchDetailsResult) {
+  const conn = await getResearchCacheConnection();
+  if (!conn) return;
+  try {
+    await ensureResearchCacheTable(conn);
+    const sources = ensureThreeSources(result.sources, peptideName);
+    await conn.execute(
+      `INSERT INTO researchDetailsCache (
+        cacheKey, productId, peptideName, researchDescription, chemicalMakeup, researchSummary,
+        source1Title, source1Url, source1Supports, source2Title, source2Url, source2Supports,
+        source3Title, source3Url, source3Supports, researchConfidence, rawSourceJson, lastResearchedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE
+        productId = VALUES(productId),
+        peptideName = VALUES(peptideName),
+        researchDescription = VALUES(researchDescription),
+        chemicalMakeup = VALUES(chemicalMakeup),
+        researchSummary = VALUES(researchSummary),
+        source1Title = VALUES(source1Title),
+        source1Url = VALUES(source1Url),
+        source1Supports = VALUES(source1Supports),
+        source2Title = VALUES(source2Title),
+        source2Url = VALUES(source2Url),
+        source2Supports = VALUES(source2Supports),
+        source3Title = VALUES(source3Title),
+        source3Url = VALUES(source3Url),
+        source3Supports = VALUES(source3Supports),
+        researchConfidence = VALUES(researchConfidence),
+        rawSourceJson = VALUES(rawSourceJson),
+        lastResearchedAt = NOW()`,
+      [
+        cacheKey,
+        productId,
+        peptideName,
+        result.description_block,
+        result.chemical_makeup_block,
+        result.research_block,
+        sources[0]?.title || "",
+        sources[0]?.url || "",
+        sources[0]?.supports || "",
+        sources[1]?.title || "",
+        sources[1]?.url || "",
+        sources[1]?.supports || "",
+        sources[2]?.title || "",
+        sources[2]?.url || "",
+        sources[2]?.supports || "",
+        result.confidence,
+        JSON.stringify(result.raw_source_json || {}),
+      ]
+    );
+  } catch (error) {
+    console.warn("[Research Details] Cache save failed.", error);
+  } finally {
+    await conn.end().catch(() => {});
+  }
+}
+
+async function lookupPubChem(peptideName: string, synonyms: string[]) {
+  const terms = uniqueStrings([peptideName, ...synonyms]).slice(0, 4);
+  for (const term of terms) {
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(term)}/property/MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES,IsomericSMILES,InChIKey/JSON`;
+    const json = await fetchJsonWithTimeout(url);
+    const props = json?.PropertyTable?.Properties?.[0];
+    if (props) {
+      const cid = props.CID ? String(props.CID) : "";
+      const source: ResearchSource = {
+        title: `${term} PubChem compound record${cid ? ` (CID ${cid})` : ""}`,
+        url: cid ? `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}` : `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(term)}`,
+        database: "PubChem",
+        supports: "Chemical identifiers, molecular formula, molecular weight, IUPAC name, SMILES, and InChIKey.",
+      };
+      return { term, props, source, raw: json };
+    }
+  }
+  return null;
+}
+
+async function lookupPubMed(peptideName: string, synonyms: string[]) {
+  const cleanName = normalizeResearchName(peptideName);
+  const termParts = uniqueStrings([cleanName, ...synonyms]).slice(0, 3);
+  const exactTerm = termParts.map((term) => `"${term}"`).join(" OR ") || `"${cleanName}"`;
+  const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
+  searchUrl.searchParams.set("db", "pubmed");
+  searchUrl.searchParams.set("retmode", "json");
+  searchUrl.searchParams.set("retmax", "8");
+  searchUrl.searchParams.set("sort", "relevance");
+  searchUrl.searchParams.set("term", `${exactTerm} AND (peptide OR compound OR pharmacology OR mechanism OR chemistry OR assay OR receptor OR pathway)`);
+  if (process.env.NCBI_API_KEY) searchUrl.searchParams.set("api_key", process.env.NCBI_API_KEY);
+
+  const searchJson = await fetchJsonWithTimeout(searchUrl);
+  const ids = (searchJson?.esearchresult?.idlist || []).slice(0, 8);
+  if (!ids.length) return { sources: [], abstracts: [], raw: searchJson };
+
+  const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
+  summaryUrl.searchParams.set("db", "pubmed");
+  summaryUrl.searchParams.set("retmode", "json");
+  summaryUrl.searchParams.set("id", ids.join(","));
+  if (process.env.NCBI_API_KEY) summaryUrl.searchParams.set("api_key", process.env.NCBI_API_KEY);
+  const summaryJson = await fetchJsonWithTimeout(summaryUrl);
+
+  const fetchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi");
+  fetchUrl.searchParams.set("db", "pubmed");
+  fetchUrl.searchParams.set("retmode", "xml");
+  fetchUrl.searchParams.set("id", ids.slice(0, 5).join(","));
+  if (process.env.NCBI_API_KEY) fetchUrl.searchParams.set("api_key", process.env.NCBI_API_KEY);
+  const xml = await fetchTextWithTimeout(fetchUrl);
+  const abstracts = xml
+    ? Array.from(xml.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/gi)).map((match) => stripXml(match[1])).filter(Boolean).slice(0, 6)
+    : [];
+
+  const sources = ids
+    .map((id: string) => summaryJson?.result?.[id])
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((item: any): ResearchSource => ({
+      title: String(item.title || `${cleanName} PubMed article`).replace(/\.$/, ""),
+      authors: Array.isArray(item.authors) ? item.authors.map((author: any) => author.name).filter(Boolean).join(", ") : "",
+      journal: item.fulljournalname || item.source || "PubMed",
+      year: item.pubdate ? String(item.pubdate).slice(0, 4) : "",
+      url: item.uid ? `https://pubmed.ncbi.nlm.nih.gov/${item.uid}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
+      database: "PubMed",
+      supports: "Peer-reviewed literature describing research context, mechanisms, targets, assay findings, or compound-specific investigation.",
+    }));
+
+  return { sources, abstracts, raw: { searchJson, summaryJson } };
+}
+
+async function lookupEuropePmc(peptideName: string, synonyms: string[]) {
+  const cleanName = normalizeResearchName(peptideName);
+  const query = uniqueStrings([cleanName, ...synonyms]).slice(0, 3).map((term) => `"${term}"`).join(" OR ");
+  const url = new URL("https://www.ebi.ac.uk/europepmc/webservices/rest/search");
+  url.searchParams.set("query", `${query || `"${cleanName}"`} AND (peptide OR pharmacology OR mechanism OR assay OR chemistry)`);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("pageSize", "5");
+  const json = await fetchJsonWithTimeout(url);
+  const records = json?.resultList?.result || [];
+  const sources = records.slice(0, 2).map((item: any): ResearchSource => ({
+    title: item.title || `${cleanName} Europe PMC source`,
+    authors: item.authorString || "",
+    journal: item.journalTitle || "Europe PMC",
+    year: item.pubYear || "",
+    url: item.doi ? `https://doi.org/${item.doi}` : item.pmid ? `https://europepmc.org/article/MED/${item.pmid}` : `https://europepmc.org/search?query=${encodeURIComponent(cleanName)}`,
+    database: "Europe PMC",
+    supports: "Biomedical literature metadata, abstract context, and additional citation support.",
+    abstract: item.abstractText || "",
+  }));
+  return { sources, abstracts: records.map((item: any) => String(item.abstractText || "")).filter(Boolean).slice(0, 4), raw: json };
+}
+
+async function lookupUniProt(peptideName: string, synonyms: string[]) {
+  const cleanName = normalizeResearchName(peptideName);
+  const query = uniqueStrings([cleanName, ...synonyms]).slice(0, 2).map((term) => `"${term}"`).join(" OR ");
+  const url = new URL("https://rest.uniprot.org/uniprotkb/search");
+  url.searchParams.set("query", query || `"${cleanName}"`);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("size", "3");
+  const json = await fetchJsonWithTimeout(url);
+  const item = json?.results?.[0];
+  if (!item) return { sources: [], notes: [], raw: json };
+  const accession = item.primaryAccession || "";
+  const proteinName = item.proteinDescription?.recommendedName?.fullName?.value || item.proteinDescription?.submissionNames?.[0]?.fullName?.value || "";
+  return {
+    sources: [{
+      title: `${proteinName || cleanName} UniProt record${accession ? ` (${accession})` : ""}`,
+      url: accession ? `https://www.uniprot.org/uniprotkb/${accession}/entry` : `https://www.uniprot.org/uniprotkb?query=${encodeURIComponent(cleanName)}`,
+      database: "UniProt",
+      supports: "Protein/peptide sequence context, organism, gene names, and functional annotations when applicable.",
+    } as ResearchSource],
+    notes: [
+      accession ? `UniProt accession: ${accession}` : "",
+      proteinName ? `Protein/sequence context: ${proteinName}` : "",
+      item.organism?.scientificName ? `Organism: ${item.organism.scientificName}` : "",
+    ].filter(Boolean),
+    raw: json,
+  };
+}
+
+async function lookupChembl(peptideName: string, synonyms: string[]) {
+  const cleanName = normalizeResearchName(peptideName);
+  const url = `https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q=${encodeURIComponent(cleanName)}`;
+  const json = await fetchJsonWithTimeout(url);
+  const molecule = json?.molecules?.[0];
+  if (!molecule) return { sources: [], notes: [], raw: json };
+  const id = molecule.molecule_chembl_id || "";
+  return {
+    sources: [{
+      title: `${molecule.pref_name || cleanName} ChEMBL molecule record${id ? ` (${id})` : ""}`,
+      url: id ? `https://www.ebi.ac.uk/chembl/explore/compound/${id}` : `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${encodeURIComponent(cleanName)}`,
+      database: "ChEMBL",
+      supports: "Bioactivity, molecule, target, and assay metadata where the compound is represented in ChEMBL.",
+    } as ResearchSource],
+    notes: [
+      id ? `ChEMBL ID: ${id}` : "",
+      molecule.molecule_type ? `Molecule type: ${molecule.molecule_type}` : "",
+      molecule.max_phase !== undefined ? `Development phase metadata: ${molecule.max_phase}` : "",
+    ].filter(Boolean),
+    raw: json,
+  };
+}
+
+async function lookupRcsb(peptideName: string, synonyms: string[]) {
+  const cleanName = normalizeResearchName(peptideName);
+  const query = {
+    query: {
+      type: "terminal",
+      service: "text",
+      parameters: {
+        attribute: "struct.title",
+        operator: "contains_phrase",
+        value: cleanName,
+      },
+    },
+    return_type: "entry",
+    request_options: { paginate: { start: 0, rows: 3 } },
+  };
+  const json = await fetchJsonWithTimeout("https://search.rcsb.org/rcsbsearch/v2/query?json=" + encodeURIComponent(JSON.stringify(query)));
+  const id = json?.result_set?.[0]?.identifier;
+  if (!id) return { sources: [], notes: [], raw: json };
+  return {
+    sources: [{
+      title: `${cleanName} RCSB PDB structure search (${id})`,
+      url: `https://www.rcsb.org/structure/${id}`,
+      database: "RCSB",
+      supports: "3D structure or structure-search context where related peptide, receptor, or complex records are available.",
+    } as ResearchSource],
+    notes: [`RCSB PDB matching entry: ${id}`],
+    raw: json,
+  };
+}
+
+function buildChemicalMakeupBlock(peptideName: string, pubChem: any, provided: { sequence?: string; molecularFormula?: string; molecularWeight?: string }, notes: string[]): { text: string; missing: string[] } {
+  const lines: string[] = [];
+  const missing: string[] = [];
+  const props = pubChem?.props;
+  lines.push(`${peptideName}`);
+  if (props?.CID) lines.push(`PubChem CID: ${props.CID}`);
+  const formula = provided.molecularFormula || props?.MolecularFormula;
+  const mw = provided.molecularWeight || props?.MolecularWeight;
+  if (formula) lines.push(`Molecular formula: ${formula}`); else { lines.push("Molecular formula: Not confirmed from available sources."); missing.push("molecularFormula"); }
+  if (mw) lines.push(`Molecular weight: ${mw}`); else { lines.push("Molecular weight: Not confirmed from available sources."); missing.push("molecularWeight"); }
+  if (provided.sequence) lines.push(`Sequence: ${provided.sequence}`); else { lines.push("Sequence: Not confirmed from available sources."); missing.push("sequence"); }
+  if (props?.IUPACName) lines.push(`IUPAC name: ${props.IUPACName}`);
+  if (props?.CanonicalSMILES) lines.push(`Canonical SMILES: ${props.CanonicalSMILES}`);
+  if (props?.IsomericSMILES) lines.push(`Isomeric SMILES: ${props.IsomericSMILES}`);
+  if (props?.InChIKey) lines.push(`InChIKey: ${props.InChIKey}`);
+  if (notes.length) lines.push(...notes);
+  return { text: lines.join("\n"), missing };
+}
+
+function buildDescriptionBlock(peptideName: string, chemicalText: string, abstracts: string[], sources: ResearchSource[], confidence: "high" | "medium" | "low"): string {
+  const sourceTitles = sources.map((s) => s.title).slice(0, 3).join("; ");
+  const abstractSummary = abstracts.join(" ").replace(/\s+/g, " ").slice(0, 1800);
+  return [
+    `${peptideName} is presented as a research-use compound for laboratory, analytical, and scientific investigation. Source-backed records are used to describe the compound identity, available chemistry, and the literature context associated with the exact product name or its closest confirmed synonyms.`,
+    `Available chemical and identifier information is summarized from public scientific databases. ${chemicalText.includes("Molecular formula: Not confirmed") ? "Some chemistry fields were not confirmed from the available records, so those values should be verified against the product certificate of analysis before publication." : "The available chemistry record provides a confirmed starting point for identity review, including formula, molecular weight, and structural identifiers where available."}`,
+    abstractSummary
+      ? `Published biomedical literature describes research interest in ${peptideName} through experimental, mechanism-focused, assay, formulation, analytical, or pharmacology contexts. The most relevant available records discuss the compound in relation to its investigated pathways, measurable laboratory effects, and study-model findings.`
+      : `Public literature searches returned limited exact abstract text for ${peptideName}; the description is therefore limited to verified database identifiers and source-backed discovery links rather than unconfirmed mechanism claims.`,
+    sourceTitles
+      ? `The most useful source context currently comes from ${sourceTitles}. These sources support the product description, chemistry review, and research-summary sections without implying approved clinical use.`
+      : "",
+    `Research confidence: ${confidence}. This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.`,
+  ].filter(Boolean).join("\n\n");
+}
+
+function buildResearchBlock(peptideName: string, abstracts: string[], notes: string[], sources: ResearchSource[], confidence: "high" | "medium" | "low"): string {
+  const snippets = abstracts.join("\n\n").replace(/\s+/g, " ").trim();
+  const noteText = notes.length ? `Additional database context: ${notes.join("; ")}.` : "";
+  return [
+    `Research summary for ${peptideName}`,
+    "",
+    snippets
+      ? snippets.slice(0, 4200)
+      : `${peptideName} currently has limited exact-name abstract text available through the queried public databases. The available source records should be used to confirm compound identity, chemistry, and literature relevance before publishing detailed mechanism-specific claims.`,
+    "",
+    `Mechanism, pathway, receptor, or assay information is included only when it appears in the retrieved scientific records or product metadata. If a target, receptor relationship, or pathway is not represented in the confirmed records, it should be treated as not confirmed rather than inferred from broad peptide-category language.`,
+    noteText,
+    `The cited sources below provide the evidence basis for this entry. The content is written for a neutral research-use catalog and intentionally avoids dosing, treatment, cure, or human-use claims.`,
+    "",
+    `Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.`,
+  ].filter(Boolean).join("\n");
+}
+
+async function buildResearchDetails(input: {
+  productId?: string | number;
+  peptideName: string;
+  synonyms?: string[];
+  sequence?: string;
+  molecularFormula?: string;
+  molecularWeight?: string;
+}, allowCache = true): Promise<ResearchDetailsResult> {
+  const peptideName = normalizeResearchName(input.peptideName);
+  if (!peptideName) throw new Error("peptideName is required");
+
+  const cacheKey = makeResearchCacheKey(peptideName);
+  if (allowCache) {
+    const cached = await getCachedResearchDetails(cacheKey);
+    if (cached?.description_block || cached?.research_block) return cached;
+  }
+
+  const synonyms = uniqueStrings(input.synonyms || []);
+  const [pubChem, pubMed, europePmc, uniProt, chembl, rcsb] = await Promise.all([
+    lookupPubChem(peptideName, synonyms),
+    lookupPubMed(peptideName, synonyms),
+    lookupEuropePmc(peptideName, synonyms),
+    lookupUniProt(peptideName, synonyms),
+    lookupChembl(peptideName, synonyms),
+    lookupRcsb(peptideName, synonyms),
+  ]);
+
+  const notes = [
+    ...(uniProt?.notes || []),
+    ...(chembl?.notes || []),
+    ...(rcsb?.notes || []),
+  ];
+  const abstracts = uniqueStrings([...(pubMed?.abstracts || []), ...(europePmc?.abstracts || [])]).slice(0, 8);
+  const sources = ensureThreeSources([
+    pubChem?.source,
+    ...(pubMed?.sources || []),
+    ...(europePmc?.sources || []),
+    ...(uniProt?.sources || []),
+    ...(chembl?.sources || []),
+    ...(rcsb?.sources || []),
+  ].filter(Boolean) as ResearchSource[], peptideName);
+
+  const chem = buildChemicalMakeupBlock(peptideName, pubChem, {
+    sequence: input.sequence,
+    molecularFormula: input.molecularFormula,
+    molecularWeight: input.molecularWeight,
+  }, notes);
+
+  const confidence: "high" | "medium" | "low" =
+    !!pubChem && (pubMed?.sources?.length || europePmc?.sources?.length) ? "high" :
+    (pubMed?.sources?.length || europePmc?.sources?.length || !!pubChem) ? "medium" :
+    "low";
+
+  const result: ResearchDetailsResult = {
+    description_block: buildDescriptionBlock(peptideName, chem.text, abstracts, sources, confidence),
+    chemical_makeup_block: chem.text,
+    research_block: buildResearchBlock(peptideName, abstracts, notes, sources, confidence),
+    sources,
+    confidence,
+    missing_fields: chem.missing,
+    raw_source_json: {
+      pubchem: pubChem?.raw,
+      pubmed: pubMed?.raw,
+      europepmc: europePmc?.raw,
+      uniprot: uniProt?.raw,
+      chembl: chembl?.raw,
+      rcsb: rcsb?.raw,
+    },
+  };
+
+  await saveCachedResearchDetails(cacheKey, input.productId ? Number(input.productId) : null, peptideName, result);
+  return result;
+}
+
+function researchDetailsToLegacyResponse(details: ResearchDetailsResult) {
+  return {
+    overview: "",
+    description: details.description_block,
+    chemicalMakeup: details.chemical_makeup_block,
+    researchContent: details.research_block,
+    citations: details.sources.slice(0, 3).map((source, index) => ({
+      title: source.title,
+      authors: source.authors || "",
+      journal: source.database || source.journal || "",
+      year: source.year || "",
+      url: source.url,
+      summary: source.supports,
+      citationNumber: index + 1,
+    })),
+    description_block: details.description_block,
+    chemical_makeup_block: details.chemical_makeup_block,
+    research_block: details.research_block,
+    sources: details.sources,
+    confidence: details.confidence,
+    missing_fields: details.missing_fields,
+  };
+}
+
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -335,6 +937,31 @@ async function startServer() {
   });
 
 
+  app.post("/api/get-research-details", async (req, res) => {
+    try {
+      const body = req.body || {};
+      const peptideName = normalizeResearchName(body.peptideName || body.name || body.productName);
+      if (!peptideName) {
+        res.status(400).json({ error: "peptideName is required" });
+        return;
+      }
+
+      const details = await buildResearchDetails({
+        productId: body.productId || "",
+        peptideName,
+        synonyms: Array.isArray(body.synonyms) ? body.synonyms : [],
+        sequence: String(body.sequence || ""),
+        molecularFormula: String(body.molecularFormula || ""),
+        molecularWeight: String(body.molecularWeight || ""),
+      });
+
+      res.json(details);
+    } catch (err: any) {
+      console.error("[Research Details API Error]", err);
+      res.status(500).json({ error: err?.message || "Unable to get research details" });
+    }
+  });
+
   app.get("/api/product-research-details", async (req, res) => {
     try {
       const name = String(req.query?.name || "").trim();
@@ -343,144 +970,14 @@ async function startServer() {
         return;
       }
 
-      const cleanName = name.replace(/\s+/g, " ").trim();
-      const pubmedTerm = `"${cleanName}" OR ${cleanName}`;
-      const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
-      searchUrl.searchParams.set("db", "pubmed");
-      searchUrl.searchParams.set("retmode", "json");
-      searchUrl.searchParams.set("retmax", "8");
-      searchUrl.searchParams.set("sort", "relevance");
-      searchUrl.searchParams.set("term", pubmedTerm);
-
-      let citations: any[] = [];
-      let abstractSnippets: string[] = [];
-
-      try {
-        const searchResponse = await fetch(searchUrl);
-        if (searchResponse.ok) {
-          const searchJson: any = await searchResponse.json();
-          const ids = (searchJson?.esearchresult?.idlist || []).slice(0, 8);
-
-          if (ids.length) {
-            const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
-            summaryUrl.searchParams.set("db", "pubmed");
-            summaryUrl.searchParams.set("retmode", "json");
-            summaryUrl.searchParams.set("id", ids.join(","));
-            const summaryResponse = await fetch(summaryUrl);
-            if (summaryResponse.ok) {
-              const summaryJson: any = await summaryResponse.json();
-              citations = ids
-                .map((id: string) => summaryJson?.result?.[id])
-                .filter(Boolean)
-                .slice(0, 3)
-                .map((item: any) => ({
-                  title: item.title || `${cleanName} PubMed source`,
-                  authors: Array.isArray(item.authors) ? item.authors.map((author: any) => author.name).filter(Boolean).join(", ") : "",
-                  journal: item.fulljournalname || item.source || "PubMed",
-                  year: item.pubdate ? String(item.pubdate).slice(0, 4) : "",
-                  url: item.uid ? `https://pubmed.ncbi.nlm.nih.gov/${item.uid}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
-                  summary: `PubMed-indexed source related to ${cleanName}.`,
-                }));
-            }
-
-            const fetchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi");
-            fetchUrl.searchParams.set("db", "pubmed");
-            fetchUrl.searchParams.set("retmode", "xml");
-            fetchUrl.searchParams.set("id", ids.slice(0, 5).join(","));
-            const fetchResponse = await fetch(fetchUrl);
-            if (fetchResponse.ok) {
-              const xml = await fetchResponse.text();
-              abstractSnippets = Array.from(xml.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/gi))
-                .map((match) => match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
-                .filter(Boolean)
-                .slice(0, 8);
-            }
-          }
-        }
-      } catch (sourceError) {
-        console.warn("[Research Details] PubMed lookup failed; using PubMed search links.", sourceError);
-      }
-
-      if (citations.length < 3) {
-        const fallbackTerms = [
-          `${cleanName}`,
-          `${cleanName} mechanism of action`,
-          `${cleanName} chemistry pharmacology`,
-        ];
-        citations = [
-          ...citations,
-          ...fallbackTerms.slice(citations.length).map((term, index) => ({
-            title: `${cleanName} ${index === 0 ? "PubMed literature search" : index === 1 ? "mechanism literature search" : "chemistry and pharmacology literature search"}`,
-            authors: "",
-            journal: "PubMed",
-            year: "",
-            url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(term)}`,
-            summary: `Current PubMed search source for ${term}.`,
-          })),
-        ].slice(0, 3);
-      }
-
-      let chemicalMakeup = "";
-      try {
-        const pubChemUrl = new URL(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/property/MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES/JSON`);
-        const pubChemResponse = await fetch(pubChemUrl);
-        if (pubChemResponse.ok) {
-          const pubChemJson: any = await pubChemResponse.json();
-          const props = pubChemJson?.PropertyTable?.Properties?.[0];
-          if (props) {
-            chemicalMakeup = [
-              props.MolecularFormula ? `Molecular formula: ${props.MolecularFormula}` : "",
-              props.MolecularWeight ? `Molecular weight: ${props.MolecularWeight}` : "",
-              props.IUPACName ? `IUPAC name: ${props.IUPACName}` : "",
-              props.CanonicalSMILES ? `Canonical SMILES: ${props.CanonicalSMILES}` : "",
-            ].filter(Boolean).join("\n");
-          }
-        }
-      } catch (chemicalError) {
-        console.warn("[Research Details] PubChem lookup failed.", chemicalError);
-      }
-
-      if (!chemicalMakeup) {
-        chemicalMakeup = [
-          `${cleanName}`,
-          "No exact PubChem chemistry record was returned for this product name. Verify the final molecular formula, molecular weight, peptide sequence, salt form, concentration, purity, and certificate-of-analysis details before publishing.",
-        ].join("\n");
-      }
-
-      const citedTitles = citations.map((citation: any) => citation.title).filter(Boolean).slice(0, 3);
-      const abstractText = abstractSnippets.join(" ").replace(/\s+/g, " ").trim();
-      const evidenceSummary = abstractText ||
-        `${cleanName} appears in PubMed-indexed scientific literature and related chemistry references. The available literature discusses the compound or product in experimental, analytical, pharmacology, laboratory, or formulation research depending on the exact identity of the material.`;
-
-      const description = [
-        `${cleanName} is a research-focused compound or product used for laboratory, analytical, and scientific investigation. Published literature and chemistry references are used here to describe its identity, how researchers evaluate it, and why it is of interest in controlled research settings.`,
-        `Researchers generally evaluate ${cleanName} by looking at its chemical identity, purity profile, structure-related behavior, stability, and the biological or analytical pathways described in the available literature. The mechanism of action depends on the exact compound, but the research record typically focuses on how the material interacts with the target systems, receptors, tissues, enzymes, signaling pathways, or assay conditions relevant to the study design.`,
-        `Current scientific interest in ${cleanName} centers on understanding its measurable effects, reproducibility, handling profile, and potential value in research models. Key areas of investigation may include pharmacology, analytical chemistry, peptide or compound characterization, mechanism-focused assays, stability evaluation, and comparison with related materials. These areas help researchers decide whether the product is appropriate for their laboratory workflow and study goals.`,
-        `Research findings referenced through PubMed-indexed sources provide useful context for the product's investigated properties, reported experimental observations, and limitations. The available evidence should be interpreted as research-context information for laboratory use rather than as medical advice or clinical direction.`,
-        "Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.",
-      ].join("\n\n");
-
-      const researchContent = [
-        `Research and clinical-study context for ${cleanName}`,
-        "",
-        evidenceSummary.slice(0, 2800),
-        "",
-        citedTitles.length
-          ? `The sources used for this overview include PubMed-indexed material such as: ${citedTitles.join("; ")}. These publications provide research context regarding the compound/product identity, mechanism-focused investigation, reported experimental findings, and areas where the material has been studied.`
-          : `The citations below are current PubMed search sources for ${cleanName} and related chemistry, mechanism, and pharmacology terms.`,
-        "",
-        `Across the available literature, ${cleanName} should be presented as a research material whose value comes from documented identity, consistent quality control, and relevance to defined laboratory questions. The most useful product-page summary is one that explains what the material is, what researchers are investigating, which mechanisms or assay systems are relevant, and what findings have been reported without implying approved medical use.`,
-        "",
-        "Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.",
-      ].join("\n");
-
-      res.json({
-        overview: "",
-        description,
-        chemicalMakeup,
-        researchContent,
-        citations,
+      const details = await buildResearchDetails({
+        peptideName: name,
+        synonyms: [],
+        sequence: "",
+        molecularFormula: "",
+        molecularWeight: "",
       });
+      res.json(researchDetailsToLegacyResponse(details));
     } catch (err: any) {
       console.error("[Research Details Error]", err);
       res.status(500).send(err?.message || "Unable to get research details");
@@ -488,7 +985,7 @@ async function startServer() {
   });
 
 
-    app.post("/api/product-image/upload", async (req, res) => {
+  app.post("/api/product-image/upload", async (req, res) => {
     try {
       const makeSafeSlug = (value: string) => String(value || "product-image").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "product-image";
       const dataUrl = String(req.body?.dataUrl || "");

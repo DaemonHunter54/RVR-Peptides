@@ -207,15 +207,6 @@ function ProductsSection() {
   const [search, setSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
-  useEffect(() => {
-    const showProductList = () => {
-      setShowForm(false);
-      setEditingProduct(null);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    };
-    window.addEventListener("rvr-admin-products-list", showProductList);
-    return () => window.removeEventListener("rvr-admin-products-list", showProductList);
-  }, []);
 
   const productsQuery = trpc.admin.products.list.useQuery({ search: search || undefined });
   const createProduct = trpc.admin.products.create.useMutation({
@@ -328,6 +319,47 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
   return productAssetForSlug(variantSlug) || generatedVialUrl(variantSlug);
 };
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
+
+async function requestResearchDetails(payload: {
+  productId?: number | string;
+  peptideName: string;
+  synonyms?: string[];
+  sequence?: string;
+  molecularFormula?: string;
+  molecularWeight?: string;
+}) {
+  const response = await fetch("/api/get-research-details", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    try {
+      const parsed = JSON.parse(errorBody);
+      throw new Error(parsed?.error || "Unable to get research details.");
+    } catch {
+      throw new Error(errorBody || "Unable to get research details.");
+    }
+  }
+  const details = await response.json();
+  const sources = Array.isArray(details.sources) ? details.sources.slice(0, 3) : [];
+  return {
+    description: details.description_block || details.description || "",
+    chemicalMakeup: details.chemical_makeup_block || details.chemicalMakeup || "",
+    researchContent: details.research_block || details.researchContent || "",
+    citations: sources.map((source: any, index: number) => ({
+      citationNumber: index + 1,
+      title: source.title || "Research source",
+      authors: source.authors || "",
+      journal: source.database || source.journal || "Scientific database",
+      year: source.year || "",
+      url: source.url || "",
+      summary: source.supports || source.summary || "",
+    })),
+  };
+}
+
 
 type PreviewProductType = "" | "vial" | "cream" | "face-mask" | "gift-card";
 const PRODUCT_PREVIEW_TYPES: Array<{ value: PreviewProductType; label: string }> = [
@@ -849,9 +881,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
           {showSpecifications && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div><Label>Purity</Label><Input value={form.purity} onChange={(e) => updateField("purity", e.target.value)} className="mt-1.5" placeholder="e.g. >99%" /></div>
-            {previewType !== "gift-card" ? (
-              <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
-            ) : null}
+            <div><Label>Dose / Size</Label><Input value={form.size} onChange={(e) => updateField("size", e.target.value)} className="mt-1.5" placeholder="e.g. 5mg" /></div>
             <div><Label>Form</Label><Input value={form.form} onChange={(e) => updateField("form", e.target.value)} className="mt-1.5" placeholder="e.g. Lyophilized Powder" /></div>
             <div><Label>Contents</Label><Input value={form.contents} onChange={(e) => updateField("contents", e.target.value)} className="mt-1.5" /></div>
             <div><Label>Molecular Formula</Label><Input value={form.molecularFormula} onChange={(e) => updateField("molecularFormula", e.target.value)} className="mt-1.5" /></div>
@@ -918,9 +948,7 @@ function DraftResearchEditor({
 
     setGettingResearchDetails(true);
     try {
-      const response = await fetch(`/api/product-research-details?name=${encodeURIComponent(name)}`);
-      if (!response.ok) throw new Error(await response.text());
-      const details = await response.json();
+      const details = await requestResearchDetails({ peptideName: name });
       onDescriptionChange?.(details.description || "");
       onChange({
         description: details.description || "",
@@ -1122,9 +1150,7 @@ function ResearchCitationsEditor({
     }
     setGettingResearchDetails(true);
     try {
-      const response = await fetch(`/api/product-research-details?name=${encodeURIComponent(name)}`);
-      if (!response.ok) throw new Error(await response.text());
-      const details = await response.json();
+      const details = await requestResearchDetails({ peptideName: name });
       const nextOverview = "";
       const nextDescription = details.description || "";
       const nextChemicalMakeup = details.chemicalMakeup || "";
@@ -1376,16 +1402,6 @@ function OrderRow({ order, onUpdateStatus, onUpdateTracking }: { order: any; onU
 // ─── Discounts ───────────────────────────────────────────────────────
 function DiscountsSection() {
   const [showForm, setShowForm] = useState(false);
-  useEffect(() => {
-    const showProductList = () => {
-      setShowForm(false);
-      setEditingProduct(null);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    };
-    window.addEventListener("rvr-admin-products-list", showProductList);
-    return () => window.removeEventListener("rvr-admin-products-list", showProductList);
-  }, []);
-
   const discountsQuery = trpc.admin.discounts.list.useQuery();
   const createDiscount = trpc.admin.discounts.create.useMutation({
     onSuccess: () => { toast.success("Discount created!"); discountsQuery.refetch(); setShowForm(false); },

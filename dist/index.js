@@ -19,7 +19,7 @@ import {
   decimal,
   boolean
 } from "drizzle-orm/mysql-core";
-var users, categories, products, productCategories, researchCitations, productResearch, orders, orderItems, discountCodes, giftCards, siteSettings, cartItems, productVariants;
+var users, categories, products, productCategories, researchCitations, productResearch, orders, orderItems, discountCodes, giftCards, giftCardTransactions, siteSettings, cartItems, productVariants;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -29,7 +29,7 @@ var init_schema = __esm({
       name: text("name"),
       email: varchar("email", { length: 320 }),
       loginMethod: varchar("loginMethod", { length: 64 }),
-      role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+      role: mysqlEnum("role", ["user", "admin", "super_admin"]).default("user").notNull(),
       // Custom auth fields
       passwordHash: varchar("passwordHash", { length: 255 }),
       username: varchar("username", { length: 100 }),
@@ -148,6 +148,8 @@ var init_schema = __esm({
       total: decimal("total", { precision: 10, scale: 2 }).notNull(),
       // Discount code used
       discountCode: varchar("discountCode", { length: 50 }),
+      giftCardCode: varchar("giftCardCode", { length: 9 }),
+      giftCardAmount: decimal("giftCardAmount", { precision: 10, scale: 2 }).default("0.00"),
       notes: text("notes"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
@@ -186,10 +188,24 @@ var init_schema = __esm({
       originalAmount: decimal("originalAmount", { precision: 10, scale: 2 }).notNull(),
       balance: decimal("balance", { precision: 10, scale: 2 }).notNull(),
       purchaserEmail: varchar("purchaserEmail", { length: 320 }),
+      recipientEmail: varchar("recipientEmail", { length: 320 }),
       orderId: int("orderId"),
       isActive: boolean("isActive").default(true).notNull(),
+      emailStatus: varchar("emailStatus", { length: 50 }).default("pending"),
+      expiresAt: timestamp("expiresAt"),
+      lastUsedAt: timestamp("lastUsedAt"),
       createdAt: timestamp("createdAt").defaultNow().notNull(),
       updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+    });
+    giftCardTransactions = mysqlTable("giftCardTransactions", {
+      id: int("id").autoincrement().primaryKey(),
+      giftCardId: int("giftCardId").notNull(),
+      orderId: int("orderId"),
+      type: mysqlEnum("type", ["issue", "reserve", "redeem", "release", "void"]).notNull(),
+      amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+      balanceAfter: decimal("balanceAfter", { precision: 10, scale: 2 }),
+      note: text("note"),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
     });
     siteSettings = mysqlTable("siteSettings", {
       id: int("id").autoincrement().primaryKey(),
@@ -304,11 +320,9 @@ function localAssetExists(image) {
   const filename = image.replace(/^\/assets\//, "");
   return fs.existsSync(path.join(process.cwd(), "client", "public", "assets", filename));
 }
-
-const NON_VIAL_TERMS2 = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
 function rowIsNonVialProduct(row) {
-  const text = [row.slug, row.name, row.form, row.category].filter(Boolean).join(" ").toLowerCase();
-  return NON_VIAL_TERMS2.some((term) => text.includes(term));
+  const text2 = [row.slug, row.name, row.form, row.category].filter(Boolean).join(" ").toLowerCase();
+  return NON_VIAL_TERMS.some((term) => text2.includes(term));
 }
 function generatedVialUrlForRow(row) {
   const slug = slugifyValue(String(row.slug || row.name || "product")) || "product";
@@ -318,7 +332,7 @@ function generatedVialUrlForRow(row) {
   params.set("v", "rvr-photoreal-adaptive-fit-v1");
   return `/api/vial/${slug}.png?${params.toString()}`;
 }
-function isLegacyBundledVialAsset2(value) {
+function isLegacyBundledVialAsset(value) {
   const image = String(value || "").toLowerCase();
   if (!image) return false;
   if (image.startsWith("/assets/products/")) return false;
@@ -329,49 +343,6 @@ function isGeneratedOrFallbackImage(value) {
   if (!image) return true;
   return image.startsWith("/api/vial/") || image.includes("generated-vials/") || image.includes("rvr-vial-template-single") || image.includes("/vials/") || image.includes("placeholder") || image.startsWith("/assets/") && !localAssetExists(image);
 }
-function getNihResearchProfile(row) {
-  const haystack = `${String(row.slug || "")} ${String(row.name || "")}`.toLowerCase();
-  return NIH_RESEARCH_PROFILES.find((profile) => profile.keys.some((key) => haystack.includes(key))) || NIH_GENERIC_RESEARCH_PROFILE;
-}
-async function ensureNihResearchDescriptions(conn) {
-  console.log("[DB init] NIH research auto-seed disabled; preserving admin-entered descriptions, research details, and citations.");
-  return;
-  const [rows] = await conn.execute(`SELECT id, name, slug FROM products ORDER BY id ASC`);
-  if (!rows.length) return;
-  for (const row of rows) {
-    const profile = getNihResearchProfile(row);
-    await conn.execute(
-      `UPDATE products SET shortDescription = ?, description = ? WHERE id = ?`,
-      [profile.shortDescription, profile.description, row.id]
-    );
-    await conn.execute(`DELETE FROM productResearch WHERE productId = ?`, [row.id]);
-    await conn.execute(
-      `INSERT INTO productResearch (productId, overview, chemicalMakeup, researchContent)
-       VALUES (?, ?, NULL, ?)`,
-      [row.id, profile.overview, profile.researchContent]
-    );
-    await conn.execute(`DELETE FROM researchCitations WHERE productId = ?`, [row.id]);
-    for (let i = 0; i < profile.citations.length; i++) {
-      const citation = profile.citations[i];
-      await conn.execute(
-        `INSERT INTO researchCitations (productId, citationNumber, title, authors, journal, year, url, summary, sortOrder)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          row.id,
-          i + 1,
-          citation.title,
-          citation.authors || null,
-          citation.journal || "NIH/PubMed",
-          citation.year || null,
-          citation.url,
-          citation.summary || null,
-          i
-        ]
-      );
-    }
-  }
-  console.log(`[DB init] NIH/PubMed descriptions and citations verified for ${rows.length} products.`);
-}
 async function ensureProductDisplayData(conn) {
   const [rows] = await conn.execute(
     `SELECT id, name, slug, price, imageUrl, size, contents, form, isActive, sortOrder FROM products ORDER BY sortOrder ASC, id ASC`
@@ -380,7 +351,7 @@ async function ensureProductDisplayData(conn) {
   for (const row of rows) {
     const currentImage = String(row.imageUrl || "");
     if (!rowIsNonVialProduct(row)) {
-      if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset2(currentImage)) {
+      if (isGeneratedOrFallbackImage(currentImage) || isLegacyBundledVialAsset(currentImage)) {
         const hdVialUrl = generatedVialUrlForRow(row);
         await conn.execute(`UPDATE products SET imageUrl = ? WHERE id = ?`, [hdVialUrl, row.id]);
         row.imageUrl = hdVialUrl;
@@ -479,6 +450,16 @@ async function ensureDefaultCatalog(conn) {
   }
   console.log(`[DB init] Seeded ${DEFAULT_PRODUCTS.length} products.`);
 }
+async function ensureConfiguredSuperAdmin(conn) {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminUsername = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+  if (adminEmail) {
+    await conn.execute("UPDATE users SET role = 'super_admin' WHERE LOWER(email) = ?", [adminEmail]);
+  }
+  if (adminUsername) {
+    await conn.execute("UPDATE users SET role = 'super_admin' WHERE LOWER(username) = ?", [adminUsername]);
+  }
+}
 async function ensureProductColumnTypes(conn) {
   const statements = [
     "ALTER TABLE products MODIFY COLUMN description LONGTEXT",
@@ -495,6 +476,13 @@ async function ensureProductColumnTypes(conn) {
     } catch (error) {
       console.warn("[DB init] Could not normalize product column type:", statement, error);
     }
+  }
+}
+async function ensureUserRoleEnum(conn) {
+  try {
+    await conn.execute("ALTER TABLE users MODIFY COLUMN role enum('user','admin','super_admin') NOT NULL DEFAULT 'user'");
+  } catch (error) {
+    console.warn("[DB init] Could not normalize users.role enum:", error);
   }
 }
 async function addColumnIfMissing(conn, table, column, definition) {
@@ -540,7 +528,39 @@ async function ensureDefaultSiteSettings(conn) {
     );
   }
 }
-
+async function clearLegacyResearchDefaultsOnce(conn) {
+  const cleanupKey = "research_content_citations_cleared_2026_06_02_v2";
+  const [existing] = await conn.execute(
+    `SELECT id FROM siteSettings WHERE settingKey = ? LIMIT 1`,
+    [cleanupKey]
+  );
+  if (existing.length) return;
+  await conn.execute(`UPDATE productResearch SET overview = '', researchContent = ''`);
+  await conn.execute(`DELETE FROM researchCitations`);
+  await conn.execute(
+    `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE settingValue = settingValue`,
+    [cleanupKey, "true", "boolean", "Research Content/Citations Cleanup Complete", "general"]
+  );
+  console.log("[DB init] Cleared legacy research content and citations once.");
+}
+async function disableFeaturedProductsOnce(conn) {
+  const cleanupKey = "featured_products_disabled_2026_06_02";
+  const [existing] = await conn.execute(
+    `SELECT id FROM siteSettings WHERE settingKey = ? LIMIT 1`,
+    [cleanupKey]
+  );
+  if (existing.length) return;
+  await conn.execute(`UPDATE products SET isFeatured = false`);
+  await conn.execute(
+    `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE settingValue = settingValue`,
+    [cleanupKey, "true", "boolean", "Featured Products Disabled", "general"]
+  );
+  console.log("[DB init] Disabled featured product flags once.");
+}
 async function ensureDatabaseReady() {
   if (initialized) return;
   if (initPromise) return initPromise;
@@ -560,11 +580,15 @@ async function ensureDatabaseReady() {
       for (const [table, column, definition] of REQUIRED_COLUMNS) {
         await addColumnIfMissing(conn, table, column, definition);
       }
+      await ensureUserRoleEnum(conn);
+      await ensureConfiguredSuperAdmin(conn);
       await ensureProductColumnTypes(conn);
       await ensureDefaultSiteSettings(conn);
+      await clearLegacyResearchDefaultsOnce(conn);
+      await disableFeaturedProductsOnce(conn);
       await ensureDefaultCatalog(conn);
       await ensureProductDisplayData(conn);
-        console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
+      console.log("[DB init] Database schema ready. Users table columns verified. Catalog verified. Product display data verified.");
       initialized = true;
     } finally {
       await conn.end();
@@ -576,7 +600,7 @@ async function ensureDatabaseReady() {
   });
   return initPromise;
 }
-var TABLES, REQUIRED_COLUMNS, DEFAULT_PRODUCTS, DEFAULT_CATEGORIES, _assetMap, NIH_RESEARCH_PROFILES, NIH_GENERIC_RESEARCH_PROFILE, initialized, initPromise;
+var TABLES, REQUIRED_COLUMNS, DEFAULT_PRODUCTS, DEFAULT_CATEGORIES, _assetMap, NON_VIAL_TERMS, initialized, initPromise;
 var init_db_init = __esm({
   "server/db-init.ts"() {
     "use strict";
@@ -587,7 +611,7 @@ var init_db_init = __esm({
   name text,
   email varchar(320),
   loginMethod varchar(64),
-  role enum('user','admin') NOT NULL DEFAULT 'user',
+  role enum('user','admin','super_admin') NOT NULL DEFAULT 'user',
   passwordHash varchar(255),
   username varchar(100),
   phone varchar(20),
@@ -698,6 +722,8 @@ var init_db_init = __esm({
   shippingCost decimal(10,2) DEFAULT '0.00',
   total decimal(10,2) NOT NULL,
   discountCode varchar(50),
+  giftCardCode varchar(9),
+  giftCardAmount decimal(10,2) DEFAULT '0.00',
   notes text,
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -738,12 +764,27 @@ var init_db_init = __esm({
   originalAmount decimal(10,2) NOT NULL,
   balance decimal(10,2) NOT NULL,
   purchaserEmail varchar(320),
+  recipientEmail varchar(320),
   orderId int,
   isActive boolean NOT NULL DEFAULT true,
+  emailStatus varchar(50) DEFAULT 'pending',
+  expiresAt timestamp NULL,
+  lastUsedAt timestamp NULL,
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY giftCards_code_unique (code)
+)`,
+      `CREATE TABLE IF NOT EXISTS giftCardTransactions (
+  id int AUTO_INCREMENT NOT NULL,
+  giftCardId int NOT NULL,
+  orderId int,
+  type enum('issue','reserve','redeem','release','void') NOT NULL,
+  amount decimal(10,2) NOT NULL,
+  balanceAfter decimal(10,2),
+  note text,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
 )`,
       `CREATE TABLE IF NOT EXISTS productAssets (
   id int AUTO_INCREMENT NOT NULL,
@@ -755,7 +796,7 @@ var init_db_init = __esm({
   PRIMARY KEY (id),
   UNIQUE KEY productAssets_name_unique (name)
 )`,
-`CREATE TABLE IF NOT EXISTS siteSettings (
+      `CREATE TABLE IF NOT EXISTS siteSettings (
   id int AUTO_INCREMENT NOT NULL,
   settingKey varchar(100) NOT NULL,
   settingValue text,
@@ -797,7 +838,7 @@ var init_db_init = __esm({
       ["users", "name", "text"],
       ["users", "email", "varchar(320)"],
       ["users", "loginMethod", "varchar(64)"],
-      ["users", "role", "enum('user','admin') NOT NULL DEFAULT 'user'"],
+      ["users", "role", "enum('user','admin','super_admin') NOT NULL DEFAULT 'user'"],
       ["users", "passwordHash", "varchar(255)"],
       ["users", "username", "varchar(100)"],
       ["users", "phone", "varchar(20)"],
@@ -837,7 +878,14 @@ var init_db_init = __esm({
       ["orderItems", "variantId", "int"],
       ["orderItems", "variantLabel", "varchar(255)"],
       ["cartItems", "variantId", "int"],
-      ["cartItems", "variantLabel", "varchar(255)"]
+      ["cartItems", "variantLabel", "varchar(255)"],
+      // Gift card checkout, lifecycle, and audit columns for existing Railway DBs.
+      ["orders", "giftCardCode", "varchar(9)"],
+      ["orders", "giftCardAmount", "decimal(10,2) DEFAULT '0.00'"],
+      ["giftCards", "recipientEmail", "varchar(320)"],
+      ["giftCards", "emailStatus", "varchar(50) DEFAULT 'pending'"],
+      ["giftCards", "expiresAt", "timestamp NULL"],
+      ["giftCards", "lastUsedAt", "timestamp NULL"]
     ];
     DEFAULT_PRODUCTS = [
       { slug: "bpc-157-5mg", name: "BPC-157 5mg", image: "/assets/bpc-157-5mg_1e10350a.webp", category: "Peptides", price: "39.99" },
@@ -897,162 +945,7 @@ var init_db_init = __esm({
     ];
     DEFAULT_CATEGORIES = ["Peptides", "Blends", "Reconstitution", "Wellness", "Skin Care"];
     _assetMap = null;
-    NIH_RESEARCH_PROFILES = [
-      {
-        keys: ["bpc-157", "bpc 157", "wolverine-blend", "wolverine blend"],
-        shortDescription: "NIH-indexed BPC-157 literature is primarily experimental and focuses on tissue-repair and recovery models.",
-        description: "NIH-indexed publications describe BPC-157 as an experimental peptide studied mainly in preclinical tissue-repair, tendon, muscle, gastrointestinal, and recovery models. Published summaries report promising research signals, while also noting that broad human validation remains limited. This material is offered for research, laboratory, or analytical use only.",
-        overview: "BPC-157 research appears in NIH-indexed literature as an experimental peptide topic with most evidence coming from animal, in vitro, and early exploratory human reports.",
-        researchContent: "Description\nNIH-indexed BPC-157 studies describe research interest around tissue repair, tendon and muscle models, gastrointestinal healing models, and early safety observations. The literature should be interpreted as research-focused and not as established clinical guidance.",
-        citations: [
-          { title: "Emerging Use of BPC-157 in Orthopaedic Sports Medicine", authors: "Vasireddi et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40756949/", summary: "Systematic review noting promising but low-level evidence." },
-          { title: "Safety of Intravenous Infusion of BPC157 in Humans", authors: "Lee et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40131143/", summary: "Pilot human safety observation." },
-          { title: "Gastric pentadecapeptide BPC 157 as an effective therapy...", authors: "Novinscak et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/18668315/", summary: "Preclinical muscle-healing model." },
-          { title: "Brain-gut Axis and Pentadecapeptide BPC 157", journal: "PubMed", year: "2016", url: "https://pubmed.ncbi.nlm.nih.gov/27138887/", summary: "Review of experimental brain-gut axis research." },
-          { title: "Impact of pentadecapeptide BPC 157 on muscle healing...", authors: "Pevec et al.", journal: "PubMed", year: "2010", url: "https://pubmed.ncbi.nlm.nih.gov/20190676/", summary: "Preclinical muscle-healing research." }
-        ]
-      },
-      {
-        keys: ["semaglutide", "tirzepatide", "retatrutide", "cagrilintide", "cagrisema", "mazdutide", "survodutide", "glp-1"],
-        shortDescription: "NIH-indexed incretin and amylin-analog literature focuses on metabolic, appetite, and body-weight endpoints.",
-        description: "NIH-indexed publications on GLP-1, GIP, glucagon, and amylin-pathway analogs describe research focused on appetite, energy intake, glycemic and metabolic markers, and body-weight endpoints. Study conclusions vary by compound and population, and reported gastrointestinal tolerability is an important recurring research consideration. This material is offered for research, laboratory, or analytical use only.",
-        overview: "This product belongs to a research area represented in NIH-indexed literature on incretin, amylin, and multi-agonist metabolic signaling compounds.",
-        researchContent: "Description\nNIH-indexed clinical and review literature describes semaglutide, tirzepatide, retatrutide, cagrilintide, and related incretin/amylin-pathway compounds as research topics centered on energy intake, appetite regulation, glycemic markers, and body-weight outcomes. These studies are compound- and protocol-specific and should not be generalized outside a research context.",
-        citations: [
-          { title: "Cagrilintide-Semaglutide in Adults with Overweight or Obesity", authors: "Davies et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40544432/", summary: "Clinical literature on cagrilintide-semaglutide body-weight endpoints." },
-          { title: "Tirzepatide as Compared with Semaglutide...", authors: "Aronne et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40353578/", summary: "Clinical comparison of tirzepatide and semaglutide." },
-          { title: "Efficacy of GLP-1 analog peptides, semaglutide, tirzepatide and retatrutide", authors: "Hitaka et al.", journal: "PubMed", year: "2026", url: "https://pubmed.ncbi.nlm.nih.gov/41723268/", summary: "Review/meta-analysis style GLP-1 analog research." },
-          { title: "Effects of once-weekly semaglutide on appetite, energy intake...", authors: "Blundell et al.", journal: "PubMed", year: "2017", url: "https://pubmed.ncbi.nlm.nih.gov/28266779/", summary: "Appetite and energy-intake endpoints." },
-          { title: "Comparative effectiveness of GLP-1 receptor agonists...", authors: "Yao et al.", journal: "PubMed", year: "2024", url: "https://pubmed.ncbi.nlm.nih.gov/38286487/", summary: "Comparative GLP-1 receptor agonist research." }
-        ]
-      },
-      {
-        keys: ["ghk", "ghk-cu", "copper", "curenex", "rm-repair", "urea-cream", "sunscreen", "skin", "cleanser", "moisturizing"],
-        shortDescription: "NIH-indexed copper-peptide and dermatology literature focuses on skin permeation, remodeling, and topical research models.",
-        description: "NIH-indexed copper-peptide literature describes GHK and GHK-Cu as research topics in skin permeation, topical delivery, remodeling biology, and cosmetic or wound-related models. Some studies report supportive findings while others describe mixed or context-specific outcomes. This material is offered for research, laboratory, or analytical use only.",
-        overview: "Copper-peptide and skin-care related products are represented in NIH-indexed literature through topical delivery, skin remodeling, permeation, and cosmetic research contexts.",
-        researchContent: "Description\nNIH-indexed studies involving GHK, GHK-Cu, and related topical peptide systems focus on skin delivery, fibroblast biology, remodeling, and cosmetic research models. Results should be read as product- and protocol-specific rather than universal clinical conclusions.",
-        citations: [
-          { title: "Topically applied GHK as an anti-wrinkle peptide", authors: "Mortazavi et al.", journal: "PubMed", year: "2024", url: "https://pubmed.ncbi.nlm.nih.gov/39963574/", summary: "Topical GHK and GHK-Cu permeation research." },
-          { title: "Microneedle-Mediated Delivery of Copper Peptide...", authors: "Li et al.", journal: "PubMed", year: "2015", url: "https://pubmed.ncbi.nlm.nih.gov/25690343/", summary: "GHK-Cu delivery and skin permeation research." },
-          { title: "Stem cell recovering effect of copper-free GHK in skin", authors: "Choi et al.", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/23019153/", summary: "GHK skin cell research." },
-          { title: "Effects of topical copper tripeptide complex on CO2 laser-resurfaced skin", authors: "Miller et al.", journal: "PubMed", year: "2006", url: "https://pubmed.ncbi.nlm.nih.gov/16847171/", summary: "Clinical-context topical copper tripeptide research." },
-          { title: "In Vitro Observations on the Influence of Copper Peptide...", authors: "Huang et al.", journal: "PubMed", year: "2007", url: "https://pubmed.ncbi.nlm.nih.gov/17603859/", summary: "In vitro fibroblast/remodeling research." }
-        ]
-      },
-      {
-        keys: ["thymosin-alpha", "thymosin alpha", "tb-500", "thymosin beta", "super-wolf", "super wolf"],
-        shortDescription: "NIH-indexed thymosin literature focuses on immune modulation and regenerative biology research.",
-        description: "NIH-indexed thymosin literature describes thymosin alpha-1 primarily in immunomodulation research and thymosin beta-4 related topics in regenerative and tissue-repair biology. Study conclusions are context-dependent and vary by model, disease state, and study design. This material is offered for research, laboratory, or analytical use only.",
-        overview: "Thymosin-family peptides are discussed in NIH-indexed literature across immune regulation, inflammatory models, and tissue-repair biology.",
-        researchContent: "Description\nNIH-indexed thymosin studies include immune-regulation research involving thymosin alpha-1 and regenerative biology literature involving thymosin beta-4 related topics. These publications do not establish universal effects and should be interpreted within their stated research models.",
-        citations: [
-          { title: "Thymosin alpha 1 alleviates inflammation and prevents infection...", authors: "Tian et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40599771/", summary: "Clinical immune-regulation research context." },
-          { title: "Efficacy of thymosin \u03B11 for sepsis: a systematic review and meta-analysis", authors: "Gu et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40969554/", summary: "Systematic review of thymosin alpha-1 research." },
-          { title: "Impact of the immunomodulating peptide thymosin alpha 1...", authors: "Binsfeld et al.", journal: "PubMed", year: "2015", url: "https://pubmed.ncbi.nlm.nih.gov/25971542/", summary: "Immunomodulation model research." },
-          { title: "Thymosin \u03B24: a multi-functional regenerative peptide", authors: "Goldstein et al.", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/22074294/", summary: "Review of thymosin beta-4 regenerative biology." },
-          { title: "The efficacy of thymosin alpha-1 therapy in moderate to critical COVID-19 patients", authors: "Soeroto et al.", journal: "PubMed", year: "2023", url: "https://pubmed.ncbi.nlm.nih.gov/37845598/", summary: "Clinical-context thymosin alpha-1 research." }
-        ]
-      },
-      {
-        keys: ["tesamorelin", "sermorelin", "ipamorelin", "cjc-1295", "cjc 1295"],
-        shortDescription: "NIH-indexed GHRH/GH-secretagogue literature focuses on GH/IGF-1 signaling and metabolic endpoints.",
-        description: "NIH-indexed literature on tesamorelin, sermorelin, CJC-1295, and ipamorelin describes research on growth-hormone releasing hormone analogs and selective growth-hormone secretagogue signaling. Reported endpoints include GH/IGF-1 response, metabolic markers, visceral adipose tissue, and safety/tolerability observations depending on the study. This material is offered for research, laboratory, or analytical use only.",
-        overview: "GHRH analog and GH-secretagogue research appears in NIH-indexed literature through endocrine signaling, GH/IGF-1 response, and metabolic endpoint studies.",
-        researchContent: "Description\nNIH-indexed studies describe growth-hormone releasing hormone analogs and GH secretagogues as research tools for evaluating GH/IGF-1 signaling and metabolic endpoints. Findings are specific to the compound, population, and study protocol.",
-        citations: [
-          { title: "Effect of tesamorelin on visceral fat and liver fat...", authors: "Stanley et al.", journal: "PubMed", year: "2014", url: "https://pubmed.ncbi.nlm.nih.gov/25038357/", summary: "Tesamorelin metabolic endpoint research." },
-          { title: "Safety and metabolic effects of tesamorelin...", authors: "Clemmons et al.", journal: "PubMed", year: "2017", url: "https://pubmed.ncbi.nlm.nih.gov/28617838/", summary: "Tesamorelin safety/metabolic research." },
-          { title: "Efficacy and safety of tesamorelin in people with HIV...", authors: "Russo et al.", journal: "PubMed", year: "2024", url: "https://pubmed.ncbi.nlm.nih.gov/38905488/", summary: "Tesamorelin clinical-context analysis." },
-          { title: "Sermorelin: a review of its use...", authors: "Prakash et al.", journal: "PubMed", year: "1999", url: "https://pubmed.ncbi.nlm.nih.gov/18031173/", summary: "Sermorelin review." },
-          { title: "Ipamorelin, the first selective growth hormone secretagogue", authors: "Raun et al.", journal: "PubMed", year: "1998", url: "https://pubmed.ncbi.nlm.nih.gov/9849822/", summary: "Ipamorelin GH-secretagogue selectivity research." }
-        ]
-      },
-      {
-        keys: ["kpv"],
-        shortDescription: "NIH-indexed KPV literature focuses on melanocortin-derived anti-inflammatory research models.",
-        description: "NIH-indexed publications describe KPV as a melanocortin-derived tripeptide studied in anti-inflammatory signaling models, including intestinal and airway inflammation systems. Reported conclusions are largely model-specific and should be interpreted as research findings rather than clinical direction. This material is offered for research, laboratory, or analytical use only.",
-        overview: "KPV is represented in NIH-indexed literature as a melanocortin-derived peptide studied for inflammation signaling and model-system research.",
-        researchContent: "Description\nNIH-indexed KPV studies describe anti-inflammatory signaling in preclinical and mechanistic models, with research focused on pathways such as epithelial uptake, NF-kB signaling, and melanocortin-related biology.",
-        citations: [
-          { title: "Melanocortin-derived tripeptide KPV has anti-inflammatory properties", authors: "Kannengiesser et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/18092346/", summary: "KPV anti-inflammatory research in colitis models." },
-          { title: "PepT1-mediated tripeptide KPV uptake reduces intestinal inflammation", authors: "Dalmasso et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/18061177/", summary: "KPV uptake and intestinal inflammation model." },
-          { title: "Dissection of the anti-inflammatory effect of the core and C-terminal MSH peptides", authors: "Getting et al.", journal: "PubMed", year: "2003", url: "https://pubmed.ncbi.nlm.nih.gov/12750433/", summary: "Mechanistic anti-inflammatory peptide research." },
-          { title: "Mechanism of KPV action and a role for MC3R agonists", authors: "Land et al.", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/22837805/", summary: "KPV/NF-kB signaling research." },
-          { title: "Critical role of PepT1 in promoting colitis-associated cancer...", authors: "Viennois et al.", journal: "PubMed", year: "2016", url: "https://pubmed.ncbi.nlm.nih.gov/27458604/", summary: "KPV in colitis-associated model research." }
-        ]
-      },
-      {
-        keys: ["mots-c", "ss-31", "nad", "l-carnitine", "glutathione"],
-        shortDescription: "NIH-indexed mitochondrial and redox literature focuses on metabolism, mitochondrial function, and oxidative-stress models.",
-        description: "NIH-indexed literature on mitochondrial-derived peptides, elamipretide/SS-31, NAD-related biology, glutathione, and L-carnitine focuses on mitochondrial function, metabolic signaling, redox biology, and oxidative-stress models. Research conclusions are pathway- and model-specific. This material is offered for research, laboratory, or analytical use only.",
-        overview: "Mitochondrial and redox-oriented products are represented in NIH-indexed literature through metabolism, mitochondrial quality-control, oxidative-stress, and cellular energetics research.",
-        researchContent: "Description\nNIH-indexed mitochondrial peptide and redox literature describes research focused on mitochondrial function, metabolic dysfunction, oxidative stress, and cellular energetics. These topics should be interpreted as mechanistic or clinical-study findings rather than universal product claims.",
-        citations: [
-          { title: "MOTS-c peptide regulates adipose homeostasis...", authors: "Lu et al.", journal: "PubMed", year: "2019", url: "https://pubmed.ncbi.nlm.nih.gov/30725119/", summary: "MOTS-c metabolic model research." },
-          { title: "A mitochondrial-derived peptide MOTS-c contributes to...", authors: "Bai et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40753494/", summary: "MOTS-c inflammatory/neurologic model research." },
-          { title: "Orally administered MOTS-c analogue ameliorates...", authors: "Jiang et al.", journal: "PubMed", year: "2023", url: "https://pubmed.ncbi.nlm.nih.gov/36528071/", summary: "MOTS-c analogue experimental IBD model." },
-          { title: "Elamipretide (SS-31) improves mitochondrial dysfunction...", authors: "Zhao et al.", journal: "PubMed", year: "2019", url: "https://pubmed.ncbi.nlm.nih.gov/31747905/", summary: "SS-31 mitochondrial dysfunction model." },
-          { title: "SS-31 as a Mitochondrial Protectant...", authors: "Zhang et al.", journal: "PubMed", year: "2022", url: "https://pubmed.ncbi.nlm.nih.gov/35984013/", summary: "SS-31 tendon-healing mitochondrial model." }
-        ]
-      },
-      {
-        keys: ["selank", "semax", "dsip", "pe-22-28", "pinealon", "epithalon", "epitalon"],
-        shortDescription: "NIH-indexed neuropeptide literature focuses on cytokine, sleep, neuroendocrine, and neurologic research models.",
-        description: "NIH-indexed literature on Selank, Semax, DSIP, Epitalon/Epithalon, and related neuropeptide topics describes research in cytokine modulation, sleep measures, neuroendocrine signaling, neurologic model systems, and aging-related peptide research. Evidence strength varies substantially by compound and study model. This material is offered for research, laboratory, or analytical use only.",
-        overview: "Neuropeptide and pineal-peptide topics appear in NIH-indexed literature across sleep research, cytokine biology, neurologic models, and aging-related studies.",
-        researchContent: "Description\nNIH-indexed literature in this group is heterogeneous. Some publications describe measurable cytokine, sleep, neuroendocrine, or neurologic-model effects, while others report limited or model-specific findings. Descriptions should be read as summaries of research topics, not clinical claims.",
-        citations: [
-          { title: "The Influence of Selank on the Level of Cytokines...", authors: "Leonidovna et al.", journal: "PubMed", year: "2021", url: "https://pubmed.ncbi.nlm.nih.gov/32621722/", summary: "Selank cytokine research." },
-          { title: "The Molecular Aspects of Heptapeptide Selank Biological Activity", authors: "Vyunova et al.", journal: "PubMed", year: "2018", url: "https://pubmed.ncbi.nlm.nih.gov/30255741/", summary: "Selank molecular mechanism research." },
-          { title: "Semax peptide targets the \u03BC opioid receptor gene Oprm1...", authors: "Liu et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40692165/", summary: "Semax neurologic-model research." },
-          { title: "Effects of delta sleep-inducing peptide on sleep...", authors: "Bes et al.", journal: "PubMed", year: "1992", url: "https://pubmed.ncbi.nlm.nih.gov/1299794/", summary: "DSIP sleep research with limited clinical significance." },
-          { title: "Overview of Epitalon\u2014Highly Bioactive Pineal Tetrapeptide", authors: "Araj et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40141333/", summary: "Epitalon review literature." }
-        ]
-      },
-      {
-        keys: ["melanotan", "pt-141", "bremelanotide"],
-        shortDescription: "NIH-indexed melanocortin literature focuses on melanocortin signaling, pigmentation, and neuroendocrine research.",
-        description: "NIH-indexed melanocortin literature describes research involving melanocortin signaling, pigmentation pathways, neuroendocrine response, and bremelanotide-related topics. Safety and adverse-event reports are an important part of the published record. This material is offered for research, laboratory, or analytical use only.",
-        overview: "Melanocortin peptides are represented in NIH-indexed literature through pigmentation, neuroendocrine signaling, and safety/adverse-event research contexts.",
-        researchContent: "Description\nNIH-indexed literature involving melanocortin peptides includes pigmentation and neuroendocrine signaling research as well as case reports and safety considerations. Product-specific interpretation requires reading the individual study context.",
-        citations: [
-          { title: "Melanotan II injection resulting in systemic toxicity...", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/23121206/", summary: "Safety/adverse event case report." },
-          { title: "The hormonal regulation of men's sexual desire, arousal...", authors: "Rastrelli et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/40519205/", summary: "Neuroendocrine peptide signaling review." },
-          { title: "Integration of the reproductive and energy balance axes...", journal: "PubMed", year: "2012", url: "https://pubmed.ncbi.nlm.nih.gov/22442260/", summary: "Melanocortin-related neuroendocrine discussion." },
-          { title: "PubMed search: melanotan peptide", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=melanotan+peptide", summary: "Current NIH-indexed melanotan literature search." },
-          { title: "PubMed search: bremelanotide melanocortin", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=bremelanotide+melanocortin", summary: "Current NIH-indexed bremelanotide/melanocortin literature search." }
-        ]
-      },
-      {
-        keys: ["kisspeptin", "oxytocin"],
-        shortDescription: "NIH-indexed kisspeptin and oxytocin literature focuses on reproductive and neuroendocrine signaling research.",
-        description: "NIH-indexed literature describes kisspeptin and oxytocin as neuroendocrine signaling topics studied in reproductive-axis, endocrine, behavioral, and biomarker research contexts. Conclusions are model- and population-specific. This material is offered for research, laboratory, or analytical use only.",
-        overview: "Kisspeptin and oxytocin are represented in NIH-indexed literature through reproductive-axis and neuroendocrine signaling research.",
-        researchContent: "Description\nNIH-indexed kisspeptin and oxytocin publications discuss endocrine signaling, reproductive-axis biology, and related neuroendocrine models. These summaries are for research context only.",
-        citations: [
-          { title: "Sex-dependent increases in oxytocin levels in response to kisspeptin", authors: "Galbiati et al.", journal: "PubMed", year: "2025", url: "https://pubmed.ncbi.nlm.nih.gov/39965102/", summary: "Kisspeptin and oxytocin response research." },
-          { title: "The effect of oxytocin and Kisspeptin-10 in ovary and uterus", authors: "Aslan et al.", journal: "PubMed", year: "2017", url: "https://pubmed.ncbi.nlm.nih.gov/28805600/", summary: "Reproductive tissue model research." },
-          { title: "Changes of placental Kiss-1 mRNA expression...", authors: "Torricelli et al.", journal: "PubMed", year: "2008", url: "https://pubmed.ncbi.nlm.nih.gov/19017815/", summary: "Placental kisspeptin/oxytocin secretion research." },
-          { title: "Neuroendocrine Mechanisms Involved in Male Sexual and Emotional Behavior", authors: "Iovino et al.", journal: "PubMed", year: "2019", url: "https://pubmed.ncbi.nlm.nih.gov/30706797/", summary: "Neuroendocrine signaling review." },
-          { title: "PubMed search: kisspeptin oxytocin", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=kisspeptin+oxytocin", summary: "Current NIH-indexed literature search." }
-        ]
-      }
-    ];
-    NIH_GENERIC_RESEARCH_PROFILE = {
-      keys: [],
-      shortDescription: "NIH/PubMed resources are provided for research-context review.",
-      description: "NIH/PubMed resources are provided below for research-context review. This product is offered for research, laboratory, or analytical use only, and the listed sources should be reviewed directly for product-specific conclusions and limitations.",
-      overview: "This product page includes NIH/PubMed resources for research-context review.",
-      researchContent: "Description\nNIH/PubMed resources are provided for research-context review. The underlying literature should be interpreted directly and in context; this description is not clinical guidance.",
-      citations: [
-        { title: "NIH/PubMed peptide literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=peptide+research", summary: "Current NIH-indexed peptide research literature search." },
-        { title: "NIH/PubMed pharmacology literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=pharmacology+research", summary: "Current NIH-indexed pharmacology research literature search." },
-        { title: "NIH/PubMed laboratory reagent literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=laboratory+reagent+research", summary: "Current NIH-indexed reagent research literature search." },
-        { title: "NIH/PubMed analytical chemistry literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=analytical+chemistry+research", summary: "Current NIH-indexed analytical chemistry research literature search." },
-        { title: "NIH/PubMed toxicology literature search", journal: "NIH/PubMed", year: "Current", url: "https://pubmed.ncbi.nlm.nih.gov/?term=toxicology+research", summary: "Current NIH-indexed toxicology research literature search." }
-      ]
-    };
+    NON_VIAL_TERMS = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
     initialized = false;
     initPromise = null;
   }
@@ -1076,9 +969,13 @@ __export(db_exports, {
   deleteCitation: () => deleteCitation,
   deleteDiscount: () => deleteDiscount,
   deleteProduct: () => deleteProduct,
+  deleteProductCitations: () => deleteProductCitations,
   deleteProductVariant: () => deleteProductVariant,
+  finalizeGiftCardRedemptionForOrder: () => finalizeGiftCardRedemptionForOrder,
+  getAdminUsers: () => getAdminUsers,
   getAllCategories: () => getAllCategories,
   getAllDiscountCodes: () => getAllDiscountCodes,
+  getAllGiftCards: () => getAllGiftCards,
   getAllOrders: () => getAllOrders,
   getAllProducts: () => getAllProducts,
   getAllProductsWithVariantCount: () => getAllProductsWithVariantCount,
@@ -1091,6 +988,7 @@ __export(db_exports, {
   getDiscountByCode: () => getDiscountByCode,
   getFeaturedProducts: () => getFeaturedProducts,
   getGiftCardByCode: () => getGiftCardByCode,
+  getGiftCardTransactions: () => getGiftCardTransactions,
   getOrderById: () => getOrderById,
   getOrderByNumber: () => getOrderByNumber,
   getOrderItems: () => getOrderItems,
@@ -1110,8 +1008,11 @@ __export(db_exports, {
   getVariantById: () => getVariantById,
   incrementDiscountUse: () => incrementDiscountUse,
   issueGiftCardsForOrder: () => issueGiftCardsForOrder,
+  previewGiftCardApplication: () => previewGiftCardApplication,
+  releaseGiftCardReservationForOrder: () => releaseGiftCardReservationForOrder,
   removeFromCart: () => removeFromCart,
   replaceProductVariants: () => replaceProductVariants,
+  reserveGiftCardForOrder: () => reserveGiftCardForOrder,
   updateCartItem: () => updateCartItem,
   updateCategory: () => updateCategory,
   updateCitation: () => updateCitation,
@@ -1124,12 +1025,14 @@ __export(db_exports, {
   updateSetting: () => updateSetting,
   updateUserPassword: () => updateUserPassword,
   updateUserProfile: () => updateUserProfile,
+  updateUserRole: () => updateUserRole,
   upsertProductResearch: () => upsertProductResearch,
   upsertSetting: () => upsertSetting,
   upsertUser: () => upsertUser
 });
-import { eq, and, like, desc, asc, sql, inArray, lte } from "drizzle-orm";
+import { eq, and, like, desc, asc, sql, inArray, or, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import crypto2 from "crypto";
 async function getDb() {
   if (process.env.DATABASE_URL) {
     await ensureDatabaseReady();
@@ -1209,7 +1112,7 @@ async function createLocalUser(data) {
     passwordHash: data.passwordHash,
     name: data.name || data.username,
     loginMethod: "local",
-    role: isConfiguredAdmin ? "admin" : "user",
+    role: isConfiguredAdmin ? "super_admin" : "user",
     lastSignedIn: /* @__PURE__ */ new Date()
   });
   return getUserByOpenId(openId);
@@ -1223,6 +1126,17 @@ async function updateUserProfile(userId, data) {
   const db = await getDb();
   if (!db) return;
   await db.update(users).set(data).where(eq(users.id, userId));
+}
+async function updateUserRole(userId, role) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ role }).where(eq(users.id, userId));
+  return getUserById(userId);
+}
+async function getAdminUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: users.id, name: users.name, email: users.email, username: users.username, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn }).from(users).where(or(eq(users.role, "admin"), eq(users.role, "super_admin"))).orderBy(desc(users.createdAt));
 }
 async function getAllUsers() {
   const db = await getDb();
@@ -1506,6 +1420,11 @@ async function deleteCitation(id) {
   if (!db) return;
   await db.delete(researchCitations).where(eq(researchCitations.id, id));
 }
+async function deleteProductCitations(productId) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(researchCitations).where(eq(researchCitations.productId, productId));
+}
 async function createOrder(data, items) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -1570,11 +1489,221 @@ async function updateOrderPayment(paymentId, paymentStatus) {
   const updateData = { paymentStatus };
   if (newStatus) updateData.status = newStatus;
   await db.update(orders).set(updateData).where(eq(orders.paymentId, paymentId));
+  const matchedOrders = await db.select().from(orders).where(eq(orders.paymentId, paymentId)).limit(1);
+  const order = matchedOrders[0];
+  if (!order) return;
   if (newStatus === "paid") {
-    const paidOrders = await db.select().from(orders).where(eq(orders.paymentId, paymentId)).limit(1);
-    const order = paidOrders[0];
-    if (order) await issueGiftCardsForOrder(order.id, order.guestEmail || void 0);
+    await finalizeGiftCardRedemptionForOrder(order.id);
+    await issueGiftCardsForOrder(order.id, order.guestEmail || void 0);
+  } else if (newStatus === "cancelled") {
+    await releaseGiftCardReservationForOrder(order.id);
   }
+}
+function parseGiftCardRecipientEmail(label) {
+  const text2 = String(label || "");
+  const match = text2.match(/Recipient:\s*([^|\s]+@[^|\s]+\.[^|\s]+)/i);
+  return match ? match[1].trim() : void 0;
+}
+function normalizeGiftCardCode(code) {
+  const alnum = String(code || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 8);
+  return alnum.length > 4 ? `${alnum.slice(0, 4)}-${alnum.slice(4)}` : alnum;
+}
+function generateGiftCardCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let raw = "";
+  for (let i = 0; i < 8; i += 1) {
+    raw += alphabet[crypto2.randomInt(0, alphabet.length)];
+  }
+  return `${raw.slice(0, 4)}-${raw.slice(4)}`;
+}
+function giftCardExpiryDate(from = /* @__PURE__ */ new Date()) {
+  const expiresAt = new Date(from);
+  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  return expiresAt;
+}
+async function sendGiftCardEmail(to, code, amount, expiresAt) {
+  if (!to) return false;
+  const subject = "Your River Valley Research Peptides Gift Card";
+  const text2 = [
+    "Thank you for your gift card purchase.",
+    "",
+    `Gift card code: ${code}`,
+    `Amount: $${amount.toFixed(2)}`,
+    expiresAt ? `Expires: ${expiresAt.toLocaleDateString()}` : "Expires: 1 year from purchase date",
+    "",
+    "Use this code during checkout in the Use gift card field."
+  ].join("\n");
+  const resendKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.GIFT_CARD_FROM_EMAIL || process.env.FROM_EMAIL || "orders@rivervalleyresearchpeptides.com";
+  if (resendKey) {
+    try {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: fromEmail, to, subject, text: text2 })
+      });
+      return true;
+    } catch (error) {
+      console.warn("[Gift Card Email] Resend delivery failed.", error);
+    }
+  }
+  const webhookUrl = process.env.GIFT_CARD_EMAIL_WEBHOOK_URL;
+  if (webhookUrl) {
+    try {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject, text: text2, code, amount, expiresAt })
+      });
+      return true;
+    } catch (error) {
+      console.warn("[Gift Card Email] Webhook delivery failed.", error);
+    }
+  }
+  console.log(`[Gift Card Email Pending] ${to}: ${code} for $${amount.toFixed(2)}`);
+  return false;
+}
+async function addGiftCardTransaction(data) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(giftCardTransactions).values(data);
+}
+async function getGiftCardTransactions(giftCardId) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(giftCardTransactions).where(eq(giftCardTransactions.giftCardId, giftCardId)).orderBy(desc(giftCardTransactions.createdAt));
+}
+async function getOpenReservedAmount(giftCardId) {
+  const txns = await getGiftCardTransactions(giftCardId);
+  const reserves = /* @__PURE__ */ new Map();
+  const closed = /* @__PURE__ */ new Set();
+  for (const txn of txns) {
+    const orderId = Number(txn.orderId || 0);
+    if (!orderId) continue;
+    if (txn.type === "reserve") {
+      reserves.set(orderId, (reserves.get(orderId) || 0) + Number(txn.amount || 0));
+    }
+    if (txn.type === "redeem" || txn.type === "release" || txn.type === "void") {
+      closed.add(orderId);
+    }
+  }
+  let total = 0;
+  for (const [orderId, amount] of reserves.entries()) {
+    if (!closed.has(orderId)) total += amount;
+  }
+  return total;
+}
+function giftCardExpired(card) {
+  return card?.expiresAt && new Date(card.expiresAt).getTime() < Date.now();
+}
+async function getGiftCardByCode(code) {
+  const db = await getDb();
+  if (!db) return void 0;
+  const normalized = normalizeGiftCardCode(code);
+  const result = await db.select().from(giftCards).where(eq(giftCards.code, normalized)).limit(1);
+  return result[0];
+}
+async function getAllGiftCards() {
+  const db = await getDb();
+  if (!db) return [];
+  const cards = await db.select().from(giftCards).orderBy(desc(giftCards.createdAt));
+  return Promise.all(cards.map(async (card) => {
+    const reservedAmount = await getOpenReservedAmount(card.id);
+    const balance = Number(card.balance || 0);
+    return {
+      ...card,
+      reservedAmount: reservedAmount.toFixed(2),
+      availableBalance: Math.max(0, balance - reservedAmount).toFixed(2),
+      expired: giftCardExpired(card)
+    };
+  }));
+}
+async function createGiftCard(data) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(giftCards).values({ ...data, code: normalizeGiftCardCode(data.code) });
+}
+async function previewGiftCardApplication(code, amountDue) {
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive || giftCardExpired(card)) {
+    return { valid: false, applied: 0, availableBalance: 0, remainingDue: amountDue, message: "Invalid, expired, or depleted gift card" };
+  }
+  const reserved = await getOpenReservedAmount(card.id);
+  const balance = Number(card.balance || 0);
+  const availableBalance = Math.max(0, balance - reserved);
+  if (availableBalance <= 0) {
+    return { valid: false, applied: 0, availableBalance: 0, remainingDue: amountDue, message: "Gift card has no available balance" };
+  }
+  const applied = Math.max(0, Math.min(availableBalance, amountDue));
+  return {
+    valid: applied > 0,
+    applied,
+    availableBalance,
+    remainingDue: Math.max(0, amountDue - applied),
+    message: `Gift card available balance: $${availableBalance.toFixed(2)}`
+  };
+}
+async function reserveGiftCardForOrder(code, amount, orderId) {
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive || giftCardExpired(card)) return { applied: 0, remainingBalance: 0 };
+  const preview = await previewGiftCardApplication(code, amount);
+  const applied = Math.min(preview.applied, amount);
+  if (applied <= 0) return { applied: 0, remainingBalance: preview.availableBalance };
+  await addGiftCardTransaction({
+    giftCardId: card.id,
+    orderId,
+    type: "reserve",
+    amount: applied.toFixed(2),
+    balanceAfter: Number(card.balance || 0).toFixed(2),
+    note: "Reserved for pending checkout"
+  });
+  return { applied, remainingBalance: Math.max(0, preview.availableBalance - applied) };
+}
+async function releaseGiftCardReservationForOrder(orderId) {
+  const db = await getDb();
+  if (!db) return;
+  const order = await getOrderById(orderId);
+  const code = order?.giftCardCode;
+  const amount = Number(order?.giftCardAmount || 0);
+  if (!code || amount <= 0) return;
+  const card = await getGiftCardByCode(code);
+  if (!card) return;
+  await addGiftCardTransaction({
+    giftCardId: card.id,
+    orderId,
+    type: "release",
+    amount: amount.toFixed(2),
+    balanceAfter: Number(card.balance || 0).toFixed(2),
+    note: "Released because checkout payment did not complete"
+  });
+}
+async function finalizeGiftCardRedemptionForOrder(orderId) {
+  const db = await getDb();
+  if (!db) return;
+  const order = await getOrderById(orderId);
+  const code = order?.giftCardCode;
+  const amount = Number(order?.giftCardAmount || 0);
+  if (!code || amount <= 0) return;
+  const card = await getGiftCardByCode(code);
+  if (!card || !card.isActive || giftCardExpired(card)) return;
+  const existing = await getGiftCardTransactions(card.id);
+  if (existing.some((txn) => txn.orderId === orderId && txn.type === "redeem")) return;
+  const currentBalance = Number(card.balance || 0);
+  const applied = Math.max(0, Math.min(currentBalance, amount));
+  const remainingBalance = Math.max(0, currentBalance - applied);
+  await db.update(giftCards).set({
+    balance: remainingBalance.toFixed(2),
+    isActive: remainingBalance > 0,
+    lastUsedAt: /* @__PURE__ */ new Date()
+  }).where(eq(giftCards.id, card.id));
+  await addGiftCardTransaction({
+    giftCardId: card.id,
+    orderId,
+    type: "redeem",
+    amount: applied.toFixed(2),
+    balanceAfter: remainingBalance.toFixed(2),
+    note: "Redeemed after verified payment"
+  });
 }
 async function issueGiftCardsForOrder(orderId, purchaserEmail) {
   const db = await getDb();
@@ -1585,42 +1714,46 @@ async function issueGiftCardsForOrder(orderId, purchaserEmail) {
     const amount = Number(item.unitPrice || item.totalPrice || 0);
     for (let i = 0; i < item.quantity; i += 1) {
       let code = "";
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const raw = Math.random().toString(36).slice(2, 10).toUpperCase().replace(/[^A-Z0-9]/g, "").padEnd(8, "X").slice(0, 8);
-        code = `${raw.slice(0, 4)}-${raw.slice(4)}`;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        code = generateGiftCardCode();
         const existing = await getGiftCardByCode(code);
         if (!existing) break;
       }
-      await createGiftCard({ code, originalAmount: amount.toFixed(2), balance: amount.toFixed(2), purchaserEmail, orderId, isActive: true });
+      const recipientEmail = parseGiftCardRecipientEmail(item.variantLabel) || purchaserEmail;
+      const expiresAt = giftCardExpiryDate();
+      await createGiftCard({
+        code,
+        originalAmount: amount.toFixed(2),
+        balance: amount.toFixed(2),
+        purchaserEmail,
+        recipientEmail,
+        orderId,
+        isActive: true,
+        emailStatus: "pending",
+        expiresAt
+      });
+      const created = await getGiftCardByCode(code);
+      if (created) {
+        await addGiftCardTransaction({
+          giftCardId: created.id,
+          orderId,
+          type: "issue",
+          amount: amount.toFixed(2),
+          balanceAfter: amount.toFixed(2),
+          note: "Issued after verified payment"
+        });
+      }
+      const delivered = await sendGiftCardEmail(recipientEmail, code, amount, expiresAt);
+      if (created) {
+        await db.update(giftCards).set({ emailStatus: delivered ? "sent" : "pending" }).where(eq(giftCards.id, created.id));
+      }
       console.log(`[Gift Card] Issued ${code} for order ${orderId}`);
     }
   }
 }
-function normalizeGiftCardCode(code) {
-  return String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^(.{4})(.+)$/, "$1-$2").slice(0, 9);
-}
-async function getGiftCardByCode(code) {
-  const db = await getDb();
-  if (!db) return void 0;
-  const normalized = normalizeGiftCardCode(code);
-  const result = await db.select().from(giftCards).where(eq(giftCards.code, normalized)).limit(1);
-  return result[0];
-}
-async function createGiftCard(data) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  await db.insert(giftCards).values({ ...data, code: normalizeGiftCardCode(data.code) });
-}
 async function applyGiftCard(code, amount) {
-  const db = await getDb();
-  if (!db) return { applied: 0, remainingBalance: 0 };
-  const card = await getGiftCardByCode(code);
-  if (!card || !card.isActive) return { applied: 0, remainingBalance: 0 };
-  const balance = Number(card.balance || 0);
-  const applied = Math.max(0, Math.min(balance, amount));
-  const remainingBalance = Math.max(0, balance - applied);
-  await db.update(giftCards).set({ balance: remainingBalance.toFixed(2), isActive: remainingBalance > 0 }).where(eq(giftCards.id, card.id));
-  return { applied, remainingBalance };
+  const preview = await previewGiftCardApplication(code, amount);
+  return { applied: preview.applied, remainingBalance: Math.max(0, preview.availableBalance - preview.applied) };
 }
 async function getAllDiscountCodes() {
   const db = await getDb();
@@ -2651,7 +2784,7 @@ var protectedProcedure = t.procedure.use(requireUser);
 var adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
-    if (!ctx.user || ctx.user.role !== "admin") {
+    if (!ctx.user || ctx.user.role !== "admin" && ctx.user.role !== "super_admin") {
       throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
     return next({
@@ -2696,7 +2829,7 @@ import { nanoid } from "nanoid";
 // server/nowpayments.ts
 init_db();
 import axios2 from "axios";
-import crypto2 from "crypto";
+import crypto3 from "crypto";
 var NOWPAYMENTS_API_URL = "https://api.nowpayments.io/v1";
 var NOWPAYMENTS_SANDBOX_URL = "https://api-sandbox.nowpayments.io/v1";
 async function getConfig() {
@@ -2752,7 +2885,7 @@ function verifyIpnSignature(body, receivedSignature, ipnSecret) {
   for (const key of sortedKeys) {
     sortedBody[key] = body[key];
   }
-  const hmac = crypto2.createHmac("sha512", ipnSecret);
+  const hmac = crypto3.createHmac("sha512", ipnSecret);
   hmac.update(JSON.stringify(sortedBody));
   const calculatedSignature = hmac.digest("hex");
   return calculatedSignature === receivedSignature;
@@ -2770,12 +2903,28 @@ async function handleIpnWebhook(body, signature) {
   const orderId = body.order_id;
   const paymentId = String(body.payment_id);
   console.log(`[NowPayments] IPN received: order=${orderId}, status=${paymentStatus}, paymentId=${paymentId}`);
+  const order = await getOrderByNumber(orderId);
   if (paymentStatus === "finished" || paymentStatus === "confirmed") {
-    await updateOrderPayment(paymentId, "finished");
+    if (order) {
+      await updateOrder(order.id, { status: "paid", paymentStatus: "finished", paymentId });
+      await finalizeGiftCardRedemptionForOrder(order.id);
+      await issueGiftCardsForOrder(order.id, order.guestEmail || void 0);
+    } else {
+      await updateOrderPayment(paymentId, "finished");
+    }
   } else if (paymentStatus === "failed" || paymentStatus === "expired" || paymentStatus === "refunded") {
-    await updateOrderPayment(paymentId, "failed");
+    if (order) {
+      await updateOrder(order.id, { status: "cancelled", paymentStatus: "failed", paymentId });
+      await releaseGiftCardReservationForOrder(order.id);
+    } else {
+      await updateOrderPayment(paymentId, "failed");
+    }
   } else if (paymentStatus === "partially_paid") {
-    await updateOrderPayment(paymentId, "partially_paid");
+    if (order) {
+      await updateOrder(order.id, { paymentStatus: "partially_paid", paymentId });
+    } else {
+      await updateOrderPayment(paymentId, "partially_paid");
+    }
   }
   return { success: true };
 }
@@ -2817,10 +2966,10 @@ function getProductAssetMap() {
   }
   return cachedProductAssets;
 }
-var NON_VIAL_TERMS = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
+var NON_VIAL_TERMS2 = ["capsule", "capsules", "cream", "cleanser", "sunscreen", "mask", "lotion", "serum", "kit", "box", "card", "storage", "cap", "bottle", "spray", "dropper"];
 function isNonVialProduct(input) {
   const text2 = [input.slug, input.name, input.form, input.category, ...(input.categories || []).map((c) => c?.name)].filter(Boolean).join(" ").toLowerCase();
-  return NON_VIAL_TERMS.some((term) => text2.includes(term));
+  return NON_VIAL_TERMS2.some((term) => text2.includes(term));
 }
 function generatedVialUrlForProduct(input) {
   const slug = makeProductSlug(input.slug || input.name || "product") || "product";
@@ -2843,15 +2992,14 @@ function shouldReplaceGeneratedImage(image) {
   const value = String(image);
   return value.startsWith("/api/vial/") || value.includes("rvr-vial-template-single") || value.includes("rvr-vial-template") || value.includes("/assets/generated/");
 }
-
-function isLegacyBundledVialAsset(value) {
+function isLegacyBundledVialAsset2(value) {
   const image = String(value || "").toLowerCase();
   if (!image) return false;
   if (image.startsWith("/assets/products/")) return false;
   return image.includes("rvr-vial-template-single") || image.includes("rvr-company-blank-vial") || image.includes("bacteriostatic-water") || image.startsWith("/assets/") && /_[0-9a-f]{8}\.(webp|png|jpg|jpeg)(?:\?|$)/i.test(image) && !/(gift-card|capsule|capsules|tube|cream|cleanser|sunscreen|mask|kit|box|storage|cap)/i.test(image);
 }
 function shouldReplaceVialImage(product, image) {
-  return shouldReplaceGeneratedImage(image) || !isNonVialProduct(product) && isLegacyBundledVialAsset(image);
+  return shouldReplaceGeneratedImage(image) || !isNonVialProduct(product) && isLegacyBundledVialAsset2(image);
 }
 function productAssetForDisplay(input) {
   const assets = getProductAssetMap();
@@ -2883,9 +3031,28 @@ function preserveManusImage(product) {
   return product;
 }
 var adminProcedure2 = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user.role !== "admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Admin access required" });
+  if (ctx.user.role !== "admin" && ctx.user.role !== "super_admin") throw new TRPCError3({ code: "FORBIDDEN", message: "Admin access required" });
   return next({ ctx });
 });
+var superAdminProcedure = adminProcedure2.use(({ ctx, next }) => {
+  if (ctx.user.role !== "super_admin") {
+    throw new TRPCError3({ code: "FORBIDDEN", message: "Super admin access required" });
+  }
+  return next({ ctx });
+});
+function isGiftCardProduct(product) {
+  return makeProductSlug(product?.slug || product?.name || "") === "gift-card" || String(product?.name || "").toLowerCase().includes("gift card");
+}
+function parseGiftCardAmountFromLabel(label) {
+  const text2 = String(label || "");
+  const match = text2.match(/(?:gift\s*card\s*)?\$?([0-9]+(?:\.[0-9]{1,2})?)/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+function giftCardVariantLabel(amount) {
+  return `Gift Card $${amount.toFixed(2)}`;
+}
 function normalizeAdminProductInput(input) {
   const out = { ...input };
   if (out.price === void 0 || out.price === null || String(out.price).trim() === "") out.price = "0";
@@ -3031,7 +3198,11 @@ var appRouter = router({
       for (const item of items) {
         const product = await getProductById(item.productId);
         if (product) {
-          enriched.push({ ...item, product });
+          const giftAmount = isGiftCardProduct(product) ? parseGiftCardAmountFromLabel(item.variantLabel) : null;
+          enriched.push({
+            ...item,
+            product: giftAmount ? { ...product, name: `${product.name} ($${giftAmount.toFixed(2)})`, price: giftAmount.toFixed(2) } : product
+          });
         }
       }
       return enriched;
@@ -3087,19 +3258,23 @@ var appRouter = router({
     })).mutation(async ({ input }) => {
       let subtotal = 0;
       let discountAmount = 0;
+      let hasShippableItems = false;
       const orderItems2 = [];
       for (const item of input.items) {
         const product = await getProductById(item.productId);
         if (!product) throw new TRPCError3({ code: "NOT_FOUND", message: `Product ${item.productId} not found` });
         if (!product.inStock || product.stockQuantity < item.quantity) throw new TRPCError3({ code: "BAD_REQUEST", message: `${product.name} is out of stock` });
-        let unitPrice = Number(product.price);
-        if (product.discountActive && product.discountPercent) {
+        const productIsGiftCard = isGiftCardProduct(product);
+        if (!productIsGiftCard) hasShippableItems = true;
+        const giftAmount = productIsGiftCard ? parseGiftCardAmountFromLabel(item.variantLabel) : null;
+        let unitPrice = giftAmount ?? Number(product.price);
+        if (!giftAmount && product.discountActive && product.discountPercent) {
           unitPrice = unitPrice * (1 - Number(product.discountPercent) / 100);
         }
         const totalPrice = unitPrice * item.quantity;
         subtotal += totalPrice;
-        const displayName = item.variantLabel ? `${product.name} (${item.variantLabel})` : product.name;
-        orderItems2.push({ productId: item.productId, productName: displayName, variantId: item.variantId || null, variantLabel: item.variantLabel || null, quantity: item.quantity, unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2) });
+        const displayName = giftAmount ? `${product.name} ($${giftAmount.toFixed(2)})` : item.variantLabel ? `${product.name} (${item.variantLabel})` : product.name;
+        orderItems2.push({ productId: item.productId, productName: displayName, variantId: item.variantId || null, variantLabel: giftAmount ? giftCardVariantLabel(giftAmount) : item.variantLabel || null, quantity: item.quantity, unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2) });
       }
       if (input.discountCode) {
         const discount = await getDiscountByCode(input.discountCode);
@@ -3114,17 +3289,21 @@ var appRouter = router({
           await incrementDiscountUse(discount.id);
         }
       }
+      const containsGiftCardPurchase = orderItems2.some((item) => String(item.productName || "").toLowerCase().includes("gift card"));
+      if (input.giftCardCode && containsGiftCardPurchase) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "Gift cards cannot be used to purchase new gift cards." });
+      }
+      const flatRateShipping = Number(await getSetting("flat_rate_shipping") || "9.99");
+      const shippingCost = hasShippableItems ? flatRateShipping : 0;
       let giftCardApplied = 0;
       if (input.giftCardCode) {
-        const gift = await applyGiftCard(input.giftCardCode, Math.max(0, subtotal - discountAmount));
+        const amountDueBeforeGiftCard = Math.max(0, subtotal - discountAmount + shippingCost);
+        const gift = await previewGiftCardApplication(input.giftCardCode, amountDueBeforeGiftCard);
         giftCardApplied = gift.applied;
-        if (giftCardApplied <= 0) throw new TRPCError3({ code: "BAD_REQUEST", message: "Invalid or depleted gift card code" });
+        if (!gift.valid || giftCardApplied <= 0) throw new TRPCError3({ code: "BAD_REQUEST", message: gift.message || "Invalid or depleted gift card code" });
         discountAmount += giftCardApplied;
       }
-      const freeShippingThreshold = Number(await getSetting("free_shipping_threshold") || "200");
-      const flatRateShipping = Number(await getSetting("flat_rate_shipping") || "9.99");
-      const shippingCost = subtotal - discountAmount >= freeShippingThreshold ? 0 : flatRateShipping;
-      const total = subtotal - discountAmount + shippingCost;
+      const total = Math.max(0, subtotal - discountAmount + shippingCost);
       const orderNumber = `RVR-${Date.now().toString(36).toUpperCase()}-${nanoid(4).toUpperCase()}`;
       const orderId = await createOrder({
         orderNumber,
@@ -3143,10 +3322,20 @@ var appRouter = router({
         shippingCost: shippingCost.toFixed(2),
         total: total.toFixed(2),
         discountCode: input.discountCode,
+        giftCardCode: input.giftCardCode ? String(input.giftCardCode).replace(/[^A-Za-z0-9]/g, "").replace(/^(.{4})(.+)$/, "$1-$2").slice(0, 9) : null,
+        giftCardAmount: giftCardApplied.toFixed(2),
         notes: input.notes
       }, orderItems2);
+      if (input.giftCardCode && giftCardApplied > 0) {
+        await reserveGiftCardForOrder(input.giftCardCode, giftCardApplied, orderId);
+      }
+      if (total <= 0) {
+        await updateOrder(orderId, { status: "paid", paymentStatus: "gift_card_paid" });
+        await finalizeGiftCardRedemptionForOrder(orderId);
+        await issueGiftCardsForOrder(orderId, input.guestEmail || void 0);
+      }
       if (input.userId) await clearCart(input.userId);
-      return { orderId, orderNumber, total: total.toFixed(2), subtotal: subtotal.toFixed(2), discountAmount: discountAmount.toFixed(2), shippingCost: shippingCost.toFixed(2) };
+      return { orderId, orderNumber, total: total.toFixed(2), subtotal: subtotal.toFixed(2), discountAmount: discountAmount.toFixed(2), shippingCost: shippingCost.toFixed(2), giftCardApplied: giftCardApplied.toFixed(2), paid: total <= 0 };
     })
   }),
   // ─── Discounts (public validate) ───────────────────────────────
@@ -3169,17 +3358,13 @@ var appRouter = router({
   // ─── Gift Cards ────────────────────────────────────────────────
   giftCards: router({
     validate: publicProcedure.input(z2.object({ code: z2.string(), subtotal: z2.number() })).query(async ({ input }) => {
-      const card = await getGiftCardByCode(input.code);
-      if (!card || !card.isActive || Number(card.balance) <= 0) {
-        return { valid: false, message: "Invalid or depleted gift card" };
-      }
-      const balance = Number(card.balance);
+      const gift = await previewGiftCardApplication(input.code, input.subtotal);
       return {
-        valid: true,
-        balance,
-        appliedAmount: Math.min(balance, input.subtotal),
-        remainingDue: Math.max(0, input.subtotal - balance),
-        message: `Gift card balance: $${balance.toFixed(2)}`
+        valid: gift.valid,
+        balance: gift.availableBalance,
+        appliedAmount: gift.applied,
+        remainingDue: gift.remainingDue,
+        message: gift.message
       };
     })
   }),
@@ -3214,7 +3399,16 @@ var appRouter = router({
     })).mutation(async ({ input }) => {
       const order = await getOrderByNumber(input.orderNumber);
       if (!order) throw new TRPCError3({ code: "NOT_FOUND", message: "Order not found" });
-      if (order.status !== "pending") throw new TRPCError3({ code: "BAD_REQUEST", message: "Order is no longer pending" });
+      if (order.status !== "pending") {
+        if (order.status === "paid") return { invoiceUrl: `/order/${order.orderNumber}?status=success`, paymentId: "gift_card_paid", invoiceId: "gift_card_paid" };
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "Order is no longer pending" });
+      }
+      if (Number(order.total || 0) <= 0) {
+        await updateOrder(order.id, { status: "paid", paymentStatus: "gift_card_paid" });
+        await finalizeGiftCardRedemptionForOrder(order.id);
+        await issueGiftCardsForOrder(order.id, input.email || order.guestEmail || void 0);
+        return { invoiceUrl: `/order/${order.orderNumber}?status=success`, paymentId: "gift_card_paid", invoiceId: "gift_card_paid" };
+      }
       const result = await createPayment(order.id, order.orderNumber, String(order.total), input.email || order.guestEmail || void 0);
       return result;
     }),
@@ -3273,13 +3467,25 @@ var appRouter = router({
         hplcUrl: z2.string().optional(),
         massSpecUrl: z2.string().optional(),
         categoryIds: z2.array(z2.number()).optional(),
-        variants: z2.array(productVariantInput).optional()
+        variants: z2.array(productVariantInput).optional(),
+        researchDraft: z2.object({
+          chemicalMakeup: z2.string().optional(),
+          researchContent: z2.string().optional(),
+          citations: z2.array(z2.object({
+            title: z2.string(),
+            authors: z2.string().optional(),
+            journal: z2.string().optional(),
+            year: z2.string().optional(),
+            url: z2.string().optional(),
+            summary: z2.string().optional()
+          })).optional()
+        }).optional()
       })).mutation(async ({ input }) => {
-        const { categoryIds, variants, ...rawData } = input;
+        const { categoryIds, variants, researchDraft, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
         if (!isNonVialProduct(data)) {
-          data.imageUrl = generatedVialUrlForProduct(data);
+          if (shouldReplaceVialImage(data, data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
         } else if (mappedImage && shouldReplaceGeneratedImage(data.imageUrl)) {
           data.imageUrl = mappedImage;
         }
@@ -3298,6 +3504,28 @@ var appRouter = router({
               sortOrder: cleanVariant.sortOrder ?? index
             };
           }));
+        }
+        if (researchDraft) {
+          await upsertProductResearch(id, {
+            overview: "",
+            chemicalMakeup: researchDraft.chemicalMakeup || "",
+            researchContent: researchDraft.researchContent || ""
+          });
+          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 3) : [];
+          for (let index = 0; index < citations.length; index++) {
+            const citation = citations[index];
+            if (!String(citation.title || "").trim()) continue;
+            await createCitation({
+              productId: id,
+              citationNumber: index + 1,
+              title: citation.title,
+              authors: citation.authors || "",
+              journal: citation.journal || "NIH/PubMed",
+              year: citation.year || "",
+              url: citation.url || "",
+              summary: citation.summary || ""
+            });
+          }
         }
         return { id };
       }),
@@ -3331,13 +3559,25 @@ var appRouter = router({
         sortOrder: z2.number().optional(),
         categoryIds: z2.array(z2.number()).optional(),
         variants: z2.array(productVariantInput).optional(),
+        researchDraft: z2.object({
+          chemicalMakeup: z2.string().optional(),
+          researchContent: z2.string().optional(),
+          citations: z2.array(z2.object({
+            title: z2.string(),
+            authors: z2.string().optional(),
+            journal: z2.string().optional(),
+            year: z2.string().optional(),
+            url: z2.string().optional(),
+            summary: z2.string().optional()
+          })).optional()
+        }).optional(),
         regenerateVial: z2.boolean().optional()
       })).mutation(async ({ input }) => {
-        const { id, categoryIds, variants, regenerateVial, ...rawData } = input;
+        const { id, categoryIds, variants, researchDraft, regenerateVial, ...rawData } = input;
         const data = normalizeAdminProductInput(rawData);
         const mappedImage = productAssetForInput(data);
         if (!isNonVialProduct(data)) {
-          data.imageUrl = generatedVialUrlForProduct(data);
+          if (regenerateVial || shouldReplaceVialImage(data, data.imageUrl)) data.imageUrl = generatedVialUrlForProduct(data);
         } else if (mappedImage && (regenerateVial || shouldReplaceGeneratedImage(data.imageUrl))) {
           data.imageUrl = mappedImage;
         }
@@ -3357,6 +3597,29 @@ var appRouter = router({
               sortOrder: cleanVariant.sortOrder ?? index
             };
           }));
+        }
+        if (researchDraft) {
+          await upsertProductResearch(id, {
+            overview: "",
+            chemicalMakeup: researchDraft.chemicalMakeup || "",
+            researchContent: researchDraft.researchContent || ""
+          });
+          await deleteProductCitations(id);
+          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 3) : [];
+          for (let index = 0; index < citations.length; index++) {
+            const citation = citations[index];
+            if (!String(citation.title || "").trim()) continue;
+            await createCitation({
+              productId: id,
+              citationNumber: index + 1,
+              title: citation.title,
+              authors: citation.authors || "",
+              journal: citation.journal || "NIH/PubMed",
+              year: citation.year || "",
+              url: citation.url || "",
+              summary: citation.summary || ""
+            });
+          }
         }
         return { success: true };
       }),
@@ -3472,6 +3735,16 @@ var appRouter = router({
         return { success: true };
       })
     }),
+    // Gift Cards
+    giftCards: router({
+      list: adminProcedure2.query(async () => getAllGiftCards()),
+      byCode: adminProcedure2.input(z2.object({ code: z2.string() })).query(async ({ input }) => {
+        const card = await getGiftCardByCode(input.code);
+        if (!card) throw new TRPCError3({ code: "NOT_FOUND", message: "Gift card not found" });
+        const transactions = await getGiftCardTransactions(card.id);
+        return { ...card, transactions };
+      })
+    }),
     // Discounts
     discounts: router({
       list: adminProcedure2.query(async () => getAllDiscountCodes()),
@@ -3526,9 +3799,22 @@ var appRouter = router({
         return { success: true };
       })
     }),
-    // Users
+    // Users / database-backed roles
     users: router({
-      list: adminProcedure2.query(async () => getAllUsers())
+      list: adminProcedure2.query(async () => getAllUsers()),
+      admins: adminProcedure2.query(async () => getAdminUsers()),
+      updateRole: superAdminProcedure.input(z2.object({
+        id: z2.number(),
+        role: z2.enum(["user", "admin", "super_admin"])
+      })).mutation(async ({ input, ctx }) => {
+        if (input.id === ctx.user.id && input.role !== "super_admin") {
+          throw new TRPCError3({ code: "BAD_REQUEST", message: "You cannot remove your own super admin role." });
+        }
+        const target = await getUserById(input.id);
+        if (!target) throw new TRPCError3({ code: "NOT_FOUND", message: "User not found" });
+        const updated = await updateUserRole(input.id, input.role);
+        return { success: true, user: updated };
+      })
     }),
     // NowPayments status check
     paymentStatus: adminProcedure2.query(async () => {
@@ -3617,6 +3903,117 @@ function serveStatic(app) {
 }
 
 // server/_core/index.ts
+init_storage();
+import mysql2 from "mysql2/promise";
+function getProductAssetDirs() {
+  const cwd = process.cwd();
+  const dirs = [
+    path6.join(cwd, "dist", "public", "assets"),
+    path6.join(cwd, "client", "public", "assets")
+  ];
+  dirs.push(path6.join(import.meta.dirname, "public", "assets"));
+  return Array.from(new Set(dirs));
+}
+function writeProductAssetToServedLocations(relativeName, data) {
+  for (const assetsDir of getProductAssetDirs()) {
+    fs6.mkdirSync(assetsDir, { recursive: true });
+    fs6.writeFileSync(path6.join(assetsDir, relativeName), data);
+  }
+}
+function readServedAsset(relativeName) {
+  const searchDirs = [
+    ...getProductAssetDirs(),
+    path6.join(process.cwd(), "public", "assets"),
+    path6.join(process.cwd(), "client", "public", "assets"),
+    path6.join(process.cwd(), "dist", "public", "assets"),
+    path6.join(import.meta.dirname, "public", "assets")
+  ];
+  for (const assetsDir of searchDirs) {
+    const fullPath = path6.join(assetsDir, relativeName);
+    if (fs6.existsSync(fullPath)) return fs6.readFileSync(fullPath);
+  }
+  throw new Error(`Asset not found: ${relativeName}`);
+}
+async function getProductAssetConnection() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  try {
+    return await mysql2.createConnection({ uri: url, connectTimeout: 1e4 });
+  } catch (error) {
+    console.warn("[Product Asset Storage] Database connection unavailable; using local asset path.", error);
+    return null;
+  }
+}
+async function ensureProductAssetsTable(conn) {
+  await conn.execute(`CREATE TABLE IF NOT EXISTS productAssets (
+    id int AUTO_INCREMENT NOT NULL,
+    name varchar(255) NOT NULL,
+    contentType varchar(100) NOT NULL,
+    data LONGBLOB NOT NULL,
+    createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY productAssets_name_unique (name)
+  )`);
+}
+async function saveProductAssetToDatabase(relativeName, data, contentType) {
+  const conn = await getProductAssetConnection();
+  if (!conn) return false;
+  try {
+    await ensureProductAssetsTable(conn);
+    const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    await conn.execute(
+      `INSERT INTO productAssets (name, contentType, data)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE contentType = VALUES(contentType), data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`,
+      [relativeName, contentType, buffer]
+    );
+    return true;
+  } catch (error) {
+    console.warn("[Product Asset Storage] Database asset save failed; using local asset path.", error);
+    return false;
+  } finally {
+    await conn.end().catch(() => {
+    });
+  }
+}
+async function readProductAssetFromDatabase(relativeName) {
+  const conn = await getProductAssetConnection();
+  if (!conn) return null;
+  try {
+    await ensureProductAssetsTable(conn);
+    const [rows] = await conn.execute(
+      `SELECT contentType, data FROM productAssets WHERE name = ? LIMIT 1`,
+      [relativeName]
+    );
+    const row = rows?.[0];
+    if (!row) return null;
+    return {
+      data: Buffer.from(row.data),
+      contentType: String(row.contentType || "application/octet-stream")
+    };
+  } catch (error) {
+    console.warn("[Product Asset Storage] Database asset read failed; trying local asset path.", error);
+    return null;
+  } finally {
+    await conn.end().catch(() => {
+    });
+  }
+}
+async function saveProductAsset(relativeName, data, contentType) {
+  writeProductAssetToServedLocations(relativeName, data);
+  const savedToDatabase = await saveProductAssetToDatabase(relativeName, data, contentType);
+  if (savedToDatabase) {
+    return { name: relativeName, url: `/api/product-assets/${encodeURIComponent(relativeName)}` };
+  }
+  try {
+    const stored = await storagePut(`assets/${relativeName}`, data, contentType);
+    return { name: relativeName, url: stored.url };
+  } catch (error) {
+    console.warn("[Product Asset Storage] Persistent storage unavailable; using local asset path.", error);
+    return { name: relativeName, url: `/assets/${relativeName}` };
+  }
+}
 function isPortAvailable(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -3633,6 +4030,524 @@ async function findAvailablePort(startPort = 3e3) {
     }
   }
   throw new Error(`No available port found starting from ${startPort}`);
+}
+function normalizeResearchName(value) {
+  return String(value || "").replace(/\s+/g, " ").replace(/\b\d+\s*(mg|mcg|ml|iu|capsules?|caps?)\b/gi, "").trim();
+}
+function uniqueStrings(values) {
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const value of values) {
+    const text2 = String(value || "").trim();
+    if (!text2) continue;
+    const key = text2.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text2);
+  }
+  return out;
+}
+function stripXml(value) {
+  return String(value || "").replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+}
+async function fetchJsonWithTimeout(url, timeoutMs = 12e3) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "Accept": "application/json" }
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function fetchTextWithTimeout(url, timeoutMs = 12e3) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { "Accept": "application/xml,text/xml,text/plain,*/*" }
+    });
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function sourceKey(source) {
+  return `${source.database}:${source.url || source.title}`.toLowerCase();
+}
+function rankedSources(sources) {
+  const priority = {
+    PubChem: 1,
+    PubMed: 2,
+    "Europe PMC": 2,
+    UniProt: 3,
+    ChEMBL: 4,
+    RCSB: 5,
+    IUPHAR: 6
+  };
+  const seen = /* @__PURE__ */ new Set();
+  return sources.filter((source) => source.title && source.url).filter((source) => {
+    const key = sourceKey(source);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a, b) => (priority[a.database] || 99) - (priority[b.database] || 99)).slice(0, 3);
+}
+function ensureThreeSources(sources, peptideName) {
+  const cleanName = normalizeResearchName(peptideName) || "peptide";
+  const base = rankedSources(sources);
+  const fallbacks = [
+    {
+      title: `${cleanName} - PubMed literature search`,
+      url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
+      database: "PubMed",
+      supports: "Peer-reviewed biomedical literature discovery for exact product-name research context."
+    },
+    {
+      title: `${cleanName} - Europe PMC literature search`,
+      url: `https://europepmc.org/search?query=${encodeURIComponent(cleanName)}`,
+      database: "Europe PMC",
+      supports: "Additional biomedical literature metadata and abstract discovery."
+    },
+    {
+      title: `${cleanName} - PubChem compound search`,
+      url: `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(cleanName)}`,
+      database: "PubChem",
+      supports: "Public chemistry identifier and property search when an exact compound record is available."
+    }
+  ];
+  return rankedSources([...base, ...fallbacks]).slice(0, 3);
+}
+async function getResearchCacheConnection() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  try {
+    return await mysql2.createConnection({ uri: url, connectTimeout: 1e4 });
+  } catch (error) {
+    console.warn("[Research Details] Database cache unavailable.", error);
+    return null;
+  }
+}
+async function ensureResearchCacheTable(conn) {
+  await conn.execute(`CREATE TABLE IF NOT EXISTS researchDetailsCache (
+    id int AUTO_INCREMENT NOT NULL,
+    cacheKey varchar(255) NOT NULL,
+    productId int,
+    peptideName varchar(255) NOT NULL,
+    researchDescription MEDIUMTEXT,
+    chemicalMakeup MEDIUMTEXT,
+    researchSummary MEDIUMTEXT,
+    source1Title text,
+    source1Url text,
+    source1Supports text,
+    source2Title text,
+    source2Url text,
+    source2Supports text,
+    source3Title text,
+    source3Url text,
+    source3Supports text,
+    researchConfidence varchar(20) DEFAULT 'low',
+    rawSourceJson LONGTEXT,
+    lastResearchedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY researchDetailsCache_cacheKey_unique (cacheKey)
+  )`);
+}
+function makeResearchCacheKey(peptideName) {
+  return normalizeResearchName(peptideName).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "unknown";
+}
+async function getCachedResearchDetails(cacheKey) {
+  const conn = await getResearchCacheConnection();
+  if (!conn) return null;
+  try {
+    await ensureResearchCacheTable(conn);
+    const [rows] = await conn.execute(
+      `SELECT * FROM researchDetailsCache WHERE cacheKey = ? AND lastResearchedAt > DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 1`,
+      [cacheKey]
+    );
+    const row = rows?.[0];
+    if (!row) return null;
+    const sources = [
+      { title: row.source1Title, url: row.source1Url, database: "Cached", supports: row.source1Supports },
+      { title: row.source2Title, url: row.source2Url, database: "Cached", supports: row.source2Supports },
+      { title: row.source3Title, url: row.source3Url, database: "Cached", supports: row.source3Supports }
+    ].filter((source) => source.title && source.url);
+    return {
+      description_block: row.researchDescription || "",
+      chemical_makeup_block: row.chemicalMakeup || "",
+      research_block: row.researchSummary || "",
+      sources,
+      confidence: row.researchConfidence || "low",
+      missing_fields: [],
+      raw_source_json: row.rawSourceJson ? JSON.parse(row.rawSourceJson) : void 0
+    };
+  } catch (error) {
+    console.warn("[Research Details] Cache read failed.", error);
+    return null;
+  } finally {
+    await conn.end().catch(() => {
+    });
+  }
+}
+async function saveCachedResearchDetails(cacheKey, productId, peptideName, result) {
+  const conn = await getResearchCacheConnection();
+  if (!conn) return;
+  try {
+    await ensureResearchCacheTable(conn);
+    const sources = ensureThreeSources(result.sources, peptideName);
+    await conn.execute(
+      `INSERT INTO researchDetailsCache (
+        cacheKey, productId, peptideName, researchDescription, chemicalMakeup, researchSummary,
+        source1Title, source1Url, source1Supports, source2Title, source2Url, source2Supports,
+        source3Title, source3Url, source3Supports, researchConfidence, rawSourceJson, lastResearchedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE
+        productId = VALUES(productId),
+        peptideName = VALUES(peptideName),
+        researchDescription = VALUES(researchDescription),
+        chemicalMakeup = VALUES(chemicalMakeup),
+        researchSummary = VALUES(researchSummary),
+        source1Title = VALUES(source1Title),
+        source1Url = VALUES(source1Url),
+        source1Supports = VALUES(source1Supports),
+        source2Title = VALUES(source2Title),
+        source2Url = VALUES(source2Url),
+        source2Supports = VALUES(source2Supports),
+        source3Title = VALUES(source3Title),
+        source3Url = VALUES(source3Url),
+        source3Supports = VALUES(source3Supports),
+        researchConfidence = VALUES(researchConfidence),
+        rawSourceJson = VALUES(rawSourceJson),
+        lastResearchedAt = NOW()`,
+      [
+        cacheKey,
+        productId,
+        peptideName,
+        result.description_block,
+        result.chemical_makeup_block,
+        result.research_block,
+        sources[0]?.title || "",
+        sources[0]?.url || "",
+        sources[0]?.supports || "",
+        sources[1]?.title || "",
+        sources[1]?.url || "",
+        sources[1]?.supports || "",
+        sources[2]?.title || "",
+        sources[2]?.url || "",
+        sources[2]?.supports || "",
+        result.confidence,
+        JSON.stringify(result.raw_source_json || {})
+      ]
+    );
+  } catch (error) {
+    console.warn("[Research Details] Cache save failed.", error);
+  } finally {
+    await conn.end().catch(() => {
+    });
+  }
+}
+async function lookupPubChem(peptideName, synonyms) {
+  const terms = uniqueStrings([peptideName, ...synonyms]).slice(0, 4);
+  for (const term of terms) {
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(term)}/property/MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES,IsomericSMILES,InChIKey/JSON`;
+    const json2 = await fetchJsonWithTimeout(url);
+    const props = json2?.PropertyTable?.Properties?.[0];
+    if (props) {
+      const cid = props.CID ? String(props.CID) : "";
+      const source = {
+        title: `${term} PubChem compound record${cid ? ` (CID ${cid})` : ""}`,
+        url: cid ? `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}` : `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(term)}`,
+        database: "PubChem",
+        supports: "Chemical identifiers, molecular formula, molecular weight, IUPAC name, SMILES, and InChIKey."
+      };
+      return { term, props, source, raw: json2 };
+    }
+  }
+  return null;
+}
+async function lookupPubMed(peptideName, synonyms) {
+  const cleanName = normalizeResearchName(peptideName);
+  const termParts = uniqueStrings([cleanName, ...synonyms]).slice(0, 3);
+  const exactTerm = termParts.map((term) => `"${term}"`).join(" OR ") || `"${cleanName}"`;
+  const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
+  searchUrl.searchParams.set("db", "pubmed");
+  searchUrl.searchParams.set("retmode", "json");
+  searchUrl.searchParams.set("retmax", "8");
+  searchUrl.searchParams.set("sort", "relevance");
+  searchUrl.searchParams.set("term", `${exactTerm} AND (peptide OR compound OR pharmacology OR mechanism OR chemistry OR assay OR receptor OR pathway)`);
+  if (process.env.NCBI_API_KEY) searchUrl.searchParams.set("api_key", process.env.NCBI_API_KEY);
+  const searchJson = await fetchJsonWithTimeout(searchUrl);
+  const ids = (searchJson?.esearchresult?.idlist || []).slice(0, 8);
+  if (!ids.length) return { sources: [], abstracts: [], raw: searchJson };
+  const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
+  summaryUrl.searchParams.set("db", "pubmed");
+  summaryUrl.searchParams.set("retmode", "json");
+  summaryUrl.searchParams.set("id", ids.join(","));
+  if (process.env.NCBI_API_KEY) summaryUrl.searchParams.set("api_key", process.env.NCBI_API_KEY);
+  const summaryJson = await fetchJsonWithTimeout(summaryUrl);
+  const fetchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi");
+  fetchUrl.searchParams.set("db", "pubmed");
+  fetchUrl.searchParams.set("retmode", "xml");
+  fetchUrl.searchParams.set("id", ids.slice(0, 5).join(","));
+  if (process.env.NCBI_API_KEY) fetchUrl.searchParams.set("api_key", process.env.NCBI_API_KEY);
+  const xml = await fetchTextWithTimeout(fetchUrl);
+  const abstracts = xml ? Array.from(xml.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/gi)).map((match) => stripXml(match[1])).filter(Boolean).slice(0, 6) : [];
+  const sources = ids.map((id) => summaryJson?.result?.[id]).filter(Boolean).slice(0, 3).map((item) => ({
+    title: String(item.title || `${cleanName} PubMed article`).replace(/\.$/, ""),
+    authors: Array.isArray(item.authors) ? item.authors.map((author) => author.name).filter(Boolean).join(", ") : "",
+    journal: item.fulljournalname || item.source || "PubMed",
+    year: item.pubdate ? String(item.pubdate).slice(0, 4) : "",
+    url: item.uid ? `https://pubmed.ncbi.nlm.nih.gov/${item.uid}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
+    database: "PubMed",
+    supports: "Peer-reviewed literature describing research context, mechanisms, targets, assay findings, or compound-specific investigation."
+  }));
+  return { sources, abstracts, raw: { searchJson, summaryJson } };
+}
+async function lookupEuropePmc(peptideName, synonyms) {
+  const cleanName = normalizeResearchName(peptideName);
+  const query = uniqueStrings([cleanName, ...synonyms]).slice(0, 3).map((term) => `"${term}"`).join(" OR ");
+  const url = new URL("https://www.ebi.ac.uk/europepmc/webservices/rest/search");
+  url.searchParams.set("query", `${query || `"${cleanName}"`} AND (peptide OR pharmacology OR mechanism OR assay OR chemistry)`);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("pageSize", "5");
+  const json2 = await fetchJsonWithTimeout(url);
+  const records = json2?.resultList?.result || [];
+  const sources = records.slice(0, 2).map((item) => ({
+    title: item.title || `${cleanName} Europe PMC source`,
+    authors: item.authorString || "",
+    journal: item.journalTitle || "Europe PMC",
+    year: item.pubYear || "",
+    url: item.doi ? `https://doi.org/${item.doi}` : item.pmid ? `https://europepmc.org/article/MED/${item.pmid}` : `https://europepmc.org/search?query=${encodeURIComponent(cleanName)}`,
+    database: "Europe PMC",
+    supports: "Biomedical literature metadata, abstract context, and additional citation support.",
+    abstract: item.abstractText || ""
+  }));
+  return { sources, abstracts: records.map((item) => String(item.abstractText || "")).filter(Boolean).slice(0, 4), raw: json2 };
+}
+async function lookupUniProt(peptideName, synonyms) {
+  const cleanName = normalizeResearchName(peptideName);
+  const query = uniqueStrings([cleanName, ...synonyms]).slice(0, 2).map((term) => `"${term}"`).join(" OR ");
+  const url = new URL("https://rest.uniprot.org/uniprotkb/search");
+  url.searchParams.set("query", query || `"${cleanName}"`);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("size", "3");
+  const json2 = await fetchJsonWithTimeout(url);
+  const item = json2?.results?.[0];
+  if (!item) return { sources: [], notes: [], raw: json2 };
+  const accession = item.primaryAccession || "";
+  const proteinName = item.proteinDescription?.recommendedName?.fullName?.value || item.proteinDescription?.submissionNames?.[0]?.fullName?.value || "";
+  return {
+    sources: [{
+      title: `${proteinName || cleanName} UniProt record${accession ? ` (${accession})` : ""}`,
+      url: accession ? `https://www.uniprot.org/uniprotkb/${accession}/entry` : `https://www.uniprot.org/uniprotkb?query=${encodeURIComponent(cleanName)}`,
+      database: "UniProt",
+      supports: "Protein/peptide sequence context, organism, gene names, and functional annotations when applicable."
+    }],
+    notes: [
+      accession ? `UniProt accession: ${accession}` : "",
+      proteinName ? `Protein/sequence context: ${proteinName}` : "",
+      item.organism?.scientificName ? `Organism: ${item.organism.scientificName}` : ""
+    ].filter(Boolean),
+    raw: json2
+  };
+}
+async function lookupChembl(peptideName, synonyms) {
+  const cleanName = normalizeResearchName(peptideName);
+  const url = `https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q=${encodeURIComponent(cleanName)}`;
+  const json2 = await fetchJsonWithTimeout(url);
+  const molecule = json2?.molecules?.[0];
+  if (!molecule) return { sources: [], notes: [], raw: json2 };
+  const id = molecule.molecule_chembl_id || "";
+  return {
+    sources: [{
+      title: `${molecule.pref_name || cleanName} ChEMBL molecule record${id ? ` (${id})` : ""}`,
+      url: id ? `https://www.ebi.ac.uk/chembl/explore/compound/${id}` : `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${encodeURIComponent(cleanName)}`,
+      database: "ChEMBL",
+      supports: "Bioactivity, molecule, target, and assay metadata where the compound is represented in ChEMBL."
+    }],
+    notes: [
+      id ? `ChEMBL ID: ${id}` : "",
+      molecule.molecule_type ? `Molecule type: ${molecule.molecule_type}` : "",
+      molecule.max_phase !== void 0 ? `Development phase metadata: ${molecule.max_phase}` : ""
+    ].filter(Boolean),
+    raw: json2
+  };
+}
+async function lookupRcsb(peptideName, synonyms) {
+  const cleanName = normalizeResearchName(peptideName);
+  const query = {
+    query: {
+      type: "terminal",
+      service: "text",
+      parameters: {
+        attribute: "struct.title",
+        operator: "contains_phrase",
+        value: cleanName
+      }
+    },
+    return_type: "entry",
+    request_options: { paginate: { start: 0, rows: 3 } }
+  };
+  const json2 = await fetchJsonWithTimeout("https://search.rcsb.org/rcsbsearch/v2/query?json=" + encodeURIComponent(JSON.stringify(query)));
+  const id = json2?.result_set?.[0]?.identifier;
+  if (!id) return { sources: [], notes: [], raw: json2 };
+  return {
+    sources: [{
+      title: `${cleanName} RCSB PDB structure search (${id})`,
+      url: `https://www.rcsb.org/structure/${id}`,
+      database: "RCSB",
+      supports: "3D structure or structure-search context where related peptide, receptor, or complex records are available."
+    }],
+    notes: [`RCSB PDB matching entry: ${id}`],
+    raw: json2
+  };
+}
+function buildChemicalMakeupBlock(peptideName, pubChem, provided, notes) {
+  const lines = [];
+  const missing = [];
+  const props = pubChem?.props;
+  lines.push(`${peptideName}`);
+  if (props?.CID) lines.push(`PubChem CID: ${props.CID}`);
+  const formula = provided.molecularFormula || props?.MolecularFormula;
+  const mw = provided.molecularWeight || props?.MolecularWeight;
+  if (formula) lines.push(`Molecular formula: ${formula}`);
+  else {
+    lines.push("Molecular formula: Not confirmed from available sources.");
+    missing.push("molecularFormula");
+  }
+  if (mw) lines.push(`Molecular weight: ${mw}`);
+  else {
+    lines.push("Molecular weight: Not confirmed from available sources.");
+    missing.push("molecularWeight");
+  }
+  if (provided.sequence) lines.push(`Sequence: ${provided.sequence}`);
+  else {
+    lines.push("Sequence: Not confirmed from available sources.");
+    missing.push("sequence");
+  }
+  if (props?.IUPACName) lines.push(`IUPAC name: ${props.IUPACName}`);
+  if (props?.CanonicalSMILES) lines.push(`Canonical SMILES: ${props.CanonicalSMILES}`);
+  if (props?.IsomericSMILES) lines.push(`Isomeric SMILES: ${props.IsomericSMILES}`);
+  if (props?.InChIKey) lines.push(`InChIKey: ${props.InChIKey}`);
+  if (notes.length) lines.push(...notes);
+  return { text: lines.join("\n"), missing };
+}
+function buildDescriptionBlock(peptideName, chemicalText, abstracts, sources, confidence) {
+  const sourceTitles = sources.map((s) => s.title).slice(0, 3).join("; ");
+  const abstractSummary = abstracts.join(" ").replace(/\s+/g, " ").slice(0, 1800);
+  return [
+    `${peptideName} is presented as a research-use compound for laboratory, analytical, and scientific investigation. Source-backed records are used to describe the compound identity, available chemistry, and the literature context associated with the exact product name or its closest confirmed synonyms.`,
+    `Available chemical and identifier information is summarized from public scientific databases. ${chemicalText.includes("Molecular formula: Not confirmed") ? "Some chemistry fields were not confirmed from the available records, so those values should be verified against the product certificate of analysis before publication." : "The available chemistry record provides a confirmed starting point for identity review, including formula, molecular weight, and structural identifiers where available."}`,
+    abstractSummary ? `Published biomedical literature describes research interest in ${peptideName} through experimental, mechanism-focused, assay, formulation, analytical, or pharmacology contexts. The most relevant available records discuss the compound in relation to its investigated pathways, measurable laboratory effects, and study-model findings.` : `Public literature searches returned limited exact abstract text for ${peptideName}; the description is therefore limited to verified database identifiers and source-backed discovery links rather than unconfirmed mechanism claims.`,
+    sourceTitles ? `The most useful source context currently comes from ${sourceTitles}. These sources support the product description, chemistry review, and research-summary sections without implying approved clinical use.` : "",
+    `Research confidence: ${confidence}. This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.`
+  ].filter(Boolean).join("\n\n");
+}
+function buildResearchBlock(peptideName, abstracts, notes, sources, confidence) {
+  const snippets = abstracts.join("\n\n").replace(/\s+/g, " ").trim();
+  const noteText = notes.length ? `Additional database context: ${notes.join("; ")}.` : "";
+  return [
+    `Research summary for ${peptideName}`,
+    "",
+    snippets ? snippets.slice(0, 4200) : `${peptideName} currently has limited exact-name abstract text available through the queried public databases. The available source records should be used to confirm compound identity, chemistry, and literature relevance before publishing detailed mechanism-specific claims.`,
+    "",
+    `Mechanism, pathway, receptor, or assay information is included only when it appears in the retrieved scientific records or product metadata. If a target, receptor relationship, or pathway is not represented in the confirmed records, it should be treated as not confirmed rather than inferred from broad peptide-category language.`,
+    noteText,
+    `The cited sources below provide the evidence basis for this entry. The content is written for a neutral research-use catalog and intentionally avoids dosing, treatment, cure, or human-use claims.`,
+    "",
+    `Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.`
+  ].filter(Boolean).join("\n");
+}
+async function buildResearchDetails(input, allowCache = true) {
+  const peptideName = normalizeResearchName(input.peptideName);
+  if (!peptideName) throw new Error("peptideName is required");
+  const cacheKey = makeResearchCacheKey(peptideName);
+  if (allowCache) {
+    const cached = await getCachedResearchDetails(cacheKey);
+    if (cached?.description_block || cached?.research_block) return cached;
+  }
+  const synonyms = uniqueStrings(input.synonyms || []);
+  const [pubChem, pubMed, europePmc, uniProt, chembl, rcsb] = await Promise.all([
+    lookupPubChem(peptideName, synonyms),
+    lookupPubMed(peptideName, synonyms),
+    lookupEuropePmc(peptideName, synonyms),
+    lookupUniProt(peptideName, synonyms),
+    lookupChembl(peptideName, synonyms),
+    lookupRcsb(peptideName, synonyms)
+  ]);
+  const notes = [
+    ...uniProt?.notes || [],
+    ...chembl?.notes || [],
+    ...rcsb?.notes || []
+  ];
+  const abstracts = uniqueStrings([...pubMed?.abstracts || [], ...europePmc?.abstracts || []]).slice(0, 8);
+  const sources = ensureThreeSources([
+    pubChem?.source,
+    ...pubMed?.sources || [],
+    ...europePmc?.sources || [],
+    ...uniProt?.sources || [],
+    ...chembl?.sources || [],
+    ...rcsb?.sources || []
+  ].filter(Boolean), peptideName);
+  const chem = buildChemicalMakeupBlock(peptideName, pubChem, {
+    sequence: input.sequence,
+    molecularFormula: input.molecularFormula,
+    molecularWeight: input.molecularWeight
+  }, notes);
+  const confidence = !!pubChem && (pubMed?.sources?.length || europePmc?.sources?.length) ? "high" : pubMed?.sources?.length || europePmc?.sources?.length || !!pubChem ? "medium" : "low";
+  const result = {
+    description_block: buildDescriptionBlock(peptideName, chem.text, abstracts, sources, confidence),
+    chemical_makeup_block: chem.text,
+    research_block: buildResearchBlock(peptideName, abstracts, notes, sources, confidence),
+    sources,
+    confidence,
+    missing_fields: chem.missing,
+    raw_source_json: {
+      pubchem: pubChem?.raw,
+      pubmed: pubMed?.raw,
+      europepmc: europePmc?.raw,
+      uniprot: uniProt?.raw,
+      chembl: chembl?.raw,
+      rcsb: rcsb?.raw
+    }
+  };
+  await saveCachedResearchDetails(cacheKey, input.productId ? Number(input.productId) : null, peptideName, result);
+  return result;
+}
+function researchDetailsToLegacyResponse(details) {
+  return {
+    overview: "",
+    description: details.description_block,
+    chemicalMakeup: details.chemical_makeup_block,
+    researchContent: details.research_block,
+    citations: details.sources.slice(0, 3).map((source, index) => ({
+      title: source.title,
+      authors: source.authors || "",
+      journal: source.database || source.journal || "",
+      year: source.year || "",
+      url: source.url,
+      summary: source.supports,
+      citationNumber: index + 1
+    })),
+    description_block: details.description_block,
+    chemical_makeup_block: details.chemical_makeup_block,
+    research_block: details.research_block,
+    sources: details.sources,
+    confidence: details.confidence,
+    missing_fields: details.missing_fields
+  };
 }
 async function startServer() {
   const app = express2();
@@ -3663,78 +4578,6 @@ async function startServer() {
       res.status(500).send("Error");
     }
   });
-  const getRuntimeProductAssetDirs = () => {
-    const dirs = [
-      path6.join(process.cwd(), "dist", "public", "assets"),
-      path6.join(process.cwd(), "client", "public", "assets"),
-      path6.join(import.meta.dirname, "public", "assets")
-    ];
-    return Array.from(new Set(dirs));
-  };
-  const writeRuntimeProductAsset = (relativeName, data) => {
-    for (const assetsDir of getRuntimeProductAssetDirs()) {
-      fs6.mkdirSync(assetsDir, { recursive: true });
-      fs6.writeFileSync(path6.join(assetsDir, relativeName), data);
-    }
-  };
-  const getProductAssetConnection2 = async () => {
-    const url = process.env.DATABASE_URL;
-    if (!url) return null;
-    try {
-      return await mysql.createConnection({ uri: url, connectTimeout: 1e4 });
-    } catch (error) {
-      console.warn("[Product Asset Storage] Database connection unavailable; using local asset path.", error);
-      return null;
-    }
-  };
-  const ensureProductAssetsTable2 = async (conn) => {
-    await conn.execute(`CREATE TABLE IF NOT EXISTS productAssets (
-      id int AUTO_INCREMENT NOT NULL,
-      name varchar(255) NOT NULL,
-      contentType varchar(100) NOT NULL,
-      data LONGBLOB NOT NULL,
-      createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (id),
-      UNIQUE KEY productAssets_name_unique (name)
-    )`);
-  };
-  const saveRuntimeProductAsset = async (relativeName, data, contentType) => {
-    writeRuntimeProductAsset(relativeName, data);
-    const conn = await getProductAssetConnection2();
-    if (!conn) return { name: relativeName, url: `/assets/${relativeName}` };
-    try {
-      await ensureProductAssetsTable2(conn);
-      const assetBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-      await conn.execute(
-        `INSERT INTO productAssets (name, contentType, data)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE contentType = VALUES(contentType), data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`,
-        [relativeName, contentType, assetBuffer]
-      );
-      return { name: relativeName, url: `/api/product-assets/${encodeURIComponent(relativeName)}` };
-    } catch (error) {
-      console.warn("[Product Asset Storage] Database asset save failed; using local asset path.", error);
-      return { name: relativeName, url: `/assets/${relativeName}` };
-    } finally {
-      await conn.end().catch(() => {});
-    }
-  };
-  const readRuntimeProductAsset = async (relativeName) => {
-    const conn = await getProductAssetConnection2();
-    if (!conn) return null;
-    try {
-      await ensureProductAssetsTable2(conn);
-      const [rows] = await conn.execute(`SELECT contentType, data FROM productAssets WHERE name = ? LIMIT 1`, [relativeName]);
-      const row = rows?.[0];
-      return row ? { contentType: String(row.contentType || "application/octet-stream"), data: Buffer.from(row.data) } : null;
-    } catch (error) {
-      console.warn("[Product Asset Storage] Database asset read failed; trying local asset path.", error);
-      return null;
-    } finally {
-      await conn.end().catch(() => {});
-    }
-  };
   app.get("/api/product-assets/:name", async (req, res) => {
     try {
       const requestedName = path6.basename(String(req.params.name || ""));
@@ -3742,24 +4585,19 @@ async function startServer() {
         res.status(400).send("Missing asset name");
         return;
       }
-      const dbAsset = await readRuntimeProductAsset(requestedName);
-      if (dbAsset) {
-        res.setHeader("Content-Type", dbAsset.contentType);
+      const databaseAsset = await readProductAssetFromDatabase(requestedName);
+      if (databaseAsset) {
+        res.setHeader("Content-Type", databaseAsset.contentType);
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        res.send(dbAsset.data);
+        res.send(databaseAsset.data);
         return;
       }
-      for (const assetsDir of getRuntimeProductAssetDirs()) {
-        const fullPath = path6.join(assetsDir, requestedName);
-        if (fs6.existsSync(fullPath)) {
-          const ext = path6.extname(requestedName).toLowerCase();
-          const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webp" ? "image/webp" : ext === ".gif" ? "image/gif" : ext === ".svg" ? "image/svg+xml" : "application/octet-stream";
-          res.setHeader("Content-Type", contentType);
-          res.send(fs6.readFileSync(fullPath));
-          return;
-        }
-      }
-      res.status(404).send("Product asset not found");
+      const localBuffer = readServedAsset(requestedName);
+      const ext = path6.extname(requestedName).toLowerCase();
+      const contentType = ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webp" ? "image/webp" : ext === ".gif" ? "image/gif" : ext === ".svg" ? "image/svg+xml" : "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(localBuffer);
     } catch (err) {
       res.status(404).send("Product asset not found");
     }
@@ -3767,7 +4605,7 @@ async function startServer() {
   app.get("/api/product-assets", async (req, res) => {
     try {
       const seen = /* @__PURE__ */ new Set();
-      const assets = getRuntimeProductAssetDirs().flatMap((assetsDir) => fs6.existsSync(assetsDir) ? fs6.readdirSync(assetsDir) : []).filter((file) => /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file)).filter((file) => {
+      const assets = getProductAssetDirs().flatMap((assetsDir) => fs6.existsSync(assetsDir) ? fs6.readdirSync(assetsDir) : []).filter((file) => /\.(png|jpg|jpeg|webp|gif|svg)$/i.test(file)).filter((file) => {
         if (seen.has(file)) return false;
         seen.add(file);
         return true;
@@ -3828,7 +4666,28 @@ async function startServer() {
       res.status(500).send(err?.message || "Unable to pull NIH report");
     }
   });
-
+  app.post("/api/get-research-details", async (req, res) => {
+    try {
+      const body = req.body || {};
+      const peptideName = normalizeResearchName(body.peptideName || body.name || body.productName);
+      if (!peptideName) {
+        res.status(400).json({ error: "peptideName is required" });
+        return;
+      }
+      const details = await buildResearchDetails({
+        productId: body.productId || "",
+        peptideName,
+        synonyms: Array.isArray(body.synonyms) ? body.synonyms : [],
+        sequence: String(body.sequence || ""),
+        molecularFormula: String(body.molecularFormula || ""),
+        molecularWeight: String(body.molecularWeight || "")
+      });
+      res.json(details);
+    } catch (err) {
+      console.error("[Research Details API Error]", err);
+      res.status(500).json({ error: err?.message || "Unable to get research details" });
+    }
+  });
   app.get("/api/product-research-details", async (req, res) => {
     try {
       const name = String(req.query?.name || "").trim();
@@ -3836,152 +4695,19 @@ async function startServer() {
         res.status(400).send("Product name is required");
         return;
       }
-
-      const cleanName = name.replace(/\s+/g, " ").trim();
-      const pubmedTerm = `"${cleanName}" OR ${cleanName}`;
-      const searchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
-      searchUrl.searchParams.set("db", "pubmed");
-      searchUrl.searchParams.set("retmode", "json");
-      searchUrl.searchParams.set("retmax", "8");
-      searchUrl.searchParams.set("sort", "relevance");
-      searchUrl.searchParams.set("term", pubmedTerm);
-
-      let citations: any[] = [];
-      let abstractSnippets: string[] = [];
-
-      try {
-        const searchResponse = await fetch(searchUrl);
-        if (searchResponse.ok) {
-          const searchJson: any = await searchResponse.json();
-          const ids = (searchJson?.esearchresult?.idlist || []).slice(0, 8);
-
-          if (ids.length) {
-            const summaryUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi");
-            summaryUrl.searchParams.set("db", "pubmed");
-            summaryUrl.searchParams.set("retmode", "json");
-            summaryUrl.searchParams.set("id", ids.join(","));
-            const summaryResponse = await fetch(summaryUrl);
-            if (summaryResponse.ok) {
-              const summaryJson: any = await summaryResponse.json();
-              citations = ids
-                .map((id: string) => summaryJson?.result?.[id])
-                .filter(Boolean)
-                .slice(0, 3)
-                .map((item: any) => ({
-                  title: item.title || `${cleanName} PubMed source`,
-                  authors: Array.isArray(item.authors) ? item.authors.map((author: any) => author.name).filter(Boolean).join(", ") : "",
-                  journal: item.fulljournalname || item.source || "PubMed",
-                  year: item.pubdate ? String(item.pubdate).slice(0, 4) : "",
-                  url: item.uid ? `https://pubmed.ncbi.nlm.nih.gov/${item.uid}/` : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(cleanName)}`,
-                  summary: `PubMed-indexed source related to ${cleanName}.`,
-                }));
-            }
-
-            const fetchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi");
-            fetchUrl.searchParams.set("db", "pubmed");
-            fetchUrl.searchParams.set("retmode", "xml");
-            fetchUrl.searchParams.set("id", ids.slice(0, 5).join(","));
-            const fetchResponse = await fetch(fetchUrl);
-            if (fetchResponse.ok) {
-              const xml = await fetchResponse.text();
-              abstractSnippets = Array.from(xml.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/gi))
-                .map((match) => match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
-                .filter(Boolean)
-                .slice(0, 8);
-            }
-          }
-        }
-      } catch (sourceError) {
-        console.warn("[Research Details] PubMed lookup failed; using PubMed search links.", sourceError);
-      }
-
-      if (citations.length < 3) {
-        const fallbackTerms = [
-          `${cleanName}`,
-          `${cleanName} mechanism of action`,
-          `${cleanName} chemistry pharmacology`,
-        ];
-        citations = [
-          ...citations,
-          ...fallbackTerms.slice(citations.length).map((term, index) => ({
-            title: `${cleanName} ${index === 0 ? "PubMed literature search" : index === 1 ? "mechanism literature search" : "chemistry and pharmacology literature search"}`,
-            authors: "",
-            journal: "PubMed",
-            year: "",
-            url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(term)}`,
-            summary: `Current PubMed search source for ${term}.`,
-          })),
-        ].slice(0, 3);
-      }
-
-      let chemicalMakeup = "";
-      try {
-        const pubChemUrl = new URL(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cleanName)}/property/MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES/JSON`);
-        const pubChemResponse = await fetch(pubChemUrl);
-        if (pubChemResponse.ok) {
-          const pubChemJson: any = await pubChemResponse.json();
-          const props = pubChemJson?.PropertyTable?.Properties?.[0];
-          if (props) {
-            chemicalMakeup = [
-              props.MolecularFormula ? `Molecular formula: ${props.MolecularFormula}` : "",
-              props.MolecularWeight ? `Molecular weight: ${props.MolecularWeight}` : "",
-              props.IUPACName ? `IUPAC name: ${props.IUPACName}` : "",
-              props.CanonicalSMILES ? `Canonical SMILES: ${props.CanonicalSMILES}` : "",
-            ].filter(Boolean).join("\n");
-          }
-        }
-      } catch (chemicalError) {
-        console.warn("[Research Details] PubChem lookup failed.", chemicalError);
-      }
-
-      if (!chemicalMakeup) {
-        chemicalMakeup = [
-          `${cleanName}`,
-          "No exact PubChem chemistry record was returned for this product name. Verify the final molecular formula, molecular weight, peptide sequence, salt form, concentration, purity, and certificate-of-analysis details before publishing.",
-        ].join("\n");
-      }
-
-      const citedTitles = citations.map((citation: any) => citation.title).filter(Boolean).slice(0, 3);
-      const abstractText = abstractSnippets.join(" ").replace(/\s+/g, " ").trim();
-      const evidenceSummary = abstractText ||
-        `${cleanName} appears in PubMed-indexed scientific literature and related chemistry references. The available literature discusses the compound or product in experimental, analytical, pharmacology, laboratory, or formulation research depending on the exact identity of the material.`;
-
-      const description = [
-        `${cleanName} is a research-focused compound or product used for laboratory, analytical, and scientific investigation. Published literature and chemistry references are used here to describe its identity, how researchers evaluate it, and why it is of interest in controlled research settings.`,
-        `Researchers generally evaluate ${cleanName} by looking at its chemical identity, purity profile, structure-related behavior, stability, and the biological or analytical pathways described in the available literature. The mechanism of action depends on the exact compound, but the research record typically focuses on how the material interacts with the target systems, receptors, tissues, enzymes, signaling pathways, or assay conditions relevant to the study design.`,
-        `Current scientific interest in ${cleanName} centers on understanding its measurable effects, reproducibility, handling profile, and potential value in research models. Key areas of investigation may include pharmacology, analytical chemistry, peptide or compound characterization, mechanism-focused assays, stability evaluation, and comparison with related materials. These areas help researchers decide whether the product is appropriate for their laboratory workflow and study goals.`,
-        `Research findings referenced through PubMed-indexed sources provide useful context for the product's investigated properties, reported experimental observations, and limitations. The available evidence should be interpreted as research-context information for laboratory use rather than as medical advice or clinical direction.`,
-        "Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.",
-      ].join("\n\n");
-
-      const researchContent = [
-        `Research and clinical-study context for ${cleanName}`,
-        "",
-        evidenceSummary.slice(0, 2800),
-        "",
-        citedTitles.length
-          ? `The sources used for this overview include PubMed-indexed material such as: ${citedTitles.join("; ")}. These publications provide research context regarding the compound/product identity, mechanism-focused investigation, reported experimental findings, and areas where the material has been studied.`
-          : `The citations below are current PubMed search sources for ${cleanName} and related chemistry, mechanism, and pharmacology terms.`,
-        "",
-        `Across the available literature, ${cleanName} should be presented as a research material whose value comes from documented identity, consistent quality control, and relevance to defined laboratory questions. The most useful product-page summary is one that explains what the material is, what researchers are investigating, which mechanisms or assay systems are relevant, and what findings have been reported without implying approved medical use.`,
-        "",
-        "Disclaimer: This product is not intended to diagnose, treat, cure, or prevent any disease. It is offered for research, laboratory, or analytical use only and is not for human or animal consumption.",
-      ].join("\n");
-
-      res.json({
-        overview: "",
-        description,
-        chemicalMakeup,
-        researchContent,
-        citations,
+      const details = await buildResearchDetails({
+        peptideName: name,
+        synonyms: [],
+        sequence: "",
+        molecularFormula: "",
+        molecularWeight: ""
       });
-    } catch (err: any) {
+      res.json(researchDetailsToLegacyResponse(details));
+    } catch (err) {
       console.error("[Research Details Error]", err);
       res.status(500).send(err?.message || "Unable to get research details");
     }
   });
-
-
   app.post("/api/product-image/upload", async (req, res) => {
     try {
       const makeSafeSlug = (value) => String(value || "product-image").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "product-image";
@@ -3992,41 +4718,51 @@ async function startServer() {
         return;
       }
       const mimeType = match[1].toLowerCase();
-      const buffer = Buffer.from(match[2], "base64");
+      const originalBuffer = Buffer.from(match[2], "base64");
       const baseSlug = makeSafeSlug(req.body?.slug || req.body?.filename);
-      if (mimeType === "image/svg+xml" || mimeType === "image/svg") {
-        const svgText = buffer.toString("utf8").trim();
+      const requestedName = String(req.body?.filename || "").toLowerCase();
+      if (mimeType === "image/svg+xml" || mimeType === "image/svg" || requestedName.endsWith(".svg")) {
+        const svgText = originalBuffer.toString("utf8").trim();
         if (!/<svg[\s>]/i.test(svgText) || /<script[\s>]/i.test(svgText) || /on\w+\s*=/i.test(svgText)) {
-          res.status(400).send("SVG uploads must be valid, safe SVG files. Please upload a PNG, JPG, WEBP, or a clean SVG.");
+          res.status(400).send("SVG uploads must be valid, safe SVG files. Please upload a PNG, JPG, WEBP, GIF, or a clean SVG.");
           return;
         }
-        const filename2 = `${baseSlug}-${Date.now()}.svg`;
-        const saved = await saveRuntimeProductAsset(filename2, svgText, "image/svg+xml");
+        const filename = `${baseSlug}-${Date.now()}.svg`;
+        const saved = await saveProductAsset(filename, svgText, "image/svg+xml");
         res.json(saved);
         return;
       }
-      const { createCanvas: createCanvas2, loadImage: loadImage2 } = await import("@napi-rs/canvas");
-      const image = await loadImage2(buffer);
-      const canvas = createCanvas2(image.width, image.height);
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0);
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = imageData.data;
-      for (let index = 0; index < pixels.length; index += 4) {
-        const red = pixels[index];
-        const green = pixels[index + 1];
-        const blue = pixels[index + 2];
-        const alpha = pixels[index + 3];
-        if (alpha > 0 && red > 238 && green > 238 && blue > 238 && Math.abs(red - green) < 12 && Math.abs(red - blue) < 12 && Math.abs(green - blue) < 12) {
-          const whiteness = Math.min(red, green, blue);
-          pixels[index + 3] = whiteness > 250 ? 0 : Math.max(0, Math.min(alpha, (255 - whiteness) * 12));
+      try {
+        const { createCanvas: createCanvas2, loadImage: loadImage2 } = await import("@napi-rs/canvas");
+        const image = await loadImage2(originalBuffer);
+        const canvas = createCanvas2(image.width, image.height);
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+        for (let index = 0; index < pixels.length; index += 4) {
+          const red = pixels[index];
+          const green = pixels[index + 1];
+          const blue = pixels[index + 2];
+          const alpha = pixels[index + 3];
+          if (alpha > 0 && red > 238 && green > 238 && blue > 238 && Math.abs(red - green) < 12 && Math.abs(red - blue) < 12 && Math.abs(green - blue) < 12) {
+            const whiteness = Math.min(red, green, blue);
+            pixels[index + 3] = whiteness > 250 ? 0 : Math.max(0, Math.min(alpha, (255 - whiteness) * 12));
+          }
         }
+        context.putImageData(imageData, 0, 0);
+        const processedBuffer = await canvas.encode("png");
+        const filename = `${baseSlug}-${Date.now()}.png`;
+        const saved = await saveProductAsset(filename, processedBuffer, "image/png");
+        res.json(saved);
+        return;
+      } catch (imageError) {
+        console.warn("[Product Image Upload] Transparent-background conversion failed; saving original image.", imageError);
+        const extension = mimeType.includes("webp") ? "webp" : mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : mimeType.includes("gif") ? "gif" : mimeType.includes("png") ? "png" : "bin";
+        const filename = `${baseSlug}-${Date.now()}.${extension}`;
+        const saved = await saveProductAsset(filename, originalBuffer, mimeType);
+        res.json(saved);
       }
-      context.putImageData(imageData, 0, 0);
-      const processedBuffer = await canvas.encode("png");
-      const filename = `${baseSlug}-${Date.now()}.png`;
-      const saved = await saveRuntimeProductAsset(filename, processedBuffer, "image/png");
-      res.json(saved);
     } catch (err) {
       console.error("[Product Image Upload Error]", err);
       res.status(500).send(err?.message || "Unable to upload product image");
@@ -4039,23 +4775,27 @@ async function startServer() {
       const slug = makeSafeSlug(req.body?.slug || req.body?.name);
       const name = String(req.body?.name || slug.replace(/-/g, " ")).trim();
       const size = String(req.body?.size || "").trim();
+      const minAmount = String(req.body?.minAmount || "").trim();
       const displayName = size && !name.toLowerCase().includes(size.toLowerCase()) ? `${name} ${size}` : name;
-      const assetsDir = path6.join(process.cwd(), "client", "public", "assets");
-      fs6.mkdirSync(assetsDir, { recursive: true });
+      const formatGiftCardAmount = (value) => {
+        const parsed = Number(String(value || "").replace(/[^0-9.]/g, ""));
+        return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toLocaleString("en-US", { maximumFractionDigits: 2 })}+` : "";
+      };
+      const giftCardRange = formatGiftCardAmount(minAmount);
       let buffer;
       let extension = "png";
       let contentType = "image/png";
       if (type === "cream") {
-        buffer = fs6.readFileSync(path6.join(assetsDir, "lotion-bottle-blank-hd-tube.png"));
+        buffer = readServedAsset("lotion-bottle-blank-hd-tube.png");
       } else if (type === "face-mask") {
-        buffer = fs6.readFileSync(path6.join(assetsDir, "face-mask-blank-hd.png"));
+        buffer = readServedAsset("face-mask-blank-hd.png");
       } else if (type === "gift-card") {
-        const giftCardBuffer = fs6.readFileSync(path6.join(assetsDir, "Gift-Card.png"));
+        const giftCardBuffer = readServedAsset("Gift-Card.png");
         if (giftCardRange) {
           try {
-            const { createCanvas, loadImage } = await import("@napi-rs/canvas");
-            const image = await loadImage(giftCardBuffer);
-            const canvas = createCanvas(image.width, image.height);
+            const { createCanvas: createCanvas2, loadImage: loadImage2 } = await import("@napi-rs/canvas");
+            const image = await loadImage2(giftCardBuffer);
+            const canvas = createCanvas2(image.width, image.height);
             const context = canvas.getContext("2d");
             context.drawImage(image, 0, 0);
             const fontSize = Math.max(34, Math.round(image.width * 0.035));
@@ -4082,7 +4822,7 @@ async function startServer() {
       }
       const amountSlug = type === "gift-card" && giftCardRange ? `-${makeSafeSlug(giftCardRange)}` : "";
       const filename = `${slug}-${type}${amountSlug}-preview.${extension}`;
-      const saved = await saveRuntimeProductAsset(filename, buffer, contentType);
+      const saved = await saveProductAsset(filename, buffer, contentType);
       res.json({ url: saved.url, contentType });
     } catch (err) {
       console.error("[Product Preview Link Error]", err);
