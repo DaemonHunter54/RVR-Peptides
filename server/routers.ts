@@ -20,25 +20,6 @@ function makeProductSlug(value: string): string {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-
-
-const CRITICAL_PRODUCT_IMAGE_REPAIRS: Record<string, string> = {
-  "5-amino-1mq": "/assets/5-amino-1mq-50mg_06697bbc.webp",
-  "5-amino-1mq-50mg": "/assets/5-amino-1mq-50mg_06697bbc.webp",
-  "bpc-157": "/assets/bpc-157-5mg_1e10350a.webp",
-  "bpc-157-5mg": "/assets/bpc-157-5mg_1e10350a.webp",
-  "bpc-157-10mg": "/assets/bpc-157-5mg_1e10350a.webp",
-  "glp-1-semaglutide": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
-  "glp-1-semaglutide-5mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
-  "glp-1-semaglutide-10mg": "/assets/glp-1-semaglutide-5mg_7dd36c7e.webp",
-};
-
-function criticalImageRepairAssetForInput(input: { slug?: string | null; name?: string | null }): string {
-  const slugKey = makeProductSlug(input.slug || "");
-  const nameKey = makeProductSlug(input.name || "");
-  return CRITICAL_PRODUCT_IMAGE_REPAIRS[slugKey] || CRITICAL_PRODUCT_IMAGE_REPAIRS[nameKey] || "";
-}
-
 let cachedProductAssets: Map<string, string> | null = null;
 function getProductAssetMap(): Map<string, string> {
   if (cachedProductAssets) return cachedProductAssets;
@@ -77,8 +58,6 @@ function generatedVialUrlForProduct(input: { slug?: string | null; name?: string
 }
 
 function productAssetForInput(input: { slug?: string | null; name?: string | null; imageUrl?: string | null }): string {
-  const critical = criticalImageRepairAssetForInput(input);
-  if (critical) return critical;
   const assets = getProductAssetMap();
   const slugKey = makeProductSlug(input.slug || "");
   if (slugKey && assets.has(slugKey)) return assets.get(slugKey)!;
@@ -144,8 +123,6 @@ function productAssetForDisplay(input: { slug?: string | null; name?: string | n
 
 function preserveManusImage(product: any): any {
   if (!product) return product;
-  const criticalImage = criticalImageRepairAssetForInput(product);
-  if (criticalImage) return { ...product, imageUrl: criticalImage };
   const mappedImage = productAssetForDisplay(product);
   if (!isNonVialProduct(product)) {
     if (mappedImage && shouldReplaceVialImage(product, product.imageUrl)) {
