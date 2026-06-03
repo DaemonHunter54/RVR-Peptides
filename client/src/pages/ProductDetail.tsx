@@ -135,12 +135,17 @@ export default function ProductDetail() {
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
   const displayImageUrl = productImageUrl(product, activeVariant) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`;
-  const isStorageContainer = makeProductSlug(product.slug || product.name) === "3ml-storage-container";
+  const normalizedProductSlug = makeProductSlug(product.slug || product.name);
+  const normalizedProductName = String(product.name || "").toLowerCase();
+  const isStorageContainer = normalizedProductSlug === "3ml-storage-container";
+  const isReconstitutionKit = normalizedProductSlug === "reconstitution-kit" || normalizedProductName.includes("reconstitution kit");
   const imageOffsetClass = isGiftCard
     ? "mt-8 lg:mt-14"
     : isStorageContainer
       ? "mt-0 lg:mt-0"
-      : "-mt-8 lg:-mt-14";
+      : isReconstitutionKit
+        ? "mt-8 lg:mt-12"
+        : "-mt-8 lg:-mt-14";
   const giftCardRange = isGiftCard ? formatGiftCardMinimum(product.price) : "";
   const shouldOverlayGiftCardRange = isGiftCard && giftCardRange && String(displayImageUrl || "").includes("Gift-Card.png");
 
