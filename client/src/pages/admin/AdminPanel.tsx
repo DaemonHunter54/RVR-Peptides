@@ -225,6 +225,21 @@ function ProductsSection() {
 
   const products = productsQuery.data?.products ?? (Array.isArray(productsQuery.data) ? productsQuery.data : []);
 
+  const openProductEditor = (product: any) => {
+    setEditingProduct(product);
+    setShowForm(true);
+  };
+
+  useEffect(() => {
+    const returnToProductsList = () => {
+      setShowForm(false);
+      setEditingProduct(null);
+    };
+
+    window.addEventListener("rvr-admin-products-list", returnToProductsList);
+    return () => window.removeEventListener("rvr-admin-products-list", returnToProductsList);
+  }, []);
+
   if (showForm) {
     return (
       <ProductForm
@@ -279,7 +294,13 @@ function ProductsSection() {
                       <img src={productImageUrl(product) || ASSETS.peptideVial} alt="" loading="lazy" decoding="async" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-10 h-10 object-contain bg-slate-50 rounded" />
                       <div>
-                        <p className="font-medium text-slate-800">{product.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => openProductEditor(product)}
+                          className="block text-left font-medium text-slate-800 hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm"
+                        >
+                          {product.name}
+                        </button>
                         <p className="text-xs text-slate-400">{product.sku || "No SKU"}</p>
                       </div>
                     </div>
@@ -295,7 +316,7 @@ function ProductsSection() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => { setEditingProduct(product); setShowForm(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => openProductEditor(product)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="sm" className="text-red-500" onClick={() => { if (confirm("Delete this product?")) deleteProduct.mutate({ id: product.id }); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </td>
