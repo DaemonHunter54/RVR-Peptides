@@ -139,13 +139,16 @@ export default function ProductDetail() {
   const normalizedProductName = String(product.name || "").toLowerCase();
   const isStorageContainer = normalizedProductSlug === "3ml-storage-container";
   const isReconstitutionKit = normalizedProductSlug === "reconstitution-kit" || normalizedProductName.includes("reconstitution kit");
+  const isVialCap = normalizedProductSlug === "vial-cap" || normalizedProductName.includes("vial cap");
   const imageOffsetClass = isGiftCard
     ? "mt-8 lg:mt-14"
     : isStorageContainer
       ? "mt-0 lg:mt-0"
       : isReconstitutionKit
         ? "mt-8 lg:mt-12"
-        : "-mt-8 lg:-mt-14";
+        : isVialCap
+          ? "mt-8 lg:mt-10"
+          : "-mt-8 lg:-mt-14";
   const giftCardRange = isGiftCard ? formatGiftCardMinimum(product.price) : "";
   const shouldOverlayGiftCardRange = isGiftCard && giftCardRange && String(displayImageUrl || "").includes("Gift-Card.png");
 
