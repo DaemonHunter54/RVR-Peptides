@@ -117,6 +117,8 @@ export type InsertResearchCitation = typeof researchCitations.$inferInsert;
 export const productResearch = mysqlTable("productResearch", {
   id: int("id").autoincrement().primaryKey(),
   productId: int("productId").notNull(),
+  productBrief: text("productBrief"),
+  qualityNotes: text("qualityNotes"),
   overview: text("overview"),
   chemicalMakeup: text("chemicalMakeup"),
   researchContent: text("researchContent"), // Rich text / markdown

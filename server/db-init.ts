@@ -281,6 +281,9 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
   ["cartItems", "variantId", "int"],
   ["cartItems", "variantLabel", "varchar(255)"],
 
+  ["productResearch", "productBrief", "text"],
+  ["productResearch", "qualityNotes", "text"],
+
   // Gift card checkout, lifecycle, and audit columns for existing Railway DBs.
   ["orders", "giftCardCode", "varchar(9)"],
   ["orders", "giftCardAmount", "decimal(10,2) DEFAULT '0.00'"],

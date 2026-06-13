@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useParams } from "wouter";
-import { toast } from "sonner";
+import { ProductResearchWorkflow, PersistedProductResearchWorkflow, type ProductResearchDraft } from "@/components/admin/ProductResearchWorkflow";
 
 // ─── Admin Layout ────────────────────────────────────────────────────
 export default function AdminPanel() {
@@ -353,46 +353,27 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 };
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
-async function requestResearchDetails(payload: {
-  productId?: number | string;
-  peptideName: string;
-  synonyms?: string[];
-  sequence?: string;
-  molecularFormula?: string;
-  molecularWeight?: string;
-}) {
-  const response = await fetch("/api/get-research-details", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const errorBody = await response.text();
-    try {
-      const parsed = JSON.parse(errorBody);
-      throw new Error(parsed?.error || "Unable to get research details.");
-    } catch {
-      throw new Error(errorBody || "Unable to get research details.");
-    }
-  }
-  const details = await response.json();
-  const sources = Array.isArray(details.sources) ? details.sources : [];
-  return {
-    description: details.description_block || details.description || "",
-    chemicalMakeup: details.chemical_makeup_block || details.chemicalMakeup || "",
-    researchContent: details.research_block || details.researchContent || "",
-    citations: sources.map((source: any, index: number) => ({
-      citationNumber: index + 1,
-      title: source.title || "Research source",
-      authors: source.authors || "",
-      journal: source.database || source.journal || "Scientific database",
-      year: source.year || "",
-      url: source.url || "",
-      summary: source.supports || source.summary || "",
-    })),
-  };
-}
+const blankResearchDraft = (): ProductResearchDraft => ({
+  productBrief: "",
+  qualityNotes: "",
+  overview: "",
+  description: "",
+  chemicalMakeup: "",
+  researchContent: "",
+  citations: [],
+});
 
+const productResearchMetaFromForm = (form: any) => ({
+  size: form.size || "",
+  purity: form.purity || "",
+  form: form.form || "",
+  contents: form.contents || "",
+  sku: form.sku || "",
+  otherNames: form.otherNames || "",
+  molecularFormula: form.molecularFormula || "",
+  molecularWeight: form.molecularWeight || "",
+  shortDescription: form.shortDescription || "",
+});
 
 type PreviewProductType = "" | "vial" | "cream" | "face-mask" | "gift-card";
 const PRODUCT_PREVIEW_TYPES: Array<{ value: PreviewProductType; label: string }> = [
@@ -501,18 +482,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       sortOrder: v.sortOrder ?? 0,
     })) : [],
   });
-  const [draftResearch, setDraftResearch] = useState<{
-    description?: string;
-    chemicalMakeup: string;
-    researchContent: string;
-    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
-  }>({ description: "", chemicalMakeup: "", researchContent: "", citations: [] });
-  const [editResearchDraft, setEditResearchDraft] = useState<{
-    description?: string;
-    chemicalMakeup: string;
-    researchContent: string;
-    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
-  }>({ description: "", chemicalMakeup: "", researchContent: "", citations: [] });
+  const [draftResearch, setDraftResearch] = useState<ProductResearchDraft>(blankResearchDraft());
   const [showTestingDocuments, setShowTestingDocuments] = useState(false);
   const [showSpecifications, setShowSpecifications] = useState(false);
 
@@ -710,7 +680,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       stockQuantity: previewType === "gift-card" ? 9999 : form.stockQuantity,
       imageUrl: linkedImageUrl || form.imageUrl || imageUrlForSlug(slug),
       variants,
-      researchDraft: previewType !== "gift-card" ? (product?.id ? editResearchDraft : draftResearch) : undefined,
+      researchDraft: previewType !== "gift-card" && !product?.id ? draftResearch : undefined,
     };
 
     onSave(payload);
@@ -925,9 +895,20 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 
         {!isGiftCardTemplate && (
           product?.id ? (
-            <ResearchCitationsEditor productId={product.id} productName={form.name} onDraftChange={setEditResearchDraft} onDescriptionChange={(description) => updateField("description", description)} />
+            <PersistedProductResearchWorkflow
+              productId={product.id}
+              productName={form.name}
+              productMeta={productResearchMetaFromForm(form)}
+              onShortDescriptionChange={(shortDescription) => updateField("shortDescription", shortDescription)}
+            />
           ) : (
-            <DraftResearchEditor productName={form.name} value={draftResearch} onChange={setDraftResearch} onDescriptionChange={(description) => updateField("description", description)} />
+            <ProductResearchWorkflow
+              productName={form.name}
+              productMeta={productResearchMetaFromForm(form)}
+              value={draftResearch}
+              onChange={setDraftResearch}
+              onShortDescriptionChange={(shortDescription) => updateField("shortDescription", shortDescription)}
+            />
           )
         )}
 
@@ -944,398 +925,6 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
 }
 
 
-// ─── Draft Research Editor (Add Product) ─────────────────────────────
-function DraftResearchEditor({
-  productName,
-  value,
-  onChange,
-  onDescriptionChange,
-}: {
-  productName: string;
-  value: {
-    description?: string;
-    chemicalMakeup: string;
-    researchContent: string;
-    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
-  };
-  onChange: (next: {
-    description?: string;
-    chemicalMakeup: string;
-    researchContent: string;
-    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
-  }) => void;
-  onDescriptionChange?: (description: string) => void;
-}) {
-  const [gettingResearchDetails, setGettingResearchDetails] = useState(false);
-
-  const getResearchDetails = async () => {
-    const name = String(productName || "").trim();
-    if (!name) {
-      toast.error("Enter a product name before getting research details.");
-      return;
-    }
-
-    setGettingResearchDetails(true);
-    try {
-      const details = await requestResearchDetails({ peptideName: name });
-      onChange({
-        chemicalMakeup: details.chemicalMakeup || "",
-        researchContent: details.researchContent || "",
-        citations: Array.isArray(details.citations) ? details.citations : [],
-      });
-      toast.success("Research details added.");
-    } catch (error: any) {
-      toast.error(error?.message || "Unable to get research details.");
-    } finally {
-      setGettingResearchDetails(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <div className="mb-3 flex justify-start">
-          <Button type="button" size="sm" onClick={getResearchDetails} disabled={gettingResearchDetails} className="bg-blue-600 hover:bg-blue-700 text-white">
-            {gettingResearchDetails ? "Researching..." : "Get Research Details"}
-          </Button>
-        </div>
-        <h2 className="font-semibold text-slate-800">Research Information</h2>
-        <p className="text-xs text-slate-400 mb-4 mt-1">Add research background, chemical makeup, and study summaries. This appears on the product detail page.</p>
-        <div className="space-y-4">
-          <div>
-            <Label>Chemical Makeup</Label>
-            <Textarea
-              value={value.chemicalMakeup}
-              onChange={(e) => onChange({ ...value, chemicalMakeup: e.target.value })}
-              className="mt-1.5"
-              rows={3}
-              placeholder="Chemical structure, amino acid sequence, molecular formula, molecular weight, etc."
-            />
-          </div>
-          <div>
-            <Label>Research Content</Label>
-            <Textarea
-              value={value.researchContent}
-              onChange={(e) => onChange({ ...value, researchContent: e.target.value })}
-              className="mt-1.5"
-              rows={5}
-              placeholder="Detailed research findings, studies, and applications..."
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <div className="mb-4">
-          <h2 className="font-semibold text-slate-800">Research Citations & Sources</h2>
-          <p className="text-xs text-slate-400">The Get Research Details button will automatically add at least 3 sources here.</p>
-        </div>
-        {value.citations.length ? (
-          <div className="space-y-3">
-            {value.citations.map((citation, index) => (
-              <div key={index} className="flex gap-3 p-4 rounded-lg border border-slate-100 bg-slate-50">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold text-sm">{index + 1}</div>
-                <div className="flex-1 min-w-0">
-                  <Input
-                    value={citation.title || ""}
-                    onChange={(e) => {
-                      const citations = [...value.citations];
-                      citations[index] = { ...citation, title: e.target.value };
-                      onChange({ ...value, citations });
-                    }}
-                    className="mb-2 bg-white font-medium"
-                    placeholder="Source title"
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <Input
-                      value={citation.journal || ""}
-                      onChange={(e) => {
-                        const citations = [...value.citations];
-                        citations[index] = { ...citation, journal: e.target.value };
-                        onChange({ ...value, citations });
-                      }}
-                      className="bg-white text-sm"
-                      placeholder="Journal/source"
-                    />
-                    <Input
-                      value={citation.year || ""}
-                      onChange={(e) => {
-                        const citations = [...value.citations];
-                        citations[index] = { ...citation, year: e.target.value };
-                        onChange({ ...value, citations });
-                      }}
-                      className="bg-white text-sm"
-                      placeholder="Year"
-                    />
-                    <Input
-                      value={citation.url || ""}
-                      onChange={(e) => {
-                        const citations = [...value.citations];
-                        citations[index] = { ...citation, url: e.target.value };
-                        onChange({ ...value, citations });
-                      }}
-                      className="bg-white text-sm"
-                      placeholder="URL"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
-            No sources added yet. Click Get Research Details to populate research citations automatically.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Research Citations Editor ──────────────────────────────────────
-function ResearchCitationsEditor({
-  productId,
-  productName,
-  onDraftChange,
-  onDescriptionChange,
-}: {
-  productId: number;
-  productName: string;
-  onDraftChange?: (next: {
-    description?: string;
-    chemicalMakeup: string;
-    researchContent: string;
-    citations: Array<{ title: string; authors?: string; journal?: string; year?: string; url?: string; summary?: string }>;
-  }) => void;
-  onDescriptionChange?: (description: string) => void;
-}) {
-  const researchQuery = trpc.admin.research.get.useQuery({ productId });
-  const upsertResearch = trpc.admin.research.upsert.useMutation({
-    onSuccess: () => { toast.success("Research saved!"); researchQuery.refetch(); },
-    onError: (err: any) => toast.error(err.message),
-  });
-  const addCitation = trpc.admin.research.addCitation.useMutation({
-    onSuccess: () => { toast.success("Citation added!"); researchQuery.refetch(); },
-    onError: (err: any) => toast.error(err.message),
-  });
-  const updateCitation = trpc.admin.research.updateCitation.useMutation({
-    onSuccess: () => { toast.success("Citation updated!"); researchQuery.refetch(); },
-    onError: (err: any) => toast.error(err.message),
-  });
-  const deleteCitation = trpc.admin.research.deleteCitation.useMutation({
-    onSuccess: () => { toast.success("Citation removed!"); researchQuery.refetch(); },
-    onError: (err: any) => toast.error(err.message),
-  });
-
-  const data = researchQuery.data;
-  const research = data?.research;
-  const citations = data?.citations || [];
-
-  const [overview, setOverview] = useState("");
-  const [chemicalMakeup, setChemicalMakeup] = useState("");
-  const [researchContent, setResearchContent] = useState("");
-  const [showAddCitation, setShowAddCitation] = useState(false);
-  const [newCitation, setNewCitation] = useState({ citationNumber: 1, title: "", authors: "", journal: "", year: "", url: "", summary: "" });
-  const [researchChanged, setResearchChanged] = useState(false);
-  const [gettingResearchDetails, setGettingResearchDetails] = useState(false);
-
-  useEffect(() => {
-    // Do not repopulate research text while the admin is actively editing.
-    // Citation deletes/refetches should not restore text the admin just cleared.
-    if (researchChanged) return;
-
-    if (research) {
-      setOverview(research.overview || "");
-      setChemicalMakeup(research.chemicalMakeup || "");
-      setResearchContent(research.researchContent || "");
-      setResearchChanged(false);
-    } else {
-      setOverview("");
-      setChemicalMakeup("");
-      setResearchContent("");
-      setResearchChanged(false);
-    }
-  }, [research, researchChanged]);
-
-  useEffect(() => {
-    onDraftChange?.({
-      description: "",
-      chemicalMakeup,
-      researchContent,
-      citations: citations.map((citation: any) => ({
-        title: citation.title || "",
-        authors: citation.authors || "",
-        journal: citation.journal || "",
-        year: citation.year || "",
-        url: citation.url || "",
-        summary: citation.summary || "",
-      })),
-    });
-  }, [chemicalMakeup, researchContent, citations.length]);
-
-  const getResearchDetails = async () => {
-    const name = String(productName || "").trim();
-    if (!name) {
-      toast.error("Enter a product name before getting research details.");
-      return;
-    }
-    setGettingResearchDetails(true);
-    try {
-      const details = await requestResearchDetails({ peptideName: name });
-      const nextOverview = "";
-      const nextDescription = details.description || "";
-      const nextChemicalMakeup = details.chemicalMakeup || "";
-      const nextResearchContent = details.researchContent || "";
-      onDescriptionChange?.(nextDescription);
-      setOverview(nextOverview);
-      setChemicalMakeup(nextChemicalMakeup);
-      setResearchContent(nextResearchContent);
-      await upsertResearch.mutateAsync({ productId, overview: nextOverview, chemicalMakeup: nextChemicalMakeup, researchContent: nextResearchContent });
-
-      for (const citation of citations) {
-        await deleteCitation.mutateAsync({ id: citation.id });
-      }
-
-      const sourceList = Array.isArray(details.citations) ? details.citations.slice(0, 3) : [];
-      for (let index = 0; index < sourceList.length; index++) {
-        const citation = sourceList[index];
-        await addCitation.mutateAsync({
-          productId,
-          citationNumber: index + 1,
-          title: citation.title || `${name} research source`,
-          authors: citation.authors || "",
-          journal: citation.journal || "NIH/PubMed",
-          year: citation.year || "",
-          url: citation.url || "",
-          summary: citation.summary || "",
-        });
-      }
-
-      setResearchChanged(false);
-      await researchQuery.refetch();
-      toast.success("Research details added.");
-    } catch (error: any) {
-      toast.error(error?.message || "Unable to get research details.");
-    } finally {
-      setGettingResearchDetails(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6 mt-6">
-      {/* Research Overview */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <div className="mb-3 flex justify-start">
-          <Button type="button" size="sm" onClick={getResearchDetails} disabled={gettingResearchDetails} className="bg-blue-600 hover:bg-blue-700 text-white">
-            {gettingResearchDetails ? "Researching..." : "Get Research Details"}
-          </Button>
-        </div>
-        <h2 className="font-semibold text-slate-800">Research Information</h2>
-        <p className="text-xs text-slate-400 mb-4 mt-1">Add research background, chemical makeup, and study summaries. This appears on the product detail page.</p>
-        <div className="space-y-4">
-          <div>
-            <Label>Chemical Makeup</Label>
-            <Textarea value={chemicalMakeup} onChange={(e) => { setChemicalMakeup(e.target.value); setResearchChanged(true); }} className="mt-1.5" rows={3} placeholder="Chemical structure, amino acid sequence, etc." />
-          </div>
-          <div>
-            <Label>Research Content</Label>
-            <Textarea value={researchContent} onChange={(e) => { setResearchContent(e.target.value); setResearchChanged(true); }} className="mt-1.5" rows={5} placeholder="Detailed research findings, studies, and applications..." />
-          </div>
-        </div>
-      </div>
-
-      {/* Citations */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-semibold text-slate-800">Research Citations & Sources</h2>
-            <p className="text-xs text-slate-400">Add published research papers and sources that back this product.</p>
-          </div>
-          <Button size="sm" onClick={() => { setShowAddCitation(!showAddCitation); setNewCitation(prev => ({ ...prev, citationNumber: citations.length + 1 })); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-1">
-            <Plus className="h-3.5 w-3.5" /> Add Citation
-          </Button>
-        </div>
-
-        {showAddCitation && (
-          <div className="bg-slate-50 rounded-lg p-4 mb-4 border border-slate-200">
-            <h3 className="font-medium text-slate-700 text-sm mb-3">New Citation</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div><Label className="text-xs">Citation # *</Label><Input type="number" value={newCitation.citationNumber} onChange={(e) => setNewCitation(p => ({ ...p, citationNumber: parseInt(e.target.value) || 1 }))} className="mt-1 h-9 text-sm" /></div>
-              <div><Label className="text-xs">Year</Label><Input value={newCitation.year} onChange={(e) => setNewCitation(p => ({ ...p, year: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="2024" /></div>
-              <div className="md:col-span-2"><Label className="text-xs">Title *</Label><Input value={newCitation.title} onChange={(e) => setNewCitation(p => ({ ...p, title: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="Study title" /></div>
-              <div><Label className="text-xs">Authors</Label><Input value={newCitation.authors} onChange={(e) => setNewCitation(p => ({ ...p, authors: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="Author names" /></div>
-              <div><Label className="text-xs">Journal</Label><Input value={newCitation.journal} onChange={(e) => setNewCitation(p => ({ ...p, journal: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="Journal name" /></div>
-              <div className="md:col-span-2"><Label className="text-xs">URL / DOI Link</Label><Input value={newCitation.url} onChange={(e) => setNewCitation(p => ({ ...p, url: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="https://pubmed.ncbi.nlm.nih.gov/..." /></div>
-              <div className="md:col-span-2"><Label className="text-xs">Summary</Label><Textarea value={newCitation.summary} onChange={(e) => setNewCitation(p => ({ ...p, summary: e.target.value }))} className="mt-1 text-sm" rows={2} placeholder="Brief summary of findings" /></div>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <Button size="sm" onClick={() => { setResearchChanged(true); addCitation.mutate({ productId, ...newCitation }); setShowAddCitation(false); setNewCitation({ citationNumber: citations.length + 2, title: "", authors: "", journal: "", year: "", url: "", summary: "" }); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-1" disabled={!newCitation.title}>
-                <Save className="h-3.5 w-3.5" /> Save Citation
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowAddCitation(false)}>Cancel</Button>
-            </div>
-          </div>
-        )}
-
-        {citations.length === 0 && !showAddCitation && (
-          <div className="text-center py-8 text-slate-400">
-            <p className="text-sm">No citations added yet. Click "Add Citation" to add research sources.</p>
-          </div>
-        )}
-
-        <div className="space-y-3">
-          {citations.map((cit: any) => (
-            <CitationRow key={cit.id} citation={cit} onUpdate={(data: any) => { setResearchChanged(true); updateCitation.mutate(data); }} onDelete={() => { if (confirm("Delete this citation?")) { setResearchChanged(true); deleteCitation.mutate({ id: cit.id }); } }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CitationRow({ citation, onUpdate, onDelete }: { citation: any; onUpdate: any; onDelete: () => void }) {
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState(citation);
-
-  if (editing) {
-    return (
-      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div><Label className="text-xs">Citation #</Label><Input type="number" value={form.citationNumber} onChange={(e) => setForm((p: any) => ({ ...p, citationNumber: parseInt(e.target.value) || 1 }))} className="mt-1 h-9 text-sm" /></div>
-          <div><Label className="text-xs">Year</Label><Input value={form.year || ""} onChange={(e) => setForm((p: any) => ({ ...p, year: e.target.value }))} className="mt-1 h-9 text-sm" /></div>
-          <div className="md:col-span-2"><Label className="text-xs">Title</Label><Input value={form.title} onChange={(e) => setForm((p: any) => ({ ...p, title: e.target.value }))} className="mt-1 h-9 text-sm" /></div>
-          <div><Label className="text-xs">Authors</Label><Input value={form.authors || ""} onChange={(e) => setForm((p: any) => ({ ...p, authors: e.target.value }))} className="mt-1 h-9 text-sm" /></div>
-          <div><Label className="text-xs">Journal</Label><Input value={form.journal || ""} onChange={(e) => setForm((p: any) => ({ ...p, journal: e.target.value }))} className="mt-1 h-9 text-sm" /></div>
-          <div className="md:col-span-2"><Label className="text-xs">URL</Label><Input value={form.url || ""} onChange={(e) => setForm((p: any) => ({ ...p, url: e.target.value }))} className="mt-1 h-9 text-sm" /></div>
-          <div className="md:col-span-2"><Label className="text-xs">Summary</Label><Textarea value={form.summary || ""} onChange={(e) => setForm((p: any) => ({ ...p, summary: e.target.value }))} className="mt-1 text-sm" rows={2} /></div>
-        </div>
-        <div className="flex gap-2 mt-3">
-          <Button size="sm" onClick={() => { onUpdate(form); setEditing(false); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-1"><Save className="h-3.5 w-3.5" /> Save</Button>
-          <Button size="sm" variant="outline" onClick={() => { setForm(citation); setEditing(false); }}>Cancel</Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors">
-      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold shrink-0">
-        {citation.citationNumber}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-800 text-sm">{citation.title}</p>
-        <p className="text-xs text-slate-500">
-          {[citation.authors, citation.journal, citation.year].filter(Boolean).join(" • ")}
-        </p>
-        {citation.url && <a href={citation.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">{citation.url}</a>}
-      </div>
-      <div className="flex gap-1 shrink-0">
-        <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="h-7 w-7 p-0"><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="sm" onClick={onDelete} className="h-7 w-7 p-0 text-red-500"><Trash2 className="h-3.5 w-3.5" /></Button>
-      </div>
-    </div>
-  );
-}
 
 // ─── Orders ──────────────────────────────────────────────────────────
 function OrdersSection() {

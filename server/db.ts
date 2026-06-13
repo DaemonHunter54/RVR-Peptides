@@ -446,7 +446,13 @@ export async function getProductResearch(productId: number) {
   return result[0];
 }
 
-export async function upsertProductResearch(productId: number, data: { overview?: string; chemicalMakeup?: string; researchContent?: string }) {
+export async function upsertProductResearch(productId: number, data: {
+  productBrief?: string;
+  qualityNotes?: string;
+  overview?: string;
+  chemicalMakeup?: string;
+  researchContent?: string;
+}) {
   const db = await getDb();
   if (!db) return;
   const existing = await getProductResearch(productId);

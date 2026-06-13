@@ -63,7 +63,7 @@ export default function ProductDetail() {
 
     const tabs: { id: string; label: string }[] = [];
     // Description tab shows only when this product has visible product/research content.
-    if (product.description || product.research?.overview || product.research?.researchContent) {
+    if (product.description || product.research?.overview || product.research?.chemicalMakeup || product.research?.researchContent) {
       tabs.push({ id: "research", label: "Research" });
     }
     if (product.coaUrl) {
@@ -422,7 +422,7 @@ export default function ProductDetail() {
                   {/* Overview */}
                   {product.research?.overview && (
                     <div className="mb-8">
-                      <h2 className="text-xl font-bold text-slate-900 mb-4">{product.name} Peptide</h2>
+                      <h2 className="text-xl font-bold text-slate-900 mb-4">About this product</h2>
                       <div className="text-slate-600 leading-relaxed whitespace-pre-line">
                         {product.research.overview}
                       </div>

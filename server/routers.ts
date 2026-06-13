@@ -621,6 +621,9 @@ export const appRouter = router({
         categoryIds: z.array(z.number()).optional(),
         variants: z.array(productVariantInput).optional(),
         researchDraft: z.object({
+          productBrief: z.string().optional(),
+          qualityNotes: z.string().optional(),
+          overview: z.string().optional(),
           chemicalMakeup: z.string().optional(),
           researchContent: z.string().optional(),
           citations: z.array(z.object({
@@ -659,11 +662,13 @@ export const appRouter = router({
         }
         if (researchDraft) {
           await db.upsertProductResearch(id, {
-            overview: "",
+            productBrief: researchDraft.productBrief || "",
+            qualityNotes: researchDraft.qualityNotes || "",
+            overview: researchDraft.overview || "",
             chemicalMakeup: researchDraft.chemicalMakeup || "",
             researchContent: researchDraft.researchContent || "",
           });
-          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 3) : [];
+          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 5) : [];
           for (let index = 0; index < citations.length; index++) {
             const citation = citations[index];
             if (!String(citation.title || "").trim()) continue;
@@ -693,6 +698,9 @@ export const appRouter = router({
         sortOrder: z.number().optional(), categoryIds: z.array(z.number()).optional(),
         variants: z.array(productVariantInput).optional(),
         researchDraft: z.object({
+          productBrief: z.string().optional(),
+          qualityNotes: z.string().optional(),
+          overview: z.string().optional(),
           chemicalMakeup: z.string().optional(),
           researchContent: z.string().optional(),
           citations: z.array(z.object({
@@ -745,12 +753,14 @@ export const appRouter = router({
         }
         if (researchDraft) {
           await db.upsertProductResearch(id, {
-            overview: "",
+            productBrief: researchDraft.productBrief || "",
+            qualityNotes: researchDraft.qualityNotes || "",
+            overview: researchDraft.overview || "",
             chemicalMakeup: researchDraft.chemicalMakeup || "",
             researchContent: researchDraft.researchContent || "",
           });
           await db.deleteProductCitations(id);
-          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 3) : [];
+          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 5) : [];
           for (let index = 0; index < citations.length; index++) {
             const citation = citations[index];
             if (!String(citation.title || "").trim()) continue;
@@ -820,8 +830,39 @@ export const appRouter = router({
         const citations = await db.getProductCitations(input.productId);
         return { research, citations };
       }),
+      generateDraft: adminProcedure.input(z.object({
+        productName: z.string(),
+        productBrief: z.string().optional(),
+        qualityNotes: z.string().optional(),
+        size: z.string().optional(),
+        purity: z.string().optional(),
+        form: z.string().optional(),
+        contents: z.string().optional(),
+        sku: z.string().optional(),
+        otherNames: z.string().optional(),
+        molecularFormula: z.string().optional(),
+        molecularWeight: z.string().optional(),
+        shortDescription: z.string().optional(),
+        sourceChemicalMakeup: z.string().optional(),
+        citations: z.array(z.object({
+          title: z.string(),
+          authors: z.string().optional(),
+          journal: z.string().optional(),
+          year: z.string().optional(),
+          url: z.string().optional(),
+          summary: z.string().optional(),
+        })).optional(),
+      })).mutation(async ({ input }) => {
+        const { generateProductCopyDraft } = await import("./productCopy");
+        return generateProductCopyDraft(input);
+      }),
       upsert: adminProcedure.input(z.object({
-        productId: z.number(), overview: z.string().optional(), chemicalMakeup: z.string().optional(), researchContent: z.string().optional(),
+        productId: z.number(),
+        productBrief: z.string().optional(),
+        qualityNotes: z.string().optional(),
+        overview: z.string().optional(),
+        chemicalMakeup: z.string().optional(),
+        researchContent: z.string().optional(),
       })).mutation(async ({ input }) => {
         const { productId, ...data } = input;
         await db.upsertProductResearch(productId, data);
