@@ -105,6 +105,16 @@ function extractSection(text: string, startPattern: RegExp, endPatterns: RegExp[
   return remainder.slice(0, endIndex).trim();
 }
 
+function stripListingSpecLines(block: string): string {
+  return block
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^(size|contents|form|purity|sku):/i.test(line))
+    .join("\n")
+    .trim();
+}
+
 function parseOverview(text: string): string {
   const intro = extractSection(
     text,
@@ -114,7 +124,7 @@ function parseOverview(text: string): string {
 
   const introFallback = extractSection(
     text,
-    /\n\s*([A-Z0-9][^\n]{2,60} Peptide)\s*\n/i,
+    /\n\s*([A-Z0-9][^\n]{2,80}(?: Peptide| Blend| Complex| Stack))\s*\n/i,
     [/\n\s*Overview\s*\n/i, /\n\s*Chemical Makeup\s*\n/i]
   );
 
@@ -123,7 +133,35 @@ function parseOverview(text: string): string {
     /\n\s*Research and Clinical Studies\s*\n/i,
   ]);
 
-  return rebrandImportedText([intro || introFallback, overviewSection].filter(Boolean).join("\n\n"));
+  const merged = [intro || introFallback, overviewSection].filter(Boolean).join("\n\n");
+  if (merged.trim()) return rebrandImportedText(merged);
+
+  const descriptionBlock = stripListingSpecLines(
+    extractSection(text, /\bDescription\b/i, [/\n\s*Chemical Makeup\s*\n/i, /\n\s*Overview\s*\n/i])
+  );
+  if (descriptionBlock.length > 40) return rebrandImportedText(descriptionBlock);
+
+  const beforeChemical = stripListingSpecLines(text.split(/\n\s*Chemical Makeup\s*\n/i)[0] || "");
+  const narrativeParagraph = beforeChemical
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .find((part) => part.length > 80 && !/^(home|shop|cart|login)/i.test(part));
+  if (narrativeParagraph) return rebrandImportedText(narrativeParagraph);
+
+  return "";
+}
+
+function overviewFromResearchContent(researchContent: string, productName: string): string {
+  const firstParagraph =
+    researchContent
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .find((part) => part.length > 80) || "";
+  if (firstParagraph.length > 320) {
+    return `${firstParagraph.slice(0, 317).trim()}...`;
+  }
+  if (firstParagraph) return firstParagraph;
+  return `${productName} is supplied by River Valley Research Peptides for laboratory and research use only.`;
 }
 
 function parseChemicalBlock(text: string): string {
@@ -392,10 +430,17 @@ export async function fetchResearchTemplate(
   const knowledge = await loadKnowledgeTemplate(templateSlug);
   const resolved = resolveListingSpecs(listingSpecs, productSlug);
 
-  const overview = applyListingSpecsToText(knowledge.overview, resolved);
   const chemicalMakeup = buildChemicalMakeup(resolved, knowledge.chemicalBlock);
   const researchContent = applyListingSpecsToText(knowledge.researchContent, resolved);
   const citations = knowledge.citations;
+
+  let overview = applyListingSpecsToText(knowledge.overview, resolved);
+  if (!overview.trim() && researchContent.trim()) {
+    overview = applyListingSpecsToText(
+      overviewFromResearchContent(knowledge.researchContent, resolved.productName),
+      resolved
+    );
+  }
 
   if (!overview && !researchContent) {
     throw new Error("Template loaded but research content could not be parsed.");

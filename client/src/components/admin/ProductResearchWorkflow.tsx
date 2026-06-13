@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Plus, Save, Sparkles, Trash2, Database, Download, Link2 } from "lucide-react";
 import { parseResearchTemplateSourceUrl } from "@shared/researchTemplateSource";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
 export type ResearchCitationDraft = {
@@ -157,7 +157,7 @@ export function ProductResearchWorkflow({
   productSlug?: string;
   productMeta?: ProductResearchMeta;
   value: ProductResearchDraft;
-  onChange: (next: ProductResearchDraft) => void;
+  onChange: Dispatch<SetStateAction<ProductResearchDraft>>;
   onShortDescriptionChange?: (shortDescription: string) => void;
   onOverviewPreview?: (overview: string) => void;
   onListingSpecsApply?: (specs: Partial<ProductResearchMeta>) => void;
@@ -172,16 +172,36 @@ export function ProductResearchWorkflow({
   const generateDraft = trpc.admin.research.generateDraft.useMutation();
   const importTemplate = trpc.admin.research.importTemplate.useMutation();
 
-  const update = (patch: Partial<ProductResearchDraft>) => onChange({ ...value, ...patch });
+  const update = (patch: Partial<ProductResearchDraft>) => {
+    onChange((prev) => ({ ...prev, ...patch }));
+  };
+
+  const importedHasContent = (imported: {
+    overview?: string;
+    chemicalMakeup?: string;
+    researchContent?: string;
+    citations?: unknown[];
+  }) =>
+    Boolean(
+      String(imported.overview || "").trim() ||
+        String(imported.chemicalMakeup || "").trim() ||
+        String(imported.researchContent || "").trim() ||
+        (Array.isArray(imported.citations) && imported.citations.length > 0)
+    );
 
   const applyImportedTemplate = (imported: any, sourceUrl?: string) => {
-    update({
-      overview: imported.overview,
-      chemicalMakeup: imported.chemicalMakeup,
-      researchContent: imported.researchContent,
-      citations: imported.citations?.length ? imported.citations : value.citations,
-      templateSourceUrl: sourceUrl || imported.sourceUrl || value.templateSourceUrl,
-    });
+    if (!importedHasContent(imported)) {
+      throw new Error("Import returned no research content. Try a different source URL or re-sync the knowledge base.");
+    }
+
+    onChange((prev) => ({
+      ...prev,
+      overview: imported.overview || "",
+      chemicalMakeup: imported.chemicalMakeup || "",
+      researchContent: imported.researchContent || "",
+      citations: imported.citations?.length ? imported.citations : prev.citations,
+      templateSourceUrl: sourceUrl || imported.sourceUrl || prev.templateSourceUrl,
+    }));
     onShortDescriptionChange?.(imported.shortDescription);
     onOverviewPreview?.(imported.overview);
 
@@ -613,9 +633,15 @@ export function PersistedProductResearchWorkflow({
     citations: [],
   });
   const [loaded, setLoaded] = useState(false);
+  const dirtyRef = useRef(false);
+
+  const handleDraftChange: Dispatch<SetStateAction<ProductResearchDraft>> = (action) => {
+    dirtyRef.current = true;
+    setDraft(action);
+  };
 
   useEffect(() => {
-    if (loaded || researchQuery.isLoading) return;
+    if (loaded || researchQuery.isLoading || dirtyRef.current) return;
     const research = researchQuery.data?.research;
     const citations = researchQuery.data?.citations || [];
     setDraft({
@@ -667,6 +693,7 @@ export function PersistedProductResearchWorkflow({
       });
     }
     await researchQuery.refetch();
+    dirtyRef.current = false;
     setLoaded(false);
   };
 
@@ -677,7 +704,7 @@ export function PersistedProductResearchWorkflow({
         productSlug={productSlug}
         productMeta={productMeta}
         value={draft}
-        onChange={setDraft}
+        onChange={handleDraftChange}
         onShortDescriptionChange={onShortDescriptionChange}
         onListingSpecsApply={onListingSpecsApply}
       />
