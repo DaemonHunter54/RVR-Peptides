@@ -1,10 +1,11 @@
 import PolicyLayout, { PolicySection, PolicySubsection } from "@/components/PolicyLayout";
 import { Link } from "wouter";
+import { BUSINESS } from "@shared/business";
 
-const SITE = "www.RVRPeptides.com";
-const SITE_URL = "https://www.RVRPeptides.com";
-const SUPPORT_EMAIL = "Support@RVRPeptides.com";
-const COMPANY = "River Valley Research Peptides LLC";
+const SITE = BUSINESS.website;
+const SITE_URL = BUSINESS.websiteUrl;
+const SUPPORT_EMAIL = BUSINESS.supportEmail;
+const COMPANY = BUSINESS.legalName;
 
 export default function PrivacyPolicy() {
   return (
@@ -278,9 +279,33 @@ export default function PrivacyPolicy() {
         </p>
         <PolicySubsection title="Marketing">
           <p>
-            You may opt-in for marketing communications on our website. These include emails and SMS
-            messaging, which you can opt-out of at any time. No purchase is necessary. Standard
-            message and data rates may apply.
+            You may opt-in for marketing communications on our website, including our newsletter.
+            Marketing requests may be sent to{" "}
+            <a href={`mailto:${BUSINESS.mailingListEmail}`} className="text-blue-600 hover:text-blue-700">
+              {BUSINESS.mailingListEmail}
+            </a>
+            . These include emails and SMS messaging, which you can opt-out of at any time. No
+            purchase is necessary. Standard message and data rates may apply.
+          </p>
+        </PolicySubsection>
+        <PolicySubsection title="Payment Processing">
+          <p>
+            When you make a purchase, payment information is collected and processed by our payment
+            service providers through PaymentCloud (including Authorize.net or NMI, depending on
+            configuration). We do not store full credit card or debit card numbers on our servers.
+          </p>
+          <p>
+            Payment providers may collect your name, billing address, email, payment method details,
+            and transaction amount to process your order, prevent fraud, and comply with applicable
+            law. Their use of your information is governed by their own privacy and security policies
+            in addition to this Privacy Policy.
+          </p>
+          <p>
+            Order confirmations and shipping updates may be sent from{" "}
+            <a href={`mailto:${BUSINESS.ordersEmail}`} className="text-blue-600 hover:text-blue-700">
+              {BUSINESS.ordersEmail}
+            </a>
+            .
           </p>
         </PolicySubsection>
         <PolicySubsection title="Analytics">
@@ -323,9 +348,21 @@ export default function PrivacyPolicy() {
         <p>If you have any questions about this Privacy Policy, You can contact us:</p>
         <ul className="list-disc pl-6 space-y-2">
           <li>
-            by email:{" "}
+            General support:{" "}
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 hover:text-blue-700">
               {SUPPORT_EMAIL}
+            </a>
+          </li>
+          <li>
+            Customer service:{" "}
+            <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-blue-600 hover:text-blue-700">
+              {BUSINESS.customerServiceEmail}
+            </a>
+          </li>
+          <li>
+            Orders:{" "}
+            <a href={`mailto:${BUSINESS.ordersEmail}`} className="text-blue-600 hover:text-blue-700">
+              {BUSINESS.ordersEmail}
             </a>
           </li>
           <li>

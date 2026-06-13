@@ -1,8 +1,9 @@
 import PolicyLayout, { PolicySection } from "@/components/PolicyLayout";
 import { Link } from "wouter";
+import { BUSINESS } from "@shared/business";
 
-const SITE = "www.RVRPeptides.com";
-const SITE_URL = "https://www.RVRPeptides.com";
+const SITE = BUSINESS.website;
+const SITE_URL = BUSINESS.websiteUrl;
 
 export default function TermsAndConditions() {
   return (
@@ -126,8 +127,21 @@ export default function TermsAndConditions() {
           professionals only, in the appropriate research setting.
         </p>
         <p>
-          <strong>RETURN POLICY.</strong> All sales on {SITE_URL} are final and we do not accept any
-          returns.
+          <strong>RETURN POLICY.</strong> All sales on {SITE_URL} are final once your order has
+          shipped. We do not accept returns of delivered products. If your order has not yet shipped,
+          you may request cancellation and a full refund by contacting{" "}
+          <a href={`mailto:${BUSINESS.ordersEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.ordersEmail}
+          </a>{" "}
+          or{" "}
+          <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.customerServiceEmail}
+          </a>
+          . See our{" "}
+          <Link href="/shipping" className="text-blue-600 hover:text-blue-700">
+            Shipping, Returns &amp; Refunds
+          </Link>{" "}
+          policy for details.
         </p>
         <p>
           <strong>CUSTOMER AGREEMENT.</strong> By using and/or purchasing from {SITE}, User agrees,
@@ -139,6 +153,50 @@ export default function TermsAndConditions() {
           customer’s ownership, use, or possession of any products sold by River Valley Research
           Peptides in customer’s jurisdiction specific to customer’s municipality, state, country,
           or government.
+        </p>
+      </PolicySection>
+
+      <PolicySection title="Payments, Billing, and Disputes">
+        <p>
+          <strong>CURRENCY.</strong> All prices and charges on {SITE} are listed in United States
+          Dollars (USD). Sales tax is not collected at checkout unless required by law and displayed
+          at the time of purchase.
+        </p>
+        <p>
+          <strong>SECURE CHECKOUT.</strong> Card and bank payments are processed through PaymentCloud
+          using a secure hosted payment page. We do not collect or store full credit or debit card
+          numbers on our servers. You will be redirected to complete payment after placing your
+          order.
+        </p>
+        <p>
+          <strong>BILLING DESCRIPTOR.</strong> Charges on your card or bank statement will appear as{" "}
+          <strong>{BUSINESS.billingDescriptor}</strong>.
+        </p>
+        <p>
+          <strong>WHEN YOU ARE CHARGED.</strong> Your payment method is authorized and captured when
+          you complete checkout on the secure payment page, subject to approval by your card issuer
+          or bank.
+        </p>
+        <p>
+          <strong>ACH.</strong> If you choose ACH bank payment where offered by our payment gateway,
+          you authorize {BUSINESS.legalName} to debit your bank account for the total order amount
+          shown at checkout. You may contact{" "}
+          <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.customerServiceEmail}
+          </a>{" "}
+          before the debit settles to request cancellation of an unshipped order.
+        </p>
+        <p>
+          <strong>BILLING QUESTIONS AND DISPUTES.</strong> If you have a question about a charge,
+          contact us first at{" "}
+          <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.customerServiceEmail}
+          </a>{" "}
+          or{" "}
+          <a href={`mailto:${BUSINESS.supportEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.supportEmail}
+          </a>{" "}
+          so we can resolve the issue before initiating a chargeback with your bank.
         </p>
       </PolicySection>
 

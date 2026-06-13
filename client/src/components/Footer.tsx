@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
+import { toast } from "sonner";
 import { ASSETS } from "@/lib/assets";
 import { BUSINESS } from "@shared/business";
 import AcceptedPaymentMethods from "@/components/AcceptedPaymentMethods";
@@ -12,6 +13,21 @@ export default function Footer() {
 
   const legalName = settings.business_legal_name || BUSINESS.legalName;
   const supportEmail = settings.contact_email || BUSINESS.supportEmail;
+  const customerServiceEmail = settings.customer_service_email || BUSINESS.customerServiceEmail;
+  const ordersEmail = settings.orders_email || BUSINESS.ordersEmail;
+  const mailingListEmail = settings.mailing_list_email || BUSINESS.mailingListEmail;
+
+  const handleNewsletterSubscribe = () => {
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes("@")) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    window.location.href = `mailto:${mailingListEmail}?subject=${encodeURIComponent("Newsletter Subscription")}&body=${encodeURIComponent(
+      `Please subscribe the following email to the RVR Peptides newsletter:\n\n${trimmed}`
+    )}`;
+    toast.success("Opening your email app to complete your subscription request.");
+  };
 
   return (
     <footer>
@@ -36,7 +52,11 @@ export default function Footer() {
               placeholder="Enter your email"
               className="flex-1 px-4 py-3 bg-white/10 border border-white/20 text-white placeholder-gray-400 text-sm rounded-sm focus:outline-none focus:border-[#4a9eff]"
             />
-            <button className="px-6 py-3 bg-[#4a9eff] text-white text-sm font-bold tracking-wider hover:bg-[#3a8eef] transition-colors rounded-sm">
+            <button
+              type="button"
+              onClick={handleNewsletterSubscribe}
+              className="px-6 py-3 bg-[#4a9eff] text-white text-sm font-bold tracking-wider hover:bg-[#3a8eef] transition-colors rounded-sm"
+            >
               SUBSCRIBE
             </button>
           </div>
@@ -57,11 +77,26 @@ export default function Footer() {
                 className="h-14 w-auto mb-4"
               />
               <p className="text-white text-sm font-medium mb-4">{legalName}</p>
-              <p className="text-gray-400 text-sm mb-4">
-                <a href={`mailto:${supportEmail}`} className="hover:text-white transition-colors">
-                  {supportEmail}
-                </a>
-              </p>
+              <div className="space-y-2 mb-4 text-sm">
+                <p>
+                  <a href={`mailto:${customerServiceEmail}`} className="text-gray-400 hover:text-white transition-colors">
+                    {customerServiceEmail}
+                  </a>
+                  <span className="text-gray-600 text-xs block">Customer Service</span>
+                </p>
+                <p>
+                  <a href={`mailto:${ordersEmail}`} className="text-gray-400 hover:text-white transition-colors">
+                    {ordersEmail}
+                  </a>
+                  <span className="text-gray-600 text-xs block">Orders</span>
+                </p>
+                <p>
+                  <a href={`mailto:${supportEmail}`} className="text-gray-400 hover:text-white transition-colors">
+                    {supportEmail}
+                  </a>
+                  <span className="text-gray-600 text-xs block">Support</span>
+                </p>
+              </div>
               <p className="text-[#4a9eff] text-sm italic font-medium mb-4">
                 All products are sold for research, laboratory, or analytical purposes only, and are not for human consumption.
               </p>
@@ -100,7 +135,7 @@ export default function Footer() {
               <h4 className="text-[#b8c5d4] text-lg font-medium mb-5">Now Accepting</h4>
               <AcceptedPaymentMethods />
               <p className="text-gray-500 text-xs mt-3">
-                Secure card and bank payments processed by PaymentCloud
+                Secure card and bank payments processed by PaymentCloud. All prices in USD.
               </p>
             </div>
           </div>

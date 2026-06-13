@@ -25,6 +25,18 @@ export default function AdminPanel() {
   const { user, isAuthenticated, loading } = useAuth();
   const { section } = useParams<{ section?: string }>();
   const activeSection = section || "dashboard";
+  const adminSettingsQuery = trpc.settings.all.useQuery(undefined, {
+    enabled: isAuthenticated && (user?.role === "admin" || user?.role === "super_admin"),
+  });
+  const adminInboxEmail = adminSettingsQuery.data?.admin_inbox_email || "";
+
+  const openAdminEmail = () => {
+    if (adminInboxEmail) {
+      window.location.href = `mailto:${adminInboxEmail}`;
+      return;
+    }
+    toast.info("Set Admin Inbox Email in Settings to link this button to your Gmail hub.");
+  };
 
   if (loading) {
     return (
@@ -73,7 +85,7 @@ export default function AdminPanel() {
           </Link>
           <div className="mt-2 flex items-center justify-between">
             <span className="font-bold text-slate-800 text-sm">Admin Panel</span>
-            <button onClick={() => toast.info("Email platform coming soon. This will link to your email management dashboard once configured.")} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
+            <button onClick={openAdminEmail} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
               Email
             </button>
           </div>
@@ -101,7 +113,7 @@ export default function AdminPanel() {
               <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
               <span className="font-bold text-slate-800 text-sm">Admin</span>
             </Link>
-            <button onClick={() => toast.info("Email platform coming soon. This will link to your email management dashboard once configured.")} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
+            <button onClick={openAdminEmail} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
               Email
             </button>
           </div>
@@ -2306,7 +2318,16 @@ function SettingsSection() {
         { key: "site_description", label: "Site Description", type: "textarea", placeholder: "We are proud to carry..." },
         { key: "logo_url", label: "Logo URL", type: "text", placeholder: "https://..." },
         { key: "business_legal_name", label: "Legal Business Name", type: "text", placeholder: "River Valley Research Peptides LLC" },
-        { key: "contact_email", label: "Contact Email", type: "text", placeholder: "Support@RVRPeptides.com" },
+      ],
+    },
+    {
+      title: "Contact & Email",
+      items: [
+        { key: "customer_service_email", label: "Customer Service Email", type: "text", placeholder: "CustomerService@RVRPeptides.com" },
+        { key: "orders_email", label: "Orders Email", type: "text", placeholder: "Orders@RVRPeptides.com" },
+        { key: "contact_email", label: "Support Email", type: "text", placeholder: "Support@RVRPeptides.com" },
+        { key: "mailing_list_email", label: "Mailing List Email", type: "text", placeholder: "MailingList@RVRPeptides.com" },
+        { key: "admin_inbox_email", label: "Admin Inbox Email (Gmail hub)", type: "text", placeholder: "owner@gmail.com" },
         { key: "contact_phone", label: "Contact Phone", type: "text", placeholder: "+1 (555) 123-4567" },
       ],
     },

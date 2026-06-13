@@ -214,6 +214,7 @@ export default function Cart() {
                     <span className="text-slate-800">Total</span>
                     <span className="text-slate-900">${total.toFixed(2)}</span>
                   </div>
+                  <p className="text-xs text-slate-400 pt-1">All amounts in USD. Sales tax is not collected.</p>
                 </div>
 
                 <Link href={`/checkout${appliedDiscount ? `?discount=${discountCode}` : ""}`}>

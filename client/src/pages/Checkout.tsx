@@ -58,6 +58,7 @@ export default function Checkout() {
   const [giftCardCode, setGiftCardCode] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [agreedToResearch, setAgreedToResearch] = useState(false);
+  const [agreedToAge, setAgreedToAge] = useState(false);
 
   // Authenticated cart
   const cartQuery = trpc.cart.get.useQuery(undefined, { enabled: isAuthenticated });
@@ -143,6 +144,11 @@ export default function Checkout() {
 
     if (!agreedToResearch) {
       toast.error("Please confirm that your purchase is for laboratory research purposes only.");
+      return;
+    }
+
+    if (!agreedToAge) {
+      toast.error("Please confirm that you are 18 years of age or older.");
       return;
     }
 
@@ -397,11 +403,23 @@ export default function Checkout() {
                   <AcceptedPaymentMethods compact />
                   <p className="text-xs text-slate-500">
                     Your card statement will show <strong>{BUSINESS.billingDescriptor}</strong>.
+                    All prices are in USD. Sales tax is not collected unless shown above.
                   </p>
                 </div>
               </div>
 
               <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-4">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="agree-age"
+                    checked={agreedToAge}
+                    onCheckedChange={(checked) => setAgreedToAge(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="agree-age" className="text-sm text-slate-700 leading-relaxed cursor-pointer">
+                    I confirm that I am 18 years of age or older.
+                  </label>
+                </div>
                 <div className="flex items-start gap-3">
                   <Checkbox
                     id="agree-research"
@@ -475,7 +493,7 @@ export default function Checkout() {
                 <Button
                   type="submit"
                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11"
-                  disabled={isProcessing || items.length === 0 || !agreedToTerms || !agreedToResearch}
+                  disabled={isProcessing || items.length === 0 || !agreedToTerms || !agreedToResearch || !agreedToAge}
                 >
                   {isProcessing ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
@@ -485,7 +503,7 @@ export default function Checkout() {
                 </Button>
 
                 <p className="text-xs text-slate-400 text-center mt-3">
-                  Secure checkout powered by PaymentCloud
+                  All amounts in USD. Secure checkout powered by PaymentCloud.
                 </p>
               </div>
             </div>

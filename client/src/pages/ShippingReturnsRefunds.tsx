@@ -1,7 +1,6 @@
 import PolicyLayout, { PolicySection } from "@/components/PolicyLayout";
 import { Link } from "wouter";
-
-const SUPPORT_EMAIL = "Support@RVRPeptides.com";
+import { BUSINESS } from "@shared/business";
 
 export default function ShippingReturnsRefunds() {
   return (
@@ -36,19 +35,43 @@ export default function ShippingReturnsRefunds() {
         </p>
       </PolicySection>
 
+      <PolicySection title="Order Cancellation (Before Shipment)">
+        <p>
+          If your order has not yet shipped, you may cancel it for a full refund by contacting us at{" "}
+          <a href={`mailto:${BUSINESS.ordersEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.ordersEmail}
+          </a>{" "}
+          or{" "}
+          <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.customerServiceEmail}
+          </a>
+          . Cancellation requests must be received before the order leaves our facility.
+        </p>
+        <p>
+          Once an order has shipped, it cannot be cancelled. All sales are final after shipment.
+        </p>
+      </PolicySection>
+
       <PolicySection title="Returns and Refunds">
         <p>
-          If your order has not yet shipped, you may cancel your order by contacting us at{" "}
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 hover:text-blue-700">
-            {SUPPORT_EMAIL}
-          </a>{" "}
-          for a refund.
+          We do not accept returns of delivered products. All sales are final once your order has
+          shipped.
         </p>
-        <p>Refunds may be requested up to 30 days after an order is placed.</p>
+        <p>
+          Pre-shipment cancellations (described above) are the only refunds we offer. If you believe
+          there is an error with your order, contact{" "}
+          <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-blue-600 hover:text-blue-700">
+            {BUSINESS.customerServiceEmail}
+          </a>{" "}
+          and we will review your request.
+        </p>
       </PolicySection>
 
       <PolicySection title="Refund Timeframe">
-        <p>Refunds should settle and post to your account in 2 to 3 business days.</p>
+        <p>
+          Approved pre-shipment cancellation refunds should settle and post to your account in 2 to
+          3 business days, depending on your card issuer or bank.
+        </p>
       </PolicySection>
 
       <PolicySection title="Bulk and Special Orders">
@@ -56,8 +79,8 @@ export default function ShippingReturnsRefunds() {
           <Link href="/contact" className="text-blue-600 hover:text-blue-700">
             Contact us
           </Link>{" "}
-          for bulk or special orders. Our friendly customer service staff will work with you to
-          satisfy any special requests.
+          for bulk or special orders. Our customer service team will work with you to satisfy any
+          special requests.
         </p>
       </PolicySection>
 

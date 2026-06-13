@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ASSETS } from "@/lib/assets";
+import { BUSINESS } from "@shared/business";
 
 export default function Home() {
   const allProductsQuery = trpc.products.list.useQuery({ limit: 100 });
@@ -100,7 +101,11 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="text-[#c8d6e5] font-bold text-base tracking-wider uppercase mb-2">ONLINE SUPPORT</h3>
-                <p className="text-gray-400 text-sm leading-relaxed">Have questions? We can help. Email us or connect with us via our <Link href="/contact" className="text-[#4a9eff] hover:underline">Contact</Link> page.</p>
+                <p className="text-gray-400 text-sm leading-relaxed">Have questions? Email{" "}
+                  <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-[#4a9eff] hover:underline">
+                    {BUSINESS.customerServiceEmail}
+                  </a>{" "}
+                  or visit our <Link href="/contact" className="text-[#4a9eff] hover:underline">Contact</Link> page.</p>
               </div>
             </div>
           </div>

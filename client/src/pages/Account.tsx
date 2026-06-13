@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Package, Truck, Clock, CheckCircle, User, LogOut, Pencil, Save, X, MapPin, CreditCard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
+import { BUSINESS } from "@shared/business";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -44,7 +44,6 @@ export default function Account() {
 
   const [editing, setEditing] = useState(false);
   const [editingShipping, setEditingShipping] = useState(false);
-  const [editingPayment, setEditingPayment] = useState(false);
 
   // Profile form state
   const [formName, setFormName] = useState("");
@@ -55,9 +54,6 @@ export default function Account() {
   // Shipping form state
   const [shippingAddress, setShippingAddress] = useState("");
 
-  // Payment form state
-  const [paymentInfo, setPaymentInfo] = useState("");
-
   useEffect(() => {
     if (user) {
       setFormName(user.name || "");
@@ -65,7 +61,6 @@ export default function Account() {
       setFormEmail(user.email || "");
       setFormPhone((user as any).phone || "");
       setShippingAddress((user as any).shippingAddress || "");
-      setPaymentInfo((user as any).savedPaymentInfo || "");
     }
   }, [user]);
 
@@ -118,12 +113,6 @@ export default function Account() {
     updateProfile.mutate({ shippingAddress });
     setEditingShipping(false);
     toast.success("Shipping address saved!");
-  };
-
-  const handleSavePayment = () => {
-    updateProfile.mutate({ savedPaymentInfo: paymentInfo });
-    setEditingPayment(false);
-    toast.success("Payment information saved!");
   };
 
   return (
@@ -244,45 +233,26 @@ export default function Account() {
               )}
             </div>
 
-            {/* Saved Payment Info */}
+            {/* Payment Information */}
             <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" /> Saved Payment Info
-                </h2>
-                {!editingPayment ? (
-                  <Button variant="ghost" size="sm" onClick={() => setEditingPayment(true)} className="text-blue-600 hover:text-blue-700">
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                  </Button>
-                ) : (
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingPayment(false)} className="text-slate-500">
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="sm" onClick={handleSavePayment} className="bg-blue-600 hover:bg-blue-700 text-white">
-                      <Save className="h-3.5 w-3.5 mr-1" /> Save
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {!editingPayment ? (
-                <p className="text-sm text-slate-700">
-                  {(user as any)?.savedPaymentInfo
-                    ? "Payment information saved for faster checkout."
-                    : "No payment information saved. Save your preferred crypto wallet address for faster checkout."}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  <Label className="text-xs text-slate-500">Preferred Crypto Wallet Address (for refunds/receipts)</Label>
-                  <Input
-                    value={paymentInfo}
-                    onChange={(e) => setPaymentInfo(e.target.value)}
-                    placeholder="Your crypto wallet address"
-                  />
-                  <p className="text-xs text-slate-400">This is stored securely and used only for order-related communications.</p>
-                </div>
-              )}
+              <h2 className="font-semibold text-slate-800 flex items-center gap-2 mb-3">
+                <CreditCard className="h-4 w-4" /> Payment Information
+              </h2>
+              <p className="text-sm text-slate-700 leading-relaxed">
+                Payments are completed securely at checkout through PaymentCloud. We do not store
+                credit or debit card numbers on our servers.
+              </p>
+              <p className="text-sm text-slate-500 leading-relaxed mt-3">
+                For billing or order questions, email{" "}
+                <a href={`mailto:${BUSINESS.ordersEmail}`} className="text-blue-600 hover:underline">
+                  {BUSINESS.ordersEmail}
+                </a>{" "}
+                or{" "}
+                <a href={`mailto:${BUSINESS.customerServiceEmail}`} className="text-blue-600 hover:underline">
+                  {BUSINESS.customerServiceEmail}
+                </a>
+                .
+              </p>
             </div>
           </div>
 

@@ -536,6 +536,7 @@ export const appRouter = router({
         "paymentcloud_api_login_id",
         "paymentcloud_transaction_key",
         "paymentcloud_security_key",
+        "admin_inbox_email",
       ];
       const all = await db.getAllSettings();
       const map: Record<string, string> = {};

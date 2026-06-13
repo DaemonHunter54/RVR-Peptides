@@ -376,6 +376,10 @@ export default function ProductDetail() {
               </div>
             )}
 
+            <p className="text-xs text-slate-500 leading-relaxed border border-slate-200 bg-slate-50 rounded-lg px-4 py-3">
+              For laboratory, in-vitro research, or analytical use only. Not for human or animal consumption.
+            </p>
+
             {/* Trust */}
             <div className="flex items-center gap-4 pt-1 border-t border-slate-100">
               <div className="flex items-center gap-1.5 text-sm text-slate-500">
