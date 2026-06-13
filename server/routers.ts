@@ -856,6 +856,64 @@ export const appRouter = router({
         const { generateProductCopyDraft } = await import("./productCopy");
         return generateProductCopyDraft(input);
       }),
+      importFromCore: adminProcedure.input(z.object({
+        productSlug: z.string(),
+        productName: z.string(),
+      })).mutation(async ({ input }) => {
+        const { fetchCorePeptidesTemplate } = await import("./corePeptidesImport");
+        return fetchCorePeptidesTemplate(input.productSlug, input.productName);
+      }),
+      importAllFromCore: adminProcedure.mutation(async () => {
+        const { fetchCorePeptidesTemplate } = await import("./corePeptidesImport");
+        const { listCoreMappableSlugs } = await import("../shared/corePeptidesMap");
+        const { products: allProducts } = await db.getAllProducts({});
+        const mappable = new Set(listCoreMappableSlugs());
+        const results: Array<{ slug: string; name: string; success: boolean; error?: string }> = [];
+
+        for (const product of allProducts) {
+          if (!mappable.has(product.slug)) continue;
+          try {
+            const imported = await fetchCorePeptidesTemplate(product.slug, product.name);
+            await db.upsertProductResearch(product.id, {
+              overview: imported.overview,
+              chemicalMakeup: imported.chemicalMakeup,
+              researchContent: imported.researchContent,
+            });
+            const existing = await db.getProductCitations(product.id);
+            for (const citation of existing) {
+              await db.deleteCitation(citation.id);
+            }
+            for (let index = 0; index < imported.citations.length; index++) {
+              const citation = imported.citations[index];
+              await db.createCitation({
+                productId: product.id,
+                citationNumber: index + 1,
+                title: citation.title,
+                authors: citation.authors,
+                journal: citation.journal,
+                year: citation.year,
+                url: citation.url,
+                summary: citation.summary,
+              });
+            }
+            await db.updateProduct(product.id, { shortDescription: imported.shortDescription } as any);
+            results.push({ slug: product.slug, name: product.name, success: true });
+          } catch (error: any) {
+            results.push({
+              slug: product.slug,
+              name: product.name,
+              success: false,
+              error: error?.message || "Import failed",
+            });
+          }
+        }
+
+        return {
+          imported: results.filter((item) => item.success).length,
+          failed: results.filter((item) => !item.success).length,
+          results,
+        };
+      }),
       upsert: adminProcedure.input(z.object({
         productId: z.number(),
         productBrief: z.string().optional(),
