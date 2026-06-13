@@ -64,7 +64,7 @@ export default function ProductDetail() {
     const tabs: { id: string; label: string }[] = [];
     // Description tab shows only when this product has visible product/research content.
     if (product.description || product.research?.overview || product.research?.chemicalMakeup || product.research?.researchContent) {
-      tabs.push({ id: "research", label: "Research" });
+      tabs.push({ id: "description", label: "Description" });
     }
     if (product.coaUrl) {
       tabs.push({ id: "coa", label: "CoA" });
@@ -417,84 +417,31 @@ export default function ProductDetail() {
             {/* Tab Content */}
             <div className="pt-4">
               {/* Description Tab */}
-              {activeTab === "research" && (
+              {activeTab === "description" && (
                 <div className="prose prose-slate max-w-none">
-                  {/* Overview */}
                   {product.research?.overview && (
                     <div className="mb-8">
-                      <h2 className="text-xl font-bold text-slate-900 mb-4">About this product</h2>
                       <div className="text-slate-600 leading-relaxed whitespace-pre-line">
                         {product.research.overview}
                       </div>
                     </div>
                   )}
 
-                  {/* Chemical Makeup */}
-                  {(product.molecularFormula || product.molecularWeight || product.otherNames || product.research?.chemicalMakeup) && (
+                  {product.research?.chemicalMakeup && (
                     <div className="mb-8">
-                      <h3 className="text-lg font-bold text-slate-900 mb-3">Chemical Makeup</h3>
-                      <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                        {product.research?.chemicalMakeup && product.research.chemicalMakeup.split('\n').map((line: string, i: number) => {
-                          const parts = line.split(':');
-                          if (parts.length >= 2) {
-                            return (
-                              <p key={i} className="text-sm text-slate-700">
-                                <strong>{parts[0].trim()}:</strong> {parts.slice(1).join(':').trim()}
-                              </p>
-                            );
-                          }
-                          return <p key={i} className="text-sm text-slate-700">{line}</p>;
-                        })}
-                        {product.molecularFormula && (
-                          <p className="text-sm text-slate-700"><strong>Molecular Formula:</strong> {product.molecularFormula}</p>
-                        )}
-                        {product.molecularWeight && (
-                          <p className="text-sm text-slate-700"><strong>Molecular Weight:</strong> {product.molecularWeight}</p>
-                        )}
-                        {product.otherNames && (
-                          <p className="text-sm text-slate-700"><strong>Other Known Titles:</strong> {product.otherNames}</p>
-                        )}
+                      <h3 className="text-lg font-bold text-slate-900 mb-3">Product Details</h3>
+                      <div className="bg-slate-50 rounded-lg p-4 text-slate-700 leading-relaxed whitespace-pre-line text-sm">
+                        {product.research.chemicalMakeup}
                       </div>
                     </div>
                   )}
 
-                  {/* Research Content */}
                   {product.research?.researchContent && (
                     <div className="mb-8">
-                      <h3 className="text-lg font-bold text-slate-900 mb-3">Research and Clinical Studies</h3>
+                      <h3 className="text-lg font-bold text-slate-900 mb-3">Potential Research Applications</h3>
                       <div className="text-slate-600 leading-relaxed whitespace-pre-line">
                         {product.research.researchContent}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Citations / Sources */}
-                  {product.citations && product.citations.length > 0 && (
-                    <div className="mt-10 pt-6 border-t border-slate-200">
-                      <h3 className="text-lg font-bold text-slate-900 mb-4">Sources</h3>
-                      <ol className="space-y-2">
-                        {product.citations.map((citation: any, idx: number) => (
-                          <li key={citation.id} className="text-sm text-slate-600 flex gap-2">
-                            <span className="text-slate-400 font-medium shrink-0">[{citation.citationNumber || idx + 1}]</span>
-                            <span>
-                              {citation.title}
-                              {citation.authors && <span className="text-slate-400"> — {citation.authors}</span>}
-                              {citation.journal && <span className="text-slate-400 italic"> {citation.journal}</span>}
-                              {citation.year && <span className="text-slate-400"> ({citation.year})</span>}
-                              {citation.url && (
-                                <a
-                                  href={citation.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 ml-1"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                            </span>
-                          </li>
-                        ))}
-                      </ol>
                     </div>
                   )}
                 </div>

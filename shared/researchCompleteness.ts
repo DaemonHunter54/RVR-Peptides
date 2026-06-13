@@ -18,9 +18,9 @@ export function getMissingResearchFields(research?: ResearchCompletenessInput | 
   const chemicalMakeup = String(research?.chemicalMakeup || "").trim();
   const researchContent = String(research?.researchContent || "").trim();
 
-  if (overview.length < 20) missing.push("overview");
-  if (chemicalMakeup.length < 10) missing.push("chemical makeup");
-  if (researchContent.length < 40 || isCitationJsonBlob(researchContent)) missing.push("research content");
+  if (overview.length < 20) missing.push("description");
+  if (chemicalMakeup.length < 10) missing.push("product details");
+  if (researchContent.length < 20 || isCitationJsonBlob(researchContent)) missing.push("research applications");
 
   return missing;
 }

@@ -629,19 +629,10 @@ export const appRouter = router({
         categoryIds: z.array(z.number()).optional(),
         variants: z.array(productVariantInput).optional(),
         researchDraft: z.object({
-          productBrief: z.string().optional(),
-          qualityNotes: z.string().optional(),
+          templateSourceUrl: z.string().optional(),
           overview: z.string().optional(),
           chemicalMakeup: z.string().optional(),
           researchContent: z.string().optional(),
-          citations: z.array(z.object({
-            title: z.string(),
-            authors: z.string().optional(),
-            journal: z.string().optional(),
-            year: z.string().optional(),
-            url: z.string().optional(),
-            summary: z.string().optional(),
-          })).optional(),
         }).optional(),
       })).mutation(async ({ input }) => {
         const { categoryIds, variants, researchDraft, ...rawData } = input;
@@ -670,27 +661,13 @@ export const appRouter = router({
         }
         if (researchDraft) {
           await db.upsertProductResearch(id, {
-            productBrief: researchDraft.productBrief || "",
-            qualityNotes: researchDraft.qualityNotes || "",
+            templateSourceUrl: researchDraft.templateSourceUrl || "",
             overview: researchDraft.overview || "",
             chemicalMakeup: researchDraft.chemicalMakeup || "",
             researchContent: researchDraft.researchContent || "",
+            productBrief: "",
+            qualityNotes: "",
           });
-          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 5) : [];
-          for (let index = 0; index < citations.length; index++) {
-            const citation = citations[index];
-            if (!String(citation.title || "").trim()) continue;
-            await db.createCitation({
-              productId: id,
-              citationNumber: index + 1,
-              title: citation.title,
-              authors: citation.authors || "",
-              journal: citation.journal || "NIH/PubMed",
-              year: citation.year || "",
-              url: citation.url || "",
-              summary: citation.summary || "",
-            } as any);
-          }
         }
         return { id };
       }),
@@ -706,19 +683,10 @@ export const appRouter = router({
         sortOrder: z.number().optional(), categoryIds: z.array(z.number()).optional(),
         variants: z.array(productVariantInput).optional(),
         researchDraft: z.object({
-          productBrief: z.string().optional(),
-          qualityNotes: z.string().optional(),
+          templateSourceUrl: z.string().optional(),
           overview: z.string().optional(),
           chemicalMakeup: z.string().optional(),
           researchContent: z.string().optional(),
-          citations: z.array(z.object({
-            title: z.string(),
-            authors: z.string().optional(),
-            journal: z.string().optional(),
-            year: z.string().optional(),
-            url: z.string().optional(),
-            summary: z.string().optional(),
-          })).optional(),
         }).optional(),
         regenerateVial: z.boolean().optional(),
       })).mutation(async ({ input }) => {
@@ -761,28 +729,13 @@ export const appRouter = router({
         }
         if (researchDraft) {
           await db.upsertProductResearch(id, {
-            productBrief: researchDraft.productBrief || "",
-            qualityNotes: researchDraft.qualityNotes || "",
+            templateSourceUrl: researchDraft.templateSourceUrl || "",
             overview: researchDraft.overview || "",
             chemicalMakeup: researchDraft.chemicalMakeup || "",
             researchContent: researchDraft.researchContent || "",
+            productBrief: "",
+            qualityNotes: "",
           });
-          await db.deleteProductCitations(id);
-          const citations = Array.isArray(researchDraft.citations) ? researchDraft.citations.slice(0, 5) : [];
-          for (let index = 0; index < citations.length; index++) {
-            const citation = citations[index];
-            if (!String(citation.title || "").trim()) continue;
-            await db.createCitation({
-              productId: id,
-              citationNumber: index + 1,
-              title: citation.title,
-              authors: citation.authors || "",
-              journal: citation.journal || "NIH/PubMed",
-              year: citation.year || "",
-              url: citation.url || "",
-              summary: citation.summary || "",
-            } as any);
-          }
         }
         return { success: true };
       }),
@@ -838,93 +791,20 @@ export const appRouter = router({
         const citations = await db.getProductCitations(input.productId);
         return { research, citations };
       }),
-      generateDraft: adminProcedure.input(z.object({
-        productName: z.string(),
-        productBrief: z.string().optional(),
-        qualityNotes: z.string().optional(),
-        size: z.string().optional(),
-        purity: z.string().optional(),
-        form: z.string().optional(),
-        contents: z.string().optional(),
-        sku: z.string().optional(),
-        otherNames: z.string().optional(),
-        molecularFormula: z.string().optional(),
-        molecularWeight: z.string().optional(),
-        shortDescription: z.string().optional(),
-        sourceChemicalMakeup: z.string().optional(),
-        citations: z.array(z.object({
-          title: z.string(),
-          authors: z.string().optional(),
-          journal: z.string().optional(),
-          year: z.string().optional(),
-          url: z.string().optional(),
-          summary: z.string().optional(),
-        })).optional(),
-      })).mutation(async ({ input }) => {
-        const { generateProductCopyDraft } = await import("./productCopy");
-        return generateProductCopyDraft(input);
-      }),
-      searchTemplate: adminProcedure.input(z.object({
-        productSlug: z.string(),
-        productName: z.string(),
-      })).query(async ({ input }) => {
-        const { searchResearchTemplates } = await import("./corePeptidesImport");
-        return searchResearchTemplates(input.productSlug, input.productName);
-      }),
-      resolveTemplateSource: adminProcedure.input(z.object({
-        sourceUrl: z.string(),
-      })).query(async ({ input }) => {
-        const { parseResearchTemplateSourceUrl } = await import("../shared/researchTemplateSource");
-        const { slugToTitle } = await import("../shared/researchTemplateMatch");
-        const templateSlug = parseResearchTemplateSourceUrl(input.sourceUrl);
-        if (!templateSlug) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Could not read a product slug from that URL. Use a link that ends with /peptides/product-slug/",
-          });
-        }
-        return { templateSlug, title: slugToTitle(templateSlug) };
-      }),
       importTemplate: adminProcedure.input(z.object({
-        productSlug: z.string(),
         productName: z.string(),
-        templateSlug: z.string().optional(),
-        sourceUrl: z.string().optional(),
-        size: z.string().optional(),
-        purity: z.string().optional(),
-        form: z.string().optional(),
-        contents: z.string().optional(),
-        sku: z.string().optional(),
-        otherNames: z.string().optional(),
-        molecularFormula: z.string().optional(),
-        molecularWeight: z.string().optional(),
+        sourceUrl: z.string(),
       })).mutation(async ({ input }) => {
-        const { fetchResearchTemplate } = await import("./corePeptidesImport");
-        const { parseResearchTemplateSourceUrl } = await import("../shared/researchTemplateSource");
-        const { productSlug, productName, templateSlug, sourceUrl, ...specs } = input;
-        const resolvedTemplateSlug =
-          templateSlug?.trim() ||
-          (sourceUrl ? parseResearchTemplateSourceUrl(sourceUrl) : null);
-
-        if (!resolvedTemplateSlug) {
+        const { fetchPeptideLabsProduct } = await import("./peptideLabsImport");
+        const { isValidPeptideLabsSourceUrl } = await import("../shared/peptideLabsSource");
+        const sourceUrl = input.sourceUrl.trim();
+        if (!isValidPeptideLabsSourceUrl(sourceUrl)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Provide a template slug or a source product URL ending in /peptides/product-slug/",
+            message: "Use a Peptide Labs product URL like https://peptidelabs.us/bpc-157/",
           });
         }
-
-        const result = await fetchResearchTemplate(
-          resolvedTemplateSlug,
-          { productName, ...specs },
-          productSlug,
-          { forceFresh: Boolean(sourceUrl?.trim()) }
-        );
-
-        return {
-          ...result,
-          sourceUrl: sourceUrl?.trim() || null,
-          resolvedTemplateSlug,
-        };
+        return fetchPeptideLabsProduct(sourceUrl);
       }),
       upsert: adminProcedure.input(z.object({
         productId: z.number(),

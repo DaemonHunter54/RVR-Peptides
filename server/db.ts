@@ -542,6 +542,15 @@ export async function deleteProductCitations(productId: number) {
   await db.delete(researchCitations).where(eq(researchCitations.productId, productId));
 }
 
+export async function clearAllProductResearchContent() {
+  const db = await getDb();
+  if (!db) return 0;
+  await db.delete(researchCitations);
+  await db.delete(productResearch);
+  const rows = await db.select({ id: products.id }).from(products);
+  return rows.length;
+}
+
 // ─── Research Knowledge Base ─────────────────────────────────────────
 export async function getResearchKnowledgeTemplate(templateSlug: string) {
   const db = await getDb();

@@ -391,35 +391,10 @@ const imageUrlForVariant = (productSlug: string, variantLabel: string) => {
 const blankVariant = () => ({ label: "", price: "", compareAtPrice: "", sku: "", stockQuantity: 100, inStock: true, imageUrl: "", sortOrder: 0 });
 
 const blankResearchDraft = (): ProductResearchDraft => ({
-  productBrief: "",
-  qualityNotes: "",
+  templateSourceUrl: "",
   overview: "",
-  description: "",
   chemicalMakeup: "",
   researchContent: "",
-  citations: [],
-});
-
-const applyListingSpecsToForm = (updateField: (field: string, value: string) => void, form: any, specs: Partial<{ size?: string; purity?: string; form?: string; contents?: string; sku?: string; molecularFormula?: string; molecularWeight?: string }>) => {
-  if (!form.size && specs.size) updateField("size", specs.size);
-  if (!form.purity && specs.purity) updateField("purity", specs.purity);
-  if (!form.form && specs.form) updateField("form", specs.form);
-  if (!form.contents && specs.contents) updateField("contents", specs.contents);
-  if (!form.sku && specs.sku) updateField("sku", specs.sku);
-  if (!form.molecularFormula && specs.molecularFormula) updateField("molecularFormula", specs.molecularFormula);
-  if (!form.molecularWeight && specs.molecularWeight) updateField("molecularWeight", specs.molecularWeight);
-};
-
-const productResearchMetaFromForm = (form: any) => ({
-  size: form.size || "",
-  purity: form.purity || "",
-  form: form.form || "",
-  contents: form.contents || "",
-  sku: form.sku || "",
-  otherNames: form.otherNames || "",
-  molecularFormula: form.molecularFormula || "",
-  molecularWeight: form.molecularWeight || "",
-  shortDescription: form.shortDescription || "",
 });
 
 type PreviewProductType = "" | "vial" | "cream" | "face-mask" | "gift-card";
@@ -946,20 +921,12 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               key={product.id}
               productId={product.id}
               productName={form.name}
-              productSlug={form.slug || autoSlug}
-              productMeta={productResearchMetaFromForm(form)}
-              onShortDescriptionChange={(shortDescription) => updateField("shortDescription", shortDescription)}
-              onListingSpecsApply={(specs) => applyListingSpecsToForm(updateField, form, specs)}
             />
           ) : (
             <ProductResearchWorkflow
               productName={form.name}
-              productSlug={form.slug || autoSlug}
-              productMeta={productResearchMetaFromForm(form)}
               value={draftResearch}
               onChange={setDraftResearch}
-              onShortDescriptionChange={(shortDescription) => updateField("shortDescription", shortDescription)}
-              onListingSpecsApply={(specs) => applyListingSpecsToForm(updateField, form, specs)}
             />
           )
         )}
