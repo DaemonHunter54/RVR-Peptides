@@ -17,6 +17,9 @@ const Account = lazy(() => import("./pages/Account"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
+const ShippingReturnsRefunds = lazy(() => import("./pages/ShippingReturnsRefunds"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const AdminPanel = lazy(() => import("./pages/admin/AdminPanel"));
 
@@ -52,6 +55,9 @@ function Router() {
       <Route path="/order/:orderNumber" component={OrderDetail} />
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
+      <Route path="/shipping" component={ShippingReturnsRefunds} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsAndConditions} />
       <Route path="/admin" component={AdminLoader} />
       <Route path="/admin/:section" component={AdminLoader} />
       <Route path="/404" component={NotFound} />

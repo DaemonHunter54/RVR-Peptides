@@ -78,6 +78,9 @@ export default function Footer() {
                   { href: "/shop", label: "Peptides for Sale" },
                   { href: "/about", label: "About Us" },
                   { href: "/contact", label: "Contact" },
+                  { href: "/shipping", label: "Shipping, Returns & Refunds" },
+                  { href: "/privacy", label: "Privacy Policy" },
+                  { href: "/terms", label: "Terms and Conditions" },
                 ].map((link) => (
                   <li key={link.href}>
                     <Link href={link.href} className="text-gray-400 text-sm hover:text-white transition-colors">
