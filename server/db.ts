@@ -537,15 +537,22 @@ export async function upsertResearchKnowledgeTemplate(data: {
 }) {
   const db = await getDb();
   if (!db) return;
+
+  const clip = (value: string | undefined, max: number) => {
+    const trimmed = String(value || "").trim();
+    if (!trimmed) return null;
+    return trimmed.length <= max ? trimmed : trimmed.slice(0, max);
+  };
+
   const existing = await getResearchKnowledgeTemplate(data.templateSlug);
   const payload: InsertResearchKnowledgeTemplate = {
-    templateSlug: data.templateSlug,
-    title: data.title,
-    sourceSize: data.sourceSize || null,
-    sourceContents: data.sourceContents || null,
-    sourceForm: data.sourceForm || null,
-    sourcePurity: data.sourcePurity || null,
-    sourceSku: data.sourceSku || null,
+    templateSlug: clip(data.templateSlug, 255) || data.templateSlug.slice(0, 255),
+    title: clip(data.title, 255) || "Research template",
+    sourceSize: clip(data.sourceSize, 100),
+    sourceContents: clip(data.sourceContents, 255),
+    sourceForm: clip(data.sourceForm, 100),
+    sourcePurity: clip(data.sourcePurity, 50),
+    sourceSku: clip(data.sourceSku, 50),
     overview: data.overview,
     chemicalBlock: data.chemicalBlock,
     researchContent: data.researchContent,

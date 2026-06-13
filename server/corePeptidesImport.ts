@@ -269,19 +269,26 @@ function inferSku(productSlug: string): string {
   return base ? `P-${base}` : "";
 }
 
+function parseSpecField(text: string, label: string, stopBefore: string[]): string {
+  const stopPattern = stopBefore.length ? `(?=\\s*(?:${stopBefore.join("|")}):)` : "$";
+  const pattern = new RegExp(`${label}:\\s*([\\s\\S]*?)${stopPattern}`, "i");
+  const match = pattern.exec(text);
+  return match?.[1]?.trim() || "";
+}
+
+function parseSku(text: string): string {
+  const match = text.match(/SKU:\s*([A-Z0-9][A-Z0-9-]*(?:\d+(?:\.\d+)?(?:mg|mcg|ml|iu))?)/i);
+  if (match?.[1]) return match[1].trim().slice(0, 50);
+  return parseSpecField(text, "SKU", ["Categories", "Description", "Certificate", "Chemical Makeup"]).slice(0, 50);
+}
+
 function parseSpecs(text: string) {
-  const sizeMatch = text.match(/Size:\s*([^\n]+)/i);
-  const contentsMatch = text.match(/Contents:\s*([^\n]+)/i);
-  const formMatch = text.match(/Form:\s*([^\n]+)/i);
-  const purityMatch = text.match(/Purity:\s*([^\n]+)/i);
-  const skuMatch = text.match(/SKU:\s*([^\n]+)/i);
-  return {
-    size: sizeMatch?.[1]?.trim() || "",
-    contents: contentsMatch?.[1]?.trim() || "",
-    form: formMatch?.[1]?.trim() || "",
-    purity: purityMatch?.[1]?.trim() || "",
-    sku: skuMatch?.[1]?.trim() || "",
-  };
+  const size = parseSpecField(text, "Size", ["Contents", "Form", "Purity", "SKU"]);
+  const contents = parseSpecField(text, "Contents", ["Form", "Purity", "SKU"]);
+  const form = parseSpecField(text, "Form", ["Purity", "SKU"]);
+  const purity = parseSpecField(text, "Purity", ["SKU"]);
+  const sku = parseSku(text);
+  return { size, contents, form, purity, sku };
 }
 
 export function parseRawKnowledgeTemplateFromHtml(html: string, templateSlug: string): RawKnowledgeTemplate {
@@ -430,15 +437,29 @@ async function fetchTemplatePageHtml(templateSlug: string): Promise<string> {
 
 export { fetchTemplatePageHtml };
 
+export async function fetchFreshKnowledgeTemplate(templateSlug: string): Promise<RawKnowledgeTemplate> {
+  const html = await fetchTemplatePageHtml(templateSlug);
+  return parseRawKnowledgeTemplateFromHtml(html, templateSlug);
+}
+
 async function loadKnowledgeTemplate(
   templateSlug: string,
   options?: { forceFresh?: boolean }
 ): Promise<RawKnowledgeTemplate> {
-  const { getKnowledgeTemplate, syncKnowledgeTemplate } = await import("./researchKnowledgeBase");
-  if (!options?.forceFresh) {
-    const cached = await getKnowledgeTemplate(templateSlug);
-    if (cached) return cached;
+  if (options?.forceFresh) {
+    const parsed = await fetchFreshKnowledgeTemplate(templateSlug);
+    try {
+      const { upsertKnowledgeTemplate } = await import("./researchKnowledgeBase");
+      await upsertKnowledgeTemplate(parsed);
+    } catch (error) {
+      console.warn(`Knowledge base persist skipped for ${templateSlug}:`, error);
+    }
+    return parsed;
   }
+
+  const { getKnowledgeTemplate, syncKnowledgeTemplate } = await import("./researchKnowledgeBase");
+  const cached = await getKnowledgeTemplate(templateSlug);
+  if (cached) return cached;
   return syncKnowledgeTemplate(templateSlug);
 }
 

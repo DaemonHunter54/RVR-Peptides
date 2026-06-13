@@ -64,7 +64,11 @@ export async function upsertKnowledgeTemplate(template: RawKnowledgeTemplate): P
 export async function syncKnowledgeTemplate(templateSlug: string): Promise<RawKnowledgeTemplate> {
   const html = await fetchTemplatePageHtml(templateSlug);
   const parsed = parseRawKnowledgeTemplateFromHtml(html, templateSlug);
-  await upsertKnowledgeTemplate(parsed);
+  try {
+    await upsertKnowledgeTemplate(parsed);
+  } catch (error) {
+    console.warn(`Knowledge base persist failed for ${templateSlug}:`, error);
+  }
   return parsed;
 }
 

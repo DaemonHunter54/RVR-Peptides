@@ -175,6 +175,16 @@ const emptyResearchDraft = (): ProductResearchDraft => ({
   citations: [],
 });
 
+function friendlyImportError(error: any, fallback: string) {
+  const message = String(error?.message || "").trim();
+  if (!message) return fallback;
+  if (message.includes("Failed query:") || message.includes("insert into `researchKnowledgeTemplates`")) {
+    return "Template import hit a database cache error. Retry after deploy, or contact support if it persists.";
+  }
+  if (message.length > 200) return fallback;
+  return message;
+}
+
 export function ProductResearchWorkflow({
   productName,
   productSlug,
@@ -275,7 +285,7 @@ export function ProductResearchWorkflow({
       }
       setPickerOpen(false);
     } catch (error: any) {
-      toast.error(error?.message || "Unable to import research template.");
+      toast.error(friendlyImportError(error, "Unable to import research template."));
     }
   };
 
@@ -308,7 +318,7 @@ export function ProductResearchWorkflow({
       }
       setPickerOpen(false);
     } catch (error: any) {
-      toast.error(error?.message || "Unable to import from that source URL.");
+      toast.error(friendlyImportError(error, "Unable to import from that source URL."));
     }
   };
 
