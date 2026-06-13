@@ -6,6 +6,7 @@ import {
   type TemplateCatalogItem,
   type TemplateMatchResult,
 } from "../shared/researchTemplateMatch";
+import { parseCitationList, sanitizeImportedResearchFields } from "../shared/researchImportNormalize";
 
 export type ListingSpecs = {
   productName: string;
@@ -197,6 +198,22 @@ function parseShortDescription(overview: string, productName: string): string {
   return `${firstParagraph.slice(0, 257).trim()}...`;
 }
 
+function extractAuthorsAndTitle(body: string): { authors: string; title: string } {
+  const withoutDoi = body.split(". doi:")[0]?.split(". https://")[0]?.split(". http://")[0]?.trim() || body;
+  const segments = withoutDoi.split(". ");
+  if (segments.length >= 2) {
+    const maybeAuthors = segments[0]?.trim() || "";
+    const looksLikeAuthors = /,/.test(maybeAuthors) && maybeAuthors.length <= 220;
+    if (looksLikeAuthors) {
+      return {
+        authors: maybeAuthors,
+        title: segments.slice(1).join(". ").trim() || withoutDoi,
+      };
+    }
+  }
+  return { authors: "", title: withoutDoi.slice(0, 500) };
+}
+
 function parseReferences(text: string) {
   const refBlock = extractSection(text, /\n\s*References:?\s*\n/i, [
     /\n\s*Dr\. Marinov\b/i,
@@ -214,13 +231,11 @@ function parseReferences(text: string) {
     if (body.length < 20) continue;
     const urlMatch = body.match(/(https?:\/\/[^\s)]+)/);
     const url = urlMatch ? urlMatch[1].replace(/[.,]$/, "") : "";
-    const title =
-      body.split(". doi:")[0]?.split(". https://")[0]?.split(". http://")[0]?.trim() ||
-      body.slice(0, 180);
+    const { authors, title } = extractAuthorsAndTitle(body);
     const yearMatch = body.match(/\b(19|20)\d{2}\b/);
     citations.push({
       title: title.slice(0, 500),
-      authors: "",
+      authors,
       journal: "PubMed / peer-reviewed literature",
       year: yearMatch ? yearMatch[0] : "",
       url,
@@ -436,9 +451,9 @@ export async function fetchResearchTemplate(
   const knowledge = await loadKnowledgeTemplate(templateSlug, options);
   const resolved = resolveListingSpecs(listingSpecs, productSlug);
 
-  const chemicalMakeup = buildChemicalMakeup(resolved, knowledge.chemicalBlock);
-  const researchContent = applyListingSpecsToText(knowledge.researchContent, resolved);
-  const citations = knowledge.citations;
+  let chemicalMakeup = buildChemicalMakeup(resolved, knowledge.chemicalBlock);
+  let researchContent = applyListingSpecsToText(knowledge.researchContent, resolved);
+  let citations = parseCitationList(knowledge.citations);
 
   let overview = applyListingSpecsToText(knowledge.overview, resolved);
   if (!overview.trim() && researchContent.trim()) {
@@ -448,7 +463,18 @@ export async function fetchResearchTemplate(
     );
   }
 
-  if (!overview && !researchContent) {
+  const sanitized = sanitizeImportedResearchFields({
+    overview,
+    chemicalMakeup,
+    researchContent,
+    citations,
+  });
+  overview = sanitized.overview;
+  chemicalMakeup = sanitized.chemicalMakeup;
+  researchContent = sanitized.researchContent;
+  citations = sanitized.citations;
+
+  if (!overview && !researchContent && !chemicalMakeup && !citations.length) {
     throw new Error("Template loaded but research content could not be parsed.");
   }
 

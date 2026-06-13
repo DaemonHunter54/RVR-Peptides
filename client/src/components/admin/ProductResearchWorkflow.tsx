@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Plus, Save, Sparkles, Trash2, Database, Download, Link2 } from "lucide-react";
 import { parseResearchTemplateSourceUrl } from "@shared/researchTemplateSource";
+import { parseCitationList, sanitizeImportedResearchFields } from "@shared/researchImportNormalize";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
@@ -148,12 +149,19 @@ function mergeImportedDraft(
   imported: any,
   sourceUrl?: string
 ): ProductResearchDraft {
+  const normalized = sanitizeImportedResearchFields({
+    overview: imported.overview,
+    chemicalMakeup: imported.chemicalMakeup,
+    researchContent: imported.researchContent,
+    citations: imported.citations,
+  });
+
   return {
     ...prev,
-    overview: imported.overview || "",
-    chemicalMakeup: imported.chemicalMakeup || "",
-    researchContent: imported.researchContent || "",
-    citations: imported.citations?.length ? imported.citations : prev.citations,
+    overview: normalized.overview,
+    chemicalMakeup: normalized.chemicalMakeup,
+    researchContent: normalized.researchContent,
+    citations: normalized.citations.length ? normalized.citations : prev.citations,
     templateSourceUrl: sourceUrl || imported.sourceUrl || prev.templateSourceUrl,
   };
 }
@@ -207,14 +215,16 @@ export function ProductResearchWorkflow({
     overview?: string;
     chemicalMakeup?: string;
     researchContent?: string;
-    citations?: unknown[];
-  }) =>
-    Boolean(
-      String(imported.overview || "").trim() ||
-        String(imported.chemicalMakeup || "").trim() ||
-        String(imported.researchContent || "").trim() ||
-        (Array.isArray(imported.citations) && imported.citations.length > 0)
+    citations?: unknown;
+  }) => {
+    const normalized = sanitizeImportedResearchFields(imported);
+    return Boolean(
+      normalized.overview ||
+        normalized.chemicalMakeup ||
+        normalized.researchContent ||
+        normalized.citations.length > 0
     );
+  };
 
   const applyImportedTemplate = async (imported: any, sourceUrl?: string) => {
     if (!importedHasContent(imported)) {
@@ -611,11 +621,11 @@ export function ProductResearchWorkflow({
             <Plus className="h-3.5 w-3.5" /> Add Source
           </Button>
         </div>
-        {value.citations.length ? (
+        {Array.isArray(value.citations) && value.citations.length ? (
           <div className="space-y-3">
             {value.citations.map((citation, index) => (
               <CitationEditorRow
-                key={index}
+                key={`${importRevision}-${index}-${citation.title?.slice(0, 24) || index}`}
                 citation={citation}
                 index={index}
                 onChange={(next) => {
@@ -668,22 +678,31 @@ export function PersistedProductResearchWorkflow({
   const [hydrated, setHydrated] = useState(false);
   const dirtyRef = useRef(false);
 
-  const draftFromServer = (research: any, citations: any[]): ProductResearchDraft => ({
-    productBrief: research?.productBrief || "",
-    qualityNotes: research?.qualityNotes || "",
-    templateSourceUrl: research?.templateSourceUrl || "",
-    overview: research?.overview || "",
-    chemicalMakeup: research?.chemicalMakeup || "",
-    researchContent: research?.researchContent || "",
-    citations: citations.map((citation: any) => ({
-      title: citation.title || "",
-      authors: citation.authors || "",
-      journal: citation.journal || "",
-      year: citation.year || "",
-      url: citation.url || "",
-      summary: citation.summary || "",
-    })),
-  });
+  const draftFromServer = (research: any, citations: any[]): ProductResearchDraft => {
+    const normalized = sanitizeImportedResearchFields({
+      overview: research?.overview,
+      chemicalMakeup: research?.chemicalMakeup,
+      researchContent: research?.researchContent,
+      citations: parseCitationList(citations),
+    });
+
+    return {
+      productBrief: research?.productBrief || "",
+      qualityNotes: research?.qualityNotes || "",
+      templateSourceUrl: research?.templateSourceUrl || "",
+      overview: normalized.overview,
+      chemicalMakeup: normalized.chemicalMakeup,
+      researchContent: normalized.researchContent,
+      citations: normalized.citations.map((citation) => ({
+        title: citation.title || "",
+        authors: citation.authors || "",
+        journal: citation.journal || "",
+        year: citation.year || "",
+        url: citation.url || "",
+        summary: citation.summary || "",
+      })),
+    };
+  };
 
   useEffect(() => {
     dirtyRef.current = false;

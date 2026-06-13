@@ -1,5 +1,6 @@
 import { eq, and, like, desc, asc, sql, inArray, or, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { parseCitationList } from "../shared/researchImportNormalize";
 import {
   InsertUser, users,
   categories, InsertCategory,
@@ -517,7 +518,7 @@ export async function getResearchKnowledgeTemplate(templateSlug: string) {
     overview: row.overview,
     chemicalBlock: row.chemicalBlock,
     researchContent: row.researchContent,
-    citations: Array.isArray(row.citations) ? row.citations : [],
+    citations: parseCitationList(row.citations),
   };
 }
 
