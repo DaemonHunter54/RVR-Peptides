@@ -217,6 +217,7 @@ function RecentOrdersTable() {
 // ─── Products ────────────────────────────────────────────────────────
 function ProductsSection() {
   const [search, setSearch] = useState("");
+  const [missingOnly, setMissingOnly] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -245,6 +246,10 @@ function ProductsSection() {
 
 
   const products = productsQuery.data?.products ?? (Array.isArray(productsQuery.data) ? productsQuery.data : []);
+  const missingCount = products.filter((product: any) => product.researchMissing).length;
+  const visibleProducts = missingOnly
+    ? products.filter((product: any) => product.researchMissing)
+    : products;
 
   const openProductEditor = (product: any) => {
     setEditingProduct(product);
@@ -297,11 +302,25 @@ function ProductsSection() {
           </Button>
         </div>
       </div>
-      <div className="mb-4">
-        <div className="relative max-w-sm">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-sm w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
         </div>
+        {missingCount > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-amber-800">{missingCount} missing research info</span>
+            <Button
+              type="button"
+              variant={missingOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMissingOnly((value) => !value)}
+              className={missingOnly ? "bg-amber-600 hover:bg-amber-700 text-white" : "border-amber-300 text-amber-800 hover:bg-amber-50"}
+            >
+              {missingOnly ? "Show all products" : "Show missing only"}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
@@ -316,20 +335,32 @@ function ProductsSection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {products.map((product: any) => (
+              {visibleProducts.length ? visibleProducts.map((product: any) => (
                 <tr key={product.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <img src={productImageUrl(product) || ASSETS.peptideVial} alt="" loading="lazy" decoding="async" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ASSETS.peptideVial; }}
                       className="w-10 h-10 object-contain bg-slate-50 rounded" />
                       <div>
-                        <button
-                          type="button"
-                          onClick={() => openProductEditor(product)}
-                          className="block text-left font-medium text-slate-800 hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm"
-                        >
-                          {product.name}
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => openProductEditor(product)}
+                            className="text-left font-medium text-slate-800 hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm"
+                          >
+                            {product.name}
+                          </button>
+                          {product.researchMissing ? (
+                            <button
+                              type="button"
+                              onClick={() => openProductEditor(product)}
+                              title={`Missing: ${(product.missingResearchFields || []).join(", ") || "research content"}`}
+                              className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline underline-offset-2 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                            >
+                              Missing Info
+                            </button>
+                          ) : null}
+                        </div>
                         <p className="text-xs text-slate-400">{product.sku || "No SKU"}</p>
                       </div>
                     </div>
@@ -350,7 +381,13 @@ function ProductsSection() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                    {missingOnly ? "No products are missing research info." : "No products found."}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -595,10 +595,18 @@ export const appRouter = router({
     products: router({
       list: adminProcedure.input(z.object({ search: z.string().optional(), limit: z.number().optional(), offset: z.number().optional() }).optional()).query(async ({ input }) => {
         const result = await db.getAllProducts({ search: input?.search, limit: input?.limit, offset: input?.offset });
-        const enrichedProducts = await Promise.all(result.products.map(async (product: any) => ({
-          ...preserveManusImage(product),
-          variants: await db.getProductVariants(product.id),
-        })));
+        const researchMap = await db.getProductResearchSummaryMap();
+        const { getMissingResearchFields, isResearchIncomplete } = await import("../shared/researchCompleteness");
+        const enrichedProducts = await Promise.all(result.products.map(async (product: any) => {
+          const research = researchMap.get(product.id);
+          const missingResearchFields = getMissingResearchFields(research);
+          return {
+            ...preserveManusImage(product),
+            variants: await db.getProductVariants(product.id),
+            researchMissing: isResearchIncomplete(research, product),
+            missingResearchFields,
+          };
+        }));
         return { ...result, products: enrichedProducts };
       }),
       get: adminProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {

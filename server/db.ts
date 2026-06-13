@@ -448,6 +448,52 @@ export async function getProductResearch(productId: number) {
   return result[0];
 }
 
+export async function getProductResearchSummaryMap() {
+  const db = await getDb();
+  if (!db) {
+    return new Map<number, { overview: string; chemicalMakeup: string; researchContent: string; citationCount: number }>();
+  }
+
+  const researchRows = await db
+    .select({
+      productId: productResearch.productId,
+      overview: productResearch.overview,
+      chemicalMakeup: productResearch.chemicalMakeup,
+      researchContent: productResearch.researchContent,
+    })
+    .from(productResearch);
+
+  const citationRows = await db
+    .select({
+      productId: researchCitations.productId,
+      count: sql<number>`count(*)`,
+    })
+    .from(researchCitations)
+    .groupBy(researchCitations.productId);
+
+  const map = new Map<number, { overview: string; chemicalMakeup: string; researchContent: string; citationCount: number }>();
+  for (const row of researchRows) {
+    map.set(row.productId, {
+      overview: row.overview || "",
+      chemicalMakeup: row.chemicalMakeup || "",
+      researchContent: row.researchContent || "",
+      citationCount: 0,
+    });
+  }
+  for (const row of citationRows) {
+    const existing = map.get(row.productId) || {
+      overview: "",
+      chemicalMakeup: "",
+      researchContent: "",
+      citationCount: 0,
+    };
+    existing.citationCount = Number(row.count || 0);
+    map.set(row.productId, existing);
+  }
+
+  return map;
+}
+
 export async function upsertProductResearch(productId: number, data: {
   productBrief?: string;
   qualityNotes?: string;
