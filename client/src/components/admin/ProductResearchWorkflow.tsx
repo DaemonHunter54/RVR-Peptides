@@ -47,11 +47,11 @@ export function ProductResearchWorkflow({
   const pullReferenceResearch = async () => {
     const sourceUrl = String(value.templateSourceUrl || "").trim();
     if (!sourceUrl) {
-      toast.error("Paste a Peptide Labs product URL first.");
+      toast.error("Paste a source product URL first.");
       return;
     }
     if (!isValidPeptideLabsSourceUrl(sourceUrl)) {
-      toast.error("Use a Peptide Labs URL like https://peptidelabs.us/bpc-157/");
+      toast.error("That URL is not supported. Use a full product page link.");
       return;
     }
 
@@ -68,7 +68,7 @@ export function ProductResearchWorkflow({
         researchContent: imported.researchContent || "",
         templateSourceUrl: imported.sourceUrl || sourceUrl,
       });
-      toast.success("Content loaded from Peptide Labs. Review and save.");
+      toast.success("Content loaded. Review and save.");
     } catch (error: any) {
       toast.error(error?.message || "Unable to pull content from that URL.");
     } finally {
@@ -80,11 +80,8 @@ export function ProductResearchWorkflow({
 
   return (
     <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-5 mt-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="font-semibold text-slate-800">Product Description</h2>
-          <p className="text-xs text-slate-400 mt-1">Matches the Peptide Labs layout: Description, Product Details, and Potential Research Applications.</p>
-        </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="font-semibold text-slate-800">Product Description</h2>
         <Button
           type="button"
           size="sm"
@@ -99,11 +96,11 @@ export function ProductResearchWorkflow({
       </div>
 
       <div>
-        <Label>Peptide Labs product URL</Label>
+        <Label>Source Product URL</Label>
         <Input
           value={value.templateSourceUrl || ""}
           onChange={(e) => update({ templateSourceUrl: e.target.value })}
-          placeholder="https://peptidelabs.us/bpc-157/?attribute_strength=5%20mg"
+          placeholder="https://example.com/product-page"
           className="mt-1.5"
         />
       </div>

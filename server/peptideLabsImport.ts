@@ -176,7 +176,7 @@ export async function fetchPeptideLabsCatalog(forceFresh = false): Promise<Pepti
     headers: { "User-Agent": "RVR-Peptides-Import/1.0" },
   });
   if (!response.ok) {
-    throw new Error(`Unable to load Peptide Labs catalog (${response.status}).`);
+    throw new Error(`Unable to load reference catalog (${response.status}).`);
   }
 
   const html = await response.text();
@@ -245,7 +245,7 @@ export function findCatalogMatch(
 export async function fetchPeptideLabsProduct(sourceUrlInput: string): Promise<PeptideLabsImportResult> {
   const sourceUrl = normalizePeptideLabsUrl(sourceUrlInput);
   if (!sourceUrl) {
-    throw new Error("Paste a valid Peptide Labs product URL (https://peptidelabs.us/product-slug/).");
+    throw new Error("Paste a valid source product URL.");
   }
 
   const response = await fetch(sourceUrl, {
@@ -284,7 +284,7 @@ export async function importPeptideLabsForProduct(
   const catalog = await fetchPeptideLabsCatalog();
   const match = findCatalogMatch(productName, catalog);
   if (!match) {
-    throw new Error(`No Peptide Labs match for "${productName}". Paste the product URL and try again.`);
+    throw new Error(`No reference match for "${productName}". Paste a source product URL and try again.`);
   }
 
   const imported = await fetchPeptideLabsProduct(match.url);

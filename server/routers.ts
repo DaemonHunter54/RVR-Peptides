@@ -801,7 +801,7 @@ export const appRouter = router({
         if (!isValidPeptideLabsSourceUrl(sourceUrl)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Use a Peptide Labs product URL like https://peptidelabs.us/bpc-157/",
+            message: "Use a valid source product page URL.",
           });
         }
         return fetchPeptideLabsProduct(sourceUrl);
