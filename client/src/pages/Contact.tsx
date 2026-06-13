@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Mail, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BUSINESS } from "@shared/business";
 
 export default function Contact() {
   const [name, setName] = useState("");
@@ -16,6 +17,8 @@ export default function Contact() {
   const [message, setMessage] = useState("");
   const settingsQuery = trpc.settings.public.useQuery();
   const settings = settingsQuery.data || {};
+  const supportEmail = settings.contact_email || BUSINESS.supportEmail;
+  const legalName = settings.business_legal_name || BUSINESS.legalName;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,19 +74,20 @@ export default function Contact() {
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-6">Get in Touch</h2>
             <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 space-y-4">
-              {settings.contact_email && (
-                <div className="flex items-start gap-3">
-                  <Mail className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-slate-800">Email</p>
-                    <a href={`mailto:${settings.contact_email}`} className="text-sm text-blue-600 hover:text-blue-700">
-                      {settings.contact_email}
-                    </a>
-                  </div>
+              <div className="flex items-start gap-3">
+                <Mail className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-slate-800">Email</p>
+                  <a href={`mailto:${supportEmail}`} className="text-sm text-blue-600 hover:text-blue-700">
+                    {supportEmail}
+                  </a>
                 </div>
-              )}
+              </div>
               <div className="pt-4 border-t border-slate-200">
-                <p className="text-sm text-slate-500 leading-relaxed">
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  {legalName}
+                </p>
+                <p className="text-sm text-slate-500 leading-relaxed mt-2">
                   We typically respond to all inquiries within 24 hours during business days.
                   For urgent matters, please include "URGENT" in your subject line.
                 </p>

@@ -925,7 +925,7 @@ function inferSettingType(key: string, value: string): "text" | "image" | "boole
 }
 
 function inferSettingGroup(key: string): string {
-  if (key.startsWith("nowpayments_")) return "payments";
+  if (key.startsWith("nowpayments_") || key.startsWith("paymentcloud_")) return "payments";
   if (key.includes("shipping")) return "shipping";
   if (key.includes("tax")) return "tax";
   if (key.includes("logo") || key.includes("color") || key.includes("hero") || key.includes("banner")) return "branding";

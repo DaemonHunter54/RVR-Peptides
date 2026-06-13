@@ -3,8 +3,8 @@ import { Link } from "wouter";
 
 const SITE = "www.RVRPeptides.com";
 const SITE_URL = "https://www.RVRPeptides.com";
-const SUPPORT_EMAIL = "support@rvrpeptides.com";
-const COMPANY = "River Valley Research Peptides";
+const SUPPORT_EMAIL = "Support@RVRPeptides.com";
+const COMPANY = "River Valley Research Peptides LLC";
 
 export default function PrivacyPolicy() {
   return (

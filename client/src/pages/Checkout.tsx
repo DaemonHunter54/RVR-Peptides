@@ -12,8 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Lock, CreditCard, Loader2, UserPlus, Mail } from "lucide-react";
 import { useState, useMemo } from "react";
-import { useLocation, useSearch } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
+import { BUSINESS } from "@shared/business";
+import AcceptedPaymentMethods from "@/components/AcceptedPaymentMethods";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -54,6 +56,8 @@ export default function Checkout() {
   const [accountUsername, setAccountUsername] = useState("");
   const [useGiftCard, setUseGiftCard] = useState(false);
   const [giftCardCode, setGiftCardCode] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToResearch, setAgreedToResearch] = useState(false);
 
   // Authenticated cart
   const cartQuery = trpc.cart.get.useQuery(undefined, { enabled: isAuthenticated });
@@ -132,6 +136,16 @@ export default function Checkout() {
       }
     }
 
+    if (!agreedToTerms) {
+      toast.error("Please agree to the Terms and Conditions and Privacy Policy before placing your order.");
+      return;
+    }
+
+    if (!agreedToResearch) {
+      toast.error("Please confirm that your purchase is for laboratory research purposes only.");
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -181,7 +195,7 @@ export default function Checkout() {
         return;
       }
 
-      // Step 2: Create NowPayments invoice
+      // Step 2: Create PaymentCloud hosted checkout
       try {
         const invoice = await createInvoice.mutateAsync({
           orderNumber: orderData.orderNumber,
@@ -192,7 +206,6 @@ export default function Checkout() {
           if (String(invoice.invoiceUrl).startsWith("/")) {
             setLocation(invoice.invoiceUrl);
           } else {
-            // Redirect to NowPayments checkout
             window.location.href = invoice.invoiceUrl;
           }
           return;
@@ -373,12 +386,46 @@ export default function Checkout() {
                 <h2 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-blue-600" /> Payment
                 </h2>
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                  <p className="text-sm text-blue-800 font-medium">Cryptocurrency Payment via NowPayments</p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    After placing your order, you'll be redirected to NowPayments to complete payment securely.
-                    We accept Bitcoin, Ethereum, Litecoin, and 100+ other cryptocurrencies.
+                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 space-y-4">
+                  <p className="text-sm text-slate-800 font-medium">
+                    Secure card and bank payments via PaymentCloud
                   </p>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    After placing your order, you will be redirected to our secure hosted payment page to complete checkout.
+                    We accept major credit and debit cards, Apple Pay, Google Pay, and ACH where enabled by your gateway.
+                  </p>
+                  <AcceptedPaymentMethods compact />
+                  <p className="text-xs text-slate-500">
+                    Your card statement will show <strong>{BUSINESS.billingDescriptor}</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-4">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="agree-research"
+                    checked={agreedToResearch}
+                    onCheckedChange={(checked) => setAgreedToResearch(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="agree-research" className="text-sm text-slate-700 leading-relaxed cursor-pointer">
+                    I confirm that all products in this order are intended for laboratory, in-vitro research, or analytical purposes only and are not for human or animal consumption.
+                  </label>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="agree-terms"
+                    checked={agreedToTerms}
+                    onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="agree-terms" className="text-sm text-slate-700 leading-relaxed cursor-pointer">
+                    I agree to the{" "}
+                    <Link href="/terms" className="text-blue-600 hover:underline">Terms and Conditions</Link>,{" "}
+                    <Link href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</Link>, and{" "}
+                    <Link href="/shipping" className="text-blue-600 hover:underline">Shipping, Returns & Refunds</Link> policies of {BUSINESS.legalName}.
+                  </label>
                 </div>
               </div>
             </div>
@@ -428,7 +475,7 @@ export default function Checkout() {
                 <Button
                   type="submit"
                   className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11"
-                  disabled={isProcessing || items.length === 0}
+                  disabled={isProcessing || items.length === 0 || !agreedToTerms || !agreedToResearch}
                 >
                   {isProcessing ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
@@ -438,7 +485,7 @@ export default function Checkout() {
                 </Button>
 
                 <p className="text-xs text-slate-400 text-center mt-3">
-                  Secure checkout powered by NowPayments
+                  Secure checkout powered by PaymentCloud
                 </p>
               </div>
             </div>

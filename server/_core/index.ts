@@ -10,6 +10,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { handlePaymentReturn, handlePaymentWebhook } from "../paymentcloud";
 import { handleIpnWebhook } from "../nowpayments";
 import { storagePut } from "../storage";
 import mysql from "mysql2/promise";
@@ -1126,7 +1127,36 @@ async function startServer() {
   });
 
 
-  // NowPayments IPN webhook endpoint
+  // PaymentCloud return + webhook endpoints
+  app.all("/api/paymentcloud/return", async (req, res) => {
+    try {
+      const orderNumber = String(req.query.order || "");
+      if (!orderNumber) {
+        res.status(400).send("Missing order reference.");
+        return;
+      }
+
+      const payload = { ...(req.query as Record<string, unknown>), ...(req.body as Record<string, unknown>) };
+      const result = await handlePaymentReturn(payload, orderNumber);
+      const status = result.success ? "success" : "failed";
+      res.redirect(`/order/${encodeURIComponent(orderNumber)}?status=${status}`);
+    } catch (err: any) {
+      console.error("[PaymentCloud Return Error]", err.message);
+      res.status(400).send(err.message || "Payment return failed");
+    }
+  });
+
+  app.post("/api/paymentcloud/webhook", async (req, res) => {
+    try {
+      await handlePaymentWebhook(req.body as Record<string, unknown>);
+      res.status(200).send("OK");
+    } catch (err: any) {
+      console.error("[PaymentCloud Webhook Error]", err.message);
+      res.status(400).send(err.message || "Webhook failed");
+    }
+  });
+
+  // Legacy NowPayments IPN webhook endpoint (deprecated)
   app.post("/api/nowpayments/ipn", async (req, res) => {
     try {
       const signature = req.headers["x-nowpayments-sig"] as string || "";

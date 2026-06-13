@@ -1701,7 +1701,7 @@ function CustomersSection() {
   );
 }
 
-// ─── Payments / NowPayments Config ──────────────────────────────────
+// ─── Payments / PaymentCloud Config ──────────────────────────────────
 function PaymentsSection() {
   const settingsQuery = trpc.settings.all.useQuery();
   const paymentStatusQuery = trpc.admin.paymentStatus.useQuery();
@@ -1713,45 +1713,64 @@ function PaymentsSection() {
   const settings = settingsQuery.data || {};
   const paymentStatus = paymentStatusQuery.data;
 
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [showIpnSecret, setShowIpnSecret] = useState(false);
-  const [apiKey, setApiKey] = useState("");
-  const [ipnSecret, setIpnSecret] = useState("");
-  const [webhookUrl, setWebhookUrl] = useState("");
+  const [gateway, setGateway] = useState("authorize_net");
+  const [apiLoginId, setApiLoginId] = useState("");
+  const [transactionKey, setTransactionKey] = useState("");
+  const [securityKey, setSecurityKey] = useState("");
+  const [billingDescriptor, setBillingDescriptor] = useState("RVR Peptides LLC");
   const [sandboxMode, setSandboxMode] = useState(true);
-  const [apiKeyChanged, setApiKeyChanged] = useState(false);
-  const [ipnSecretChanged, setIpnSecretChanged] = useState(false);
-  const [webhookChanged, setWebhookChanged] = useState(false);
+  const [showTransactionKey, setShowTransactionKey] = useState(false);
+  const [showSecurityKey, setShowSecurityKey] = useState(false);
+  const [apiLoginChanged, setApiLoginChanged] = useState(false);
+  const [transactionKeyChanged, setTransactionKeyChanged] = useState(false);
+  const [securityKeyChanged, setSecurityKeyChanged] = useState(false);
+  const [descriptorChanged, setDescriptorChanged] = useState(false);
 
   useEffect(() => {
     if (settings) {
-      setApiKey(settings.nowpayments_api_key || "");
-      setIpnSecret(settings.nowpayments_ipn_secret || "");
-      setWebhookUrl(settings.nowpayments_webhook_url || "");
-      setSandboxMode(settings.nowpayments_sandbox_mode === "true");
-      setApiKeyChanged(false);
-      setIpnSecretChanged(false);
-      setWebhookChanged(false);
+      setGateway(settings.paymentcloud_gateway || "authorize_net");
+      setApiLoginId(settings.paymentcloud_api_login_id || "");
+      setTransactionKey(settings.paymentcloud_transaction_key || "");
+      setSecurityKey(settings.paymentcloud_security_key || "");
+      setBillingDescriptor(settings.paymentcloud_billing_descriptor || "RVR Peptides LLC");
+      setSandboxMode(settings.paymentcloud_sandbox_mode !== "false");
+      setApiLoginChanged(false);
+      setTransactionKeyChanged(false);
+      setSecurityKeyChanged(false);
+      setDescriptorChanged(false);
     }
-  }, [settings.nowpayments_api_key, settings.nowpayments_ipn_secret, settings.nowpayments_webhook_url, settings.nowpayments_sandbox_mode]);
+  }, [
+    settings.paymentcloud_gateway,
+    settings.paymentcloud_api_login_id,
+    settings.paymentcloud_transaction_key,
+    settings.paymentcloud_security_key,
+    settings.paymentcloud_billing_descriptor,
+    settings.paymentcloud_sandbox_mode,
+  ]);
+
+  const appBaseUrl = typeof window !== "undefined" ? window.location.origin : "https://your-domain.up.railway.app";
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Payment Configuration</h1>
-      <p className="text-slate-500 text-sm mb-8">Manage your NowPayments crypto payment gateway settings. Update your API key, IPN secret, and webhook URL at any time.</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-2">PaymentCloud Gateway</h1>
+      <p className="text-slate-500 text-sm mb-8">
+        Configure the PaymentCloud payment gateway credentials provided by your account manager.
+        PaymentCloud typically connects through Authorize.net or NMI depending on your merchant setup.
+      </p>
 
-      {/* Connection Status */}
       <div className="bg-white rounded-xl p-6 border border-slate-200 mb-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-slate-800 mb-1">Connection Status</h2>
-            <p className="text-sm text-slate-500">Current NowPayments API connection status</p>
+            <p className="text-sm text-slate-500">
+              Gateway: {paymentStatus?.gateway === "nmi" ? "NMI" : "Authorize.net"}
+            </p>
           </div>
           {paymentStatus?.configured ? (
-            paymentStatus.status === "ok" || paymentStatus.status === "OK" ? (
+            paymentStatus.status === "ok" || paymentStatus.status === "ready" ? (
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle2 className="h-5 w-5" />
-                <span className="font-medium text-sm">Connected{paymentStatus.sandbox ? " (Sandbox)" : ""}</span>
+                <span className="font-medium text-sm">Ready{paymentStatus.sandbox ? " (Sandbox)" : " (Live)"}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-red-500">
@@ -1768,52 +1787,36 @@ function PaymentsSection() {
         </div>
       </div>
 
-      {/* API Key */}
       <div className="bg-white rounded-xl p-6 border border-slate-200 mb-6">
-        <h2 className="font-semibold text-slate-800 mb-4">API Credentials</h2>
-        <div className="space-y-5">
+        <h2 className="font-semibold text-slate-800 mb-4">Gateway Selection</h2>
+        <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <Label className="text-sm font-medium">API Key</Label>
-            <p className="text-xs text-slate-400 mb-1.5">Your NowPayments API key for processing crypto payments. Find it in your NowPayments dashboard.</p>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showApiKey ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(e) => { setApiKey(e.target.value); setApiKeyChanged(true); }}
-                  placeholder="Enter your NowPayments API key"
-                  className="pr-10"
-                />
-                <button type="button" onClick={() => setShowApiKey(!showApiKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {apiKeyChanged && (
-                <Button size="sm" onClick={() => { updateSetting.mutate({ key: "nowpayments_api_key", value: apiKey }); setApiKeyChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
-                  <Save className="h-3.5 w-3.5 mr-1" /> Save
-                </Button>
-              )}
-            </div>
+            <Label className="text-sm font-medium">Gateway Provider</Label>
+            <Select
+              value={gateway}
+              onValueChange={(value) => {
+                setGateway(value);
+                updateSetting.mutate({ key: "paymentcloud_gateway", value });
+              }}
+            >
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="authorize_net">Authorize.net (most common with PaymentCloud)</SelectItem>
+                <SelectItem value="nmi">NMI</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
           <div>
-            <Label className="text-sm font-medium">IPN Secret</Label>
-            <p className="text-xs text-slate-400 mb-1.5">Used to verify webhook callbacks from NowPayments. Find it in your NowPayments IPN settings.</p>
+            <Label className="text-sm font-medium">Billing Descriptor</Label>
+            <p className="text-xs text-slate-400 mb-1.5">Name customers will see on their card statement.</p>
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showIpnSecret ? "text" : "password"}
-                  value={ipnSecret}
-                  onChange={(e) => { setIpnSecret(e.target.value); setIpnSecretChanged(true); }}
-                  placeholder="Enter your NowPayments IPN secret"
-                  className="pr-10"
-                />
-                <button type="button" onClick={() => setShowIpnSecret(!showIpnSecret)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  {showIpnSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {ipnSecretChanged && (
-                <Button size="sm" onClick={() => { updateSetting.mutate({ key: "nowpayments_ipn_secret", value: ipnSecret }); setIpnSecretChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
+              <Input
+                value={billingDescriptor}
+                onChange={(e) => { setBillingDescriptor(e.target.value); setDescriptorChanged(true); }}
+                placeholder="RVR Peptides LLC"
+              />
+              {descriptorChanged && (
+                <Button size="sm" onClick={() => { updateSetting.mutate({ key: "paymentcloud_billing_descriptor", value: billingDescriptor }); setDescriptorChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
                   <Save className="h-3.5 w-3.5 mr-1" /> Save
                 </Button>
               )}
@@ -1822,33 +1825,104 @@ function PaymentsSection() {
         </div>
       </div>
 
-      {/* Webhook URL */}
+      {gateway === "authorize_net" ? (
+        <div className="bg-white rounded-xl p-6 border border-slate-200 mb-6">
+          <h2 className="font-semibold text-slate-800 mb-4">Authorize.net Credentials</h2>
+          <div className="space-y-5">
+            <div>
+              <Label className="text-sm font-medium">API Login ID</Label>
+              <p className="text-xs text-slate-400 mb-1.5">Provided by PaymentCloud / Authorize.net merchant settings.</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={apiLoginId}
+                  onChange={(e) => { setApiLoginId(e.target.value); setApiLoginChanged(true); }}
+                  placeholder="Enter API Login ID"
+                />
+                {apiLoginChanged && (
+                  <Button size="sm" onClick={() => { updateSetting.mutate({ key: "paymentcloud_api_login_id", value: apiLoginId }); setApiLoginChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
+                    <Save className="h-3.5 w-3.5 mr-1" /> Save
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Transaction Key</Label>
+              <p className="text-xs text-slate-400 mb-1.5">Generate this in your Authorize.net merchant interface.</p>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showTransactionKey ? "text" : "password"}
+                    value={transactionKey}
+                    onChange={(e) => { setTransactionKey(e.target.value); setTransactionKeyChanged(true); }}
+                    placeholder="Enter Transaction Key"
+                    className="pr-10"
+                  />
+                  <button type="button" onClick={() => setShowTransactionKey(!showTransactionKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showTransactionKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {transactionKeyChanged && (
+                  <Button size="sm" onClick={() => { updateSetting.mutate({ key: "paymentcloud_transaction_key", value: transactionKey }); setTransactionKeyChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
+                    <Save className="h-3.5 w-3.5 mr-1" /> Save
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl p-6 border border-slate-200 mb-6">
+          <h2 className="font-semibold text-slate-800 mb-4">NMI Credentials</h2>
+          <div>
+            <Label className="text-sm font-medium">Security Key</Label>
+            <p className="text-xs text-slate-400 mb-1.5">Private security key from your NMI merchant portal.</p>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Input
+                  type={showSecurityKey ? "text" : "password"}
+                  value={securityKey}
+                  onChange={(e) => { setSecurityKey(e.target.value); setSecurityKeyChanged(true); }}
+                  placeholder="Enter NMI Security Key"
+                  className="pr-10"
+                />
+                <button type="button" onClick={() => setShowSecurityKey(!showSecurityKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showSecurityKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {securityKeyChanged && (
+                <Button size="sm" onClick={() => { updateSetting.mutate({ key: "paymentcloud_security_key", value: securityKey }); setSecurityKeyChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
+                  <Save className="h-3.5 w-3.5 mr-1" /> Save
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl p-6 border border-slate-200 mb-6">
-        <h2 className="font-semibold text-slate-800 mb-1">Webhook URL</h2>
-        <p className="text-xs text-slate-400 mb-4">This is the URL NowPayments will send payment notifications to. Set this in your NowPayments dashboard under IPN settings. It will be your Railway domain + <code className="bg-slate-100 px-1 py-0.5 rounded text-xs">/api/nowpayments/ipn</code></p>
-        <div className="flex items-center gap-2">
-          <Input
-            value={webhookUrl}
-            onChange={(e) => { setWebhookUrl(e.target.value); setWebhookChanged(true); }}
-            placeholder="https://your-railway-domain.up.railway.app/api/nowpayments/ipn"
-            className="flex-1"
-          />
-          {webhookChanged && (
-            <Button size="sm" onClick={() => { updateSetting.mutate({ key: "nowpayments_webhook_url", value: webhookUrl }); setWebhookChanged(false); }} className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
-              <Save className="h-3.5 w-3.5 mr-1" /> Save
-            </Button>
-          )}
+        <h2 className="font-semibold text-slate-800 mb-1">Webhook & Return URLs</h2>
+        <p className="text-xs text-slate-400 mb-4">
+          Provide these URLs to PaymentCloud or your gateway if silent post / webhook configuration is required.
+        </p>
+        <div className="space-y-3 text-sm">
+          <div>
+            <Label className="text-xs text-slate-500">Payment Return URL</Label>
+            <Input readOnly value={`${appBaseUrl}/api/paymentcloud/return?order=ORDER_NUMBER`} className="mt-1 bg-slate-50" />
+          </div>
+          <div>
+            <Label className="text-xs text-slate-500">Silent Post / Webhook URL</Label>
+            <Input readOnly value={`${appBaseUrl}/api/paymentcloud/webhook`} className="mt-1 bg-slate-50" />
+          </div>
         </div>
       </div>
 
-      {/* Sandbox Mode */}
       <div className="bg-white rounded-xl p-6 border border-slate-200">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-slate-800 mb-1">Sandbox Mode</h2>
-            <p className="text-xs text-slate-400">When enabled, payments use the NowPayments sandbox/test environment. Disable for live payments.</p>
+            <p className="text-xs text-slate-400">Keep enabled while testing with sandbox credentials. Disable for live PaymentCloud processing.</p>
           </div>
-          <Switch checked={sandboxMode} onCheckedChange={(v) => { setSandboxMode(v); updateSetting.mutate({ key: "nowpayments_sandbox_mode", value: v ? "true" : "false" }); }} />
+          <Switch checked={sandboxMode} onCheckedChange={(v) => { setSandboxMode(v); updateSetting.mutate({ key: "paymentcloud_sandbox_mode", value: v ? "true" : "false" }); }} />
         </div>
       </div>
     </div>
@@ -2231,7 +2305,8 @@ function SettingsSection() {
         { key: "site_tagline", label: "Site Tagline", type: "text", placeholder: "Highest Quality Research Peptides" },
         { key: "site_description", label: "Site Description", type: "textarea", placeholder: "We are proud to carry..." },
         { key: "logo_url", label: "Logo URL", type: "text", placeholder: "https://..." },
-        { key: "contact_email", label: "Contact Email", type: "text", placeholder: "support@rvrpeptides.com" },
+        { key: "business_legal_name", label: "Legal Business Name", type: "text", placeholder: "River Valley Research Peptides LLC" },
+        { key: "contact_email", label: "Contact Email", type: "text", placeholder: "Support@RVRPeptides.com" },
         { key: "contact_phone", label: "Contact Phone", type: "text", placeholder: "+1 (555) 123-4567" },
       ],
     },

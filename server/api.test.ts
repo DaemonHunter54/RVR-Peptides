@@ -184,9 +184,12 @@ describe("settings.public", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.settings.public();
     expect(typeof result).toBe("object");
-    // Should not contain NowPayments API key or IPN secret
+    // Should not contain sensitive payment credentials
     expect(result).not.toHaveProperty("nowpayments_api_key");
     expect(result).not.toHaveProperty("nowpayments_ipn_secret");
+    expect(result).not.toHaveProperty("paymentcloud_api_login_id");
+    expect(result).not.toHaveProperty("paymentcloud_transaction_key");
+    expect(result).not.toHaveProperty("paymentcloud_security_key");
   });
 });
 

@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import * as db from "./db";
 import { nanoid } from "nanoid";
-import { createPayment, getPaymentStatus, getApiStatus } from "./nowpayments";
+import { createHostedPayment, getHostedPaymentForm, getApiStatus } from "./paymentcloud";
 import { generateVialImage, generateHeroVialsImage, generateVialBuffer, generateHeroVialsBuffer } from "./vialGenerator";
 import crypto from "crypto";
 import fs from "fs";
@@ -530,7 +530,13 @@ export const appRouter = router({
   // ─── Site Settings (public) ────────────────────────────────────
   settings: router({
     public: publicProcedure.query(async () => {
-      const SENSITIVE_KEYS = ["nowpayments_api_key", "nowpayments_ipn_secret"];
+      const SENSITIVE_KEYS = [
+        "nowpayments_api_key",
+        "nowpayments_ipn_secret",
+        "paymentcloud_api_login_id",
+        "paymentcloud_transaction_key",
+        "paymentcloud_security_key",
+      ];
       const all = await db.getAllSettings();
       const map: Record<string, string> = {};
       for (const s of all) {
@@ -567,12 +573,14 @@ export const appRouter = router({
         await db.issueGiftCardsForOrder(order.id, input.email || order.guestEmail || undefined);
         return { invoiceUrl: `/order/${order.orderNumber}?status=success`, paymentId: "gift_card_paid", invoiceId: "gift_card_paid" };
       }
-      const result = await createPayment(order.id, order.orderNumber, String(order.total), input.email || order.guestEmail || undefined);
+      const result = await createHostedPayment(order.id, order.orderNumber, String(order.total), input.email || order.guestEmail || undefined);
       return result;
     }),
-    status: publicProcedure.input(z.object({ paymentId: z.string() })).query(async ({ input }) => {
-      const status = await getPaymentStatus(input.paymentId);
-      return status;
+    hostedForm: publicProcedure.input(z.object({ orderNumber: z.string() })).query(async ({ input }) => {
+      return getHostedPaymentForm(input.orderNumber);
+    }),
+    status: publicProcedure.input(z.object({ paymentId: z.string() })).query(async () => {
+      return getApiStatus();
     }),
   }),
 
@@ -936,7 +944,7 @@ export const appRouter = router({
       }),
     }),
 
-    // NowPayments status check
+    // PaymentCloud gateway status check
     paymentStatus: adminProcedure.query(async () => {
       return getApiStatus();
     }),

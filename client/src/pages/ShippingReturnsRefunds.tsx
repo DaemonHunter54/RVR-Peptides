@@ -1,7 +1,7 @@
 import PolicyLayout, { PolicySection } from "@/components/PolicyLayout";
 import { Link } from "wouter";
 
-const SUPPORT_EMAIL = "support@rvrpeptides.com";
+const SUPPORT_EMAIL = "Support@RVRPeptides.com";
 
 export default function ShippingReturnsRefunds() {
   return (

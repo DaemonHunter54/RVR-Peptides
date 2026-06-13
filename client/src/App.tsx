@@ -20,6 +20,7 @@ const Contact = lazy(() => import("./pages/Contact"));
 const ShippingReturnsRefunds = lazy(() => import("./pages/ShippingReturnsRefunds"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
+const PaymentRedirect = lazy(() => import("./pages/PaymentRedirect"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const AdminPanel = lazy(() => import("./pages/admin/AdminPanel"));
 
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/shipping" component={ShippingReturnsRefunds} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsAndConditions} />
+      <Route path="/pay/:orderNumber" component={PaymentRedirect} />
       <Route path="/admin" component={AdminLoader} />
       <Route path="/admin/:section" component={AdminLoader} />
       <Route path="/404" component={NotFound} />
