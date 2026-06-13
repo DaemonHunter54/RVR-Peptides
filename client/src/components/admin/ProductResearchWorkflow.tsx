@@ -1,10 +1,17 @@
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Plus, Save, Sparkles, Trash2, Database, Download } from "lucide-react";
-import { resolveCorePeptidesSlug } from "@shared/corePeptidesMap";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -37,6 +44,12 @@ export type ProductResearchMeta = {
   molecularFormula?: string;
   molecularWeight?: string;
   shortDescription?: string;
+};
+
+type TemplateSuggestion = {
+  slug: string;
+  title: string;
+  score: number;
 };
 
 async function requestResearchSources(payload: {
@@ -106,6 +119,27 @@ function CitationEditorRow({
   );
 }
 
+function buildImportPayload(
+  productSlug: string,
+  productName: string,
+  templateSlug: string,
+  productMeta?: ProductResearchMeta
+) {
+  return {
+    productSlug,
+    productName,
+    templateSlug,
+    size: productMeta?.size,
+    purity: productMeta?.purity,
+    form: productMeta?.form,
+    contents: productMeta?.contents,
+    sku: productMeta?.sku,
+    otherNames: productMeta?.otherNames,
+    molecularFormula: productMeta?.molecularFormula,
+    molecularWeight: productMeta?.molecularWeight,
+  };
+}
+
 export function ProductResearchWorkflow({
   productName,
   productSlug,
@@ -114,6 +148,7 @@ export function ProductResearchWorkflow({
   onChange,
   onShortDescriptionChange,
   onOverviewPreview,
+  onListingSpecsApply,
 }: {
   productName: string;
   productSlug?: string;
@@ -122,13 +157,94 @@ export function ProductResearchWorkflow({
   onChange: (next: ProductResearchDraft) => void;
   onShortDescriptionChange?: (shortDescription: string) => void;
   onOverviewPreview?: (overview: string) => void;
+  onListingSpecsApply?: (specs: Partial<ProductResearchMeta>) => void;
 }) {
   const [fetchingSources, setFetchingSources] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<TemplateSuggestion[]>([]);
+  const [searchingTemplate, setSearchingTemplate] = useState(false);
+
+  const utils = trpc.useUtils();
   const generateDraft = trpc.admin.research.generateDraft.useMutation();
-  const importFromCore = trpc.admin.research.importFromCore.useMutation();
-  const coreTemplateSlug = productSlug ? resolveCorePeptidesSlug(productSlug) : null;
+  const importTemplate = trpc.admin.research.importTemplate.useMutation();
 
   const update = (patch: Partial<ProductResearchDraft>) => onChange({ ...value, ...patch });
+
+  const applyImportedTemplate = (imported: any) => {
+    update({
+      overview: imported.overview,
+      chemicalMakeup: imported.chemicalMakeup,
+      researchContent: imported.researchContent,
+      citations: imported.citations?.length ? imported.citations : value.citations,
+    });
+    onShortDescriptionChange?.(imported.shortDescription);
+    onOverviewPreview?.(imported.overview);
+
+    const applied = imported.appliedSpecs || {};
+    onListingSpecsApply?.({
+      size: productMeta?.size ? undefined : applied.size,
+      purity: productMeta?.purity ? undefined : applied.purity,
+      form: productMeta?.form ? undefined : applied.form,
+      contents: productMeta?.contents ? undefined : applied.contents,
+      sku: productMeta?.sku ? undefined : applied.sku,
+      molecularFormula: productMeta?.molecularFormula ? undefined : applied.molecularFormula,
+      molecularWeight: productMeta?.molecularWeight ? undefined : applied.molecularWeight,
+    });
+  };
+
+  const runImport = async (templateSlug: string) => {
+    const name = String(productName || "").trim();
+    const slug = String(productSlug || "").trim();
+    if (!name || !slug) {
+      toast.error("Enter a product name and slug first.");
+      return;
+    }
+
+    try {
+      const imported = await importTemplate.mutateAsync(
+        buildImportPayload(slug, name, templateSlug, productMeta)
+      );
+      applyImportedTemplate(imported);
+      toast.success(`Research template imported for ${name}. Review your dose, SKU, and specs, then save.`);
+      setPickerOpen(false);
+    } catch (error: any) {
+      toast.error(error?.message || "Unable to import research template.");
+    }
+  };
+
+  const beginTemplateImport = async () => {
+    const name = String(productName || "").trim();
+    const slug = String(productSlug || "").trim();
+    if (!name || !slug) {
+      toast.error("Enter a product name and slug first.");
+      return;
+    }
+
+    setSearchingTemplate(true);
+    try {
+      const search = await utils.admin.research.searchTemplate.fetch({
+        productSlug: slug,
+        productName: name,
+      });
+
+      if (search.match) {
+        await runImport(search.match.slug);
+        return;
+      }
+
+      if (search.suggestions.length) {
+        setSuggestions(search.suggestions);
+        setPickerOpen(true);
+        return;
+      }
+
+      toast.error("No similar research templates found for this product.");
+    } catch (error: any) {
+      toast.error(error?.message || "Unable to search research templates.");
+    } finally {
+      setSearchingTemplate(false);
+    }
+  };
 
   const fetchSources = async () => {
     const name = String(productName || "").trim();
@@ -198,40 +314,44 @@ export function ProductResearchWorkflow({
     }
   };
 
-  const importCoreTemplate = async () => {
-    const name = String(productName || "").trim();
-    const slug = String(productSlug || "").trim();
-    if (!name || !slug) {
-      toast.error("Save the product with a slug first.");
-      return;
-    }
-    if (!coreTemplateSlug) {
-      toast.error("No Core Peptides template is mapped for this product slug.");
-      return;
-    }
-
-    try {
-      const imported = await importFromCore.mutateAsync({ productSlug: slug, productName: name });
-      update({
-        overview: imported.overview,
-        chemicalMakeup: imported.chemicalMakeup,
-        researchContent: imported.researchContent,
-        citations: imported.citations.length ? imported.citations : value.citations,
-      });
-      onShortDescriptionChange?.(imported.shortDescription);
-      onOverviewPreview?.(imported.overview);
-      toast.success(`Core template imported (${coreTemplateSlug}). Review, rebrand if needed, then save.`);
-    } catch (error: any) {
-      toast.error(error?.message || "Unable to import Core Peptides template.");
-    }
-  };
+  const importBusy = searchingTemplate || importTemplate.isPending;
 
   return (
     <div className="space-y-6">
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose a similar research template</DialogTitle>
+            <DialogDescription>
+              We could not find an exact match for this product. Pick the closest listing and we will apply your dose, SKU, and specification fields.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {suggestions.map((item) => (
+              <button
+                key={item.slug}
+                type="button"
+                onClick={() => runImport(item.slug)}
+                disabled={importTemplate.isPending}
+                className="w-full text-left rounded-lg border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors"
+              >
+                <p className="font-medium text-slate-900">{item.title}</p>
+                <p className="text-xs text-slate-500 mt-1">Match score: {Math.round(item.score * 100)}%</p>
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPickerOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
         <p className="text-sm text-blue-900 font-medium mb-1">Research content workflow</p>
         <p className="text-xs text-blue-800/80 leading-relaxed">
-          <strong>Import Core Template</strong> pulls overview, chemical makeup, research sections, and references from a matching Core Peptides listing (no API key).
+          <strong>Import Research Template</strong> fills overview, chemical makeup, research sections, and references using your product dose, SKU, and specs.
           <strong> Fetch Sources</strong> pulls PubChem / PubMed citations.
           <strong> Generate Draft Copy</strong> uses AI with your Product Brief for original RVR-specific copy.
         </p>
@@ -265,12 +385,17 @@ export function ProductResearchWorkflow({
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          {coreTemplateSlug ? (
-            <Button type="button" size="sm" variant="secondary" onClick={importCoreTemplate} disabled={importFromCore.isPending} className="gap-1.5">
-              {importFromCore.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-              {importFromCore.isPending ? "Importing..." : "Import Core Template"}
-            </Button>
-          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={beginTemplateImport}
+            disabled={importBusy}
+            className="gap-1.5"
+          >
+            {importBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            {importBusy ? "Importing..." : "Import Research Template"}
+          </Button>
           <Button type="button" size="sm" variant="outline" onClick={fetchSources} disabled={fetchingSources} className="gap-1.5">
             {fetchingSources ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
             {fetchingSources ? "Fetching..." : "Fetch Sources"}
@@ -365,12 +490,14 @@ export function PersistedProductResearchWorkflow({
   productSlug,
   productMeta,
   onShortDescriptionChange,
+  onListingSpecsApply,
 }: {
   productId: number;
   productName: string;
   productSlug?: string;
   productMeta?: ProductResearchMeta;
   onShortDescriptionChange?: (shortDescription: string) => void;
+  onListingSpecsApply?: (specs: Partial<ProductResearchMeta>) => void;
 }) {
   const researchQuery = trpc.admin.research.get.useQuery({ productId });
   const upsertResearch = trpc.admin.research.upsert.useMutation({
@@ -456,6 +583,7 @@ export function PersistedProductResearchWorkflow({
         value={draft}
         onChange={setDraft}
         onShortDescriptionChange={onShortDescriptionChange}
+        onListingSpecsApply={onListingSpecsApply}
       />
       <div className="flex justify-end">
         <Button type="button" onClick={saveAll} disabled={upsertResearch.isPending} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">

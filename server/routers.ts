@@ -856,24 +856,94 @@ export const appRouter = router({
         const { generateProductCopyDraft } = await import("./productCopy");
         return generateProductCopyDraft(input);
       }),
+      searchTemplate: adminProcedure.input(z.object({
+        productSlug: z.string(),
+        productName: z.string(),
+      })).query(async ({ input }) => {
+        const { searchResearchTemplates } = await import("./corePeptidesImport");
+        return searchResearchTemplates(input.productSlug, input.productName);
+      }),
+      importTemplate: adminProcedure.input(z.object({
+        productSlug: z.string(),
+        productName: z.string(),
+        templateSlug: z.string(),
+        size: z.string().optional(),
+        purity: z.string().optional(),
+        form: z.string().optional(),
+        contents: z.string().optional(),
+        sku: z.string().optional(),
+        otherNames: z.string().optional(),
+        molecularFormula: z.string().optional(),
+        molecularWeight: z.string().optional(),
+      })).mutation(async ({ input }) => {
+        const { fetchResearchTemplate } = await import("./corePeptidesImport");
+        const { productSlug, productName, templateSlug, ...specs } = input;
+        return fetchResearchTemplate(templateSlug, { productName, ...specs }, productSlug);
+      }),
       importFromCore: adminProcedure.input(z.object({
         productSlug: z.string(),
         productName: z.string(),
+        templateSlug: z.string().optional(),
+        size: z.string().optional(),
+        purity: z.string().optional(),
+        form: z.string().optional(),
+        contents: z.string().optional(),
+        sku: z.string().optional(),
+        otherNames: z.string().optional(),
+        molecularFormula: z.string().optional(),
+        molecularWeight: z.string().optional(),
       })).mutation(async ({ input }) => {
-        const { fetchCorePeptidesTemplate } = await import("./corePeptidesImport");
-        return fetchCorePeptidesTemplate(input.productSlug, input.productName);
+        const { fetchResearchTemplate, searchResearchTemplates } = await import("./corePeptidesImport");
+        const { productSlug, productName, templateSlug, ...specs } = input;
+        const search = await searchResearchTemplates(productSlug, productName);
+        const resolvedTemplateSlug = templateSlug || search.match?.slug || search.suggestions[0]?.slug;
+
+        if (!resolvedTemplateSlug) {
+          throw new Error("No matching research template was found for this product.");
+        }
+
+        return fetchResearchTemplate(resolvedTemplateSlug, { productName, ...specs }, productSlug);
       }),
       importAllFromCore: adminProcedure.mutation(async () => {
-        const { fetchCorePeptidesTemplate } = await import("./corePeptidesImport");
-        const { listCoreMappableSlugs } = await import("../shared/corePeptidesMap");
+        const { fetchResearchTemplate, searchResearchTemplates } = await import("./corePeptidesImport");
+        const { DIRECT_MATCH_SCORE } = await import("../shared/researchTemplateMatch");
         const { products: allProducts } = await db.getAllProducts({});
-        const mappable = new Set(listCoreMappableSlugs());
         const results: Array<{ slug: string; name: string; success: boolean; error?: string }> = [];
 
         for (const product of allProducts) {
-          if (!mappable.has(product.slug)) continue;
           try {
-            const imported = await fetchCorePeptidesTemplate(product.slug, product.name);
+            const search = await searchResearchTemplates(product.slug, product.name);
+            const templateSlug =
+              search.match?.slug ||
+              search.suggestions.find((item) => item.score >= DIRECT_MATCH_SCORE)?.slug ||
+              search.suggestions[0]?.slug;
+
+            if (!templateSlug) {
+              results.push({
+                slug: product.slug,
+                name: product.name,
+                success: false,
+                error: "No similar research template found",
+              });
+              continue;
+            }
+
+            const imported = await fetchResearchTemplate(
+              templateSlug,
+              {
+                productName: product.name,
+                size: product.size || undefined,
+                purity: product.purity || undefined,
+                form: product.form || undefined,
+                contents: product.contents || undefined,
+                sku: product.sku || undefined,
+                otherNames: product.otherNames || undefined,
+                molecularFormula: product.molecularFormula || undefined,
+                molecularWeight: product.molecularWeight || undefined,
+              },
+              product.slug
+            );
+
             await db.upsertProductResearch(product.id, {
               overview: imported.overview,
               chemicalMakeup: imported.chemicalMakeup,
@@ -896,7 +966,16 @@ export const appRouter = router({
                 summary: citation.summary,
               });
             }
-            await db.updateProduct(product.id, { shortDescription: imported.shortDescription } as any);
+
+            const productPatch: Record<string, string> = { shortDescription: imported.shortDescription };
+            const applied = imported.appliedSpecs;
+            if (!product.size && applied.size) productPatch.size = applied.size;
+            if (!product.purity && applied.purity) productPatch.purity = applied.purity;
+            if (!product.form && applied.form) productPatch.form = applied.form;
+            if (!product.contents && applied.contents) productPatch.contents = applied.contents;
+            if (!product.sku && applied.sku) productPatch.sku = applied.sku;
+
+            await db.updateProduct(product.id, productPatch as any);
             results.push({ slug: product.slug, name: product.name, success: true });
           } catch (error: any) {
             results.push({

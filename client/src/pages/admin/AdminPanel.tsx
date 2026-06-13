@@ -235,7 +235,7 @@ function ProductsSection() {
   });
   const importAllFromCore = trpc.admin.research.importAllFromCore.useMutation({
     onSuccess: (result) => {
-      toast.success(`Imported ${result.imported} product(s) from Core Peptides${result.failed ? ` (${result.failed} failed)` : ""}.`);
+      toast.success(`Imported ${result.imported} product research template(s)${result.failed ? ` (${result.failed} skipped)` : ""}.`);
       productsQuery.refetch();
     },
     onError: (err: any) => toast.error(err.message),
@@ -288,7 +288,7 @@ function ProductsSection() {
             disabled={importAllFromCore.isPending}
             className="gap-2"
           >
-            {importAllFromCore.isPending ? "Importing..." : "Import Core Templates"}
+            {importAllFromCore.isPending ? "Importing..." : "Import Research Templates"}
           </Button>
           <Button onClick={() => { setEditingProduct(null); setShowForm(true); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
             <Plus className="h-4 w-4" /> Add Product
@@ -377,6 +377,16 @@ const blankResearchDraft = (): ProductResearchDraft => ({
   researchContent: "",
   citations: [],
 });
+
+const applyListingSpecsToForm = (updateField: (field: string, value: string) => void, form: any, specs: Partial<{ size?: string; purity?: string; form?: string; contents?: string; sku?: string; molecularFormula?: string; molecularWeight?: string }>) => {
+  if (!form.size && specs.size) updateField("size", specs.size);
+  if (!form.purity && specs.purity) updateField("purity", specs.purity);
+  if (!form.form && specs.form) updateField("form", specs.form);
+  if (!form.contents && specs.contents) updateField("contents", specs.contents);
+  if (!form.sku && specs.sku) updateField("sku", specs.sku);
+  if (!form.molecularFormula && specs.molecularFormula) updateField("molecularFormula", specs.molecularFormula);
+  if (!form.molecularWeight && specs.molecularWeight) updateField("molecularWeight", specs.molecularWeight);
+};
 
 const productResearchMetaFromForm = (form: any) => ({
   size: form.size || "",
@@ -916,6 +926,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               productSlug={form.slug}
               productMeta={productResearchMetaFromForm(form)}
               onShortDescriptionChange={(shortDescription) => updateField("shortDescription", shortDescription)}
+              onListingSpecsApply={(specs) => applyListingSpecsToForm(updateField, form, specs)}
             />
           ) : (
             <ProductResearchWorkflow
@@ -925,6 +936,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
               value={draftResearch}
               onChange={setDraftResearch}
               onShortDescriptionChange={(shortDescription) => updateField("shortDescription", shortDescription)}
+              onListingSpecsApply={(specs) => applyListingSpecsToForm(updateField, form, specs)}
             />
           )
         )}
