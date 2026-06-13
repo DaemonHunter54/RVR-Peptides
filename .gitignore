@@ -1,1 +1,36 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local npm lock (project uses pnpm-lock.yaml)
+package-lock.json
+
+# Generated / local data
 data/research-knowledge-base.json
+
+# Local scratch / import temp files
+tmp-*
+tmp-catalog.html
+reports/peptide-labs-import-20*.json
+reports/peptide-labs-import-20*.md
+scripts/analyze-peptide-labs-catalog.mjs
+scripts/list-catalog.mjs
+scripts/parse-peptide-labs-sample.mjs
