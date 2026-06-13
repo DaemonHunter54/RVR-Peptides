@@ -234,15 +234,6 @@ function ProductsSection() {
     onSuccess: () => { toast.success("Product deleted"); productsQuery.refetch(); },
     onError: (err: any) => toast.error(err.message),
   });
-  const importAllFromCore = trpc.admin.research.importAllFromCore.useMutation({
-    onSuccess: (result) => {
-      const imported = result.matched?.filter((item: any) => item.applied).length ?? result.imported ?? 0;
-      const unmatched = result.unmatched?.length ?? 0;
-      toast.success(`Imported ${imported} product research template(s)${unmatched ? ` (${unmatched} need manual review)` : ""}.`);
-      productsQuery.refetch();
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
 
 
   const products = productsQuery.data?.products ?? (Array.isArray(productsQuery.data) ? productsQuery.data : []);
@@ -289,14 +280,6 @@ function ProductsSection() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Products</h1>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => importAllFromCore.mutate()}
-            disabled={importAllFromCore.isPending}
-            className="gap-2"
-          >
-            {importAllFromCore.isPending ? "Importing..." : "Import Research Templates"}
-          </Button>
           <Button onClick={() => { setEditingProduct(null); setShowForm(true); }} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
             <Plus className="h-4 w-4" /> Add Product
           </Button>

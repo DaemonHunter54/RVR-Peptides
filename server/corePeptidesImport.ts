@@ -446,21 +446,12 @@ async function loadKnowledgeTemplate(
   templateSlug: string,
   options?: { forceFresh?: boolean }
 ): Promise<RawKnowledgeTemplate> {
-  if (options?.forceFresh) {
-    const parsed = await fetchFreshKnowledgeTemplate(templateSlug);
-    try {
-      const { upsertKnowledgeTemplate } = await import("./researchKnowledgeBase");
-      await upsertKnowledgeTemplate(parsed);
-    } catch (error) {
-      console.warn(`Knowledge base persist skipped for ${templateSlug}:`, error);
-    }
-    return parsed;
+  if (!options?.forceFresh) {
+    const { getKnowledgeTemplate } = await import("./researchKnowledgeBase");
+    const cached = await getKnowledgeTemplate(templateSlug);
+    if (cached) return cached;
   }
-
-  const { getKnowledgeTemplate, syncKnowledgeTemplate } = await import("./researchKnowledgeBase");
-  const cached = await getKnowledgeTemplate(templateSlug);
-  if (cached) return cached;
-  return syncKnowledgeTemplate(templateSlug);
+  return fetchFreshKnowledgeTemplate(templateSlug);
 }
 
 export async function fetchResearchTemplate(

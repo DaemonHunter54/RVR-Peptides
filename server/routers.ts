@@ -926,59 +926,6 @@ export const appRouter = router({
           resolvedTemplateSlug,
         };
       }),
-      importFromCore: adminProcedure.input(z.object({
-        productSlug: z.string(),
-        productName: z.string(),
-        templateSlug: z.string().optional(),
-        size: z.string().optional(),
-        purity: z.string().optional(),
-        form: z.string().optional(),
-        contents: z.string().optional(),
-        sku: z.string().optional(),
-        otherNames: z.string().optional(),
-        molecularFormula: z.string().optional(),
-        molecularWeight: z.string().optional(),
-      })).mutation(async ({ input }) => {
-        const { fetchResearchTemplate, searchResearchTemplates } = await import("./corePeptidesImport");
-        const { productSlug, productName, templateSlug, ...specs } = input;
-        const search = await searchResearchTemplates(productSlug, productName);
-        const resolvedTemplateSlug = templateSlug || search.match?.slug || search.suggestions[0]?.slug;
-
-        if (!resolvedTemplateSlug) {
-          throw new Error("No matching research template was found for this product.");
-        }
-
-        return fetchResearchTemplate(resolvedTemplateSlug, { productName, ...specs }, productSlug);
-      }),
-      syncKnowledgeBase: adminProcedure
-        .input(z.object({ force: z.boolean().optional() }).optional())
-        .mutation(async ({ input }) => {
-          const { syncFullKnowledgeBase } = await import("./researchKnowledgeBase");
-          return syncFullKnowledgeBase({ force: input?.force });
-        }),
-      bulkImportReport: adminProcedure.query(async () => {
-        const { buildBulkImportReport } = await import("./researchBulkImport");
-        const { products: allProducts } = await db.getAllProducts({});
-        return buildBulkImportReport(
-          allProducts.map((product) => ({
-            id: product.id,
-            slug: product.slug,
-            name: product.name,
-            size: product.size,
-            purity: product.purity,
-            form: product.form,
-            contents: product.contents,
-            sku: product.sku,
-            otherNames: product.otherNames,
-            molecularFormula: product.molecularFormula,
-            molecularWeight: product.molecularWeight,
-          }))
-        );
-      }),
-      importAllFromCore: adminProcedure.mutation(async () => {
-        const { runBulkResearchImport } = await import("./researchBulkImport");
-        return runBulkResearchImport({ apply: true, syncKnowledgeBase: true });
-      }),
       upsert: adminProcedure.input(z.object({
         productId: z.number(),
         productBrief: z.string().optional(),

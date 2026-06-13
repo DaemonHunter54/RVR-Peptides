@@ -1,17 +1,9 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Plus, Save, Sparkles, Trash2, Database, Download, Link2 } from "lucide-react";
+import { Loader2, Plus, Save, Sparkles, Trash2, Database, BookOpen } from "lucide-react";
 import { parseResearchTemplateSourceUrl } from "@shared/researchTemplateSource";
 import { parseCitationList, sanitizeImportedResearchFields } from "@shared/researchImportNormalize";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
@@ -47,12 +39,6 @@ export type ProductResearchMeta = {
   molecularFormula?: string;
   molecularWeight?: string;
   shortDescription?: string;
-};
-
-type TemplateSuggestion = {
-  slug: string;
-  title: string;
-  score: number;
 };
 
 async function requestResearchSources(payload: {
@@ -194,7 +180,6 @@ export function ProductResearchWorkflow({
   onShortDescriptionChange,
   onOverviewPreview,
   onListingSpecsApply,
-  onImportApplied,
 }: {
   productName: string;
   productSlug?: string;
@@ -204,13 +189,9 @@ export function ProductResearchWorkflow({
   onShortDescriptionChange?: (shortDescription: string) => void;
   onOverviewPreview?: (overview: string) => void;
   onListingSpecsApply?: (specs: Partial<ProductResearchMeta>) => void;
-  onImportApplied?: (draft: ProductResearchDraft) => Promise<void> | void;
 }) {
   const [fetchingSources, setFetchingSources] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<TemplateSuggestion[]>([]);
-  const [searchingTemplate, setSearchingTemplate] = useState(false);
-  const [manualSourceUrl, setManualSourceUrl] = useState("");
+  const [pullingReference, setPullingReference] = useState(false);
   const [importRevision, setImportRevision] = useState(0);
 
   const utils = trpc.useUtils();
@@ -261,10 +242,6 @@ export function ProductResearchWorkflow({
       molecularFormula: productMeta?.molecularFormula ? undefined : applied.molecularFormula,
       molecularWeight: productMeta?.molecularWeight ? undefined : applied.molecularWeight,
     });
-
-    if (onImportApplied) {
-      await onImportApplied(merged);
-    }
   };
 
   const runImport = async (templateSlug: string) => {
@@ -275,22 +252,15 @@ export function ProductResearchWorkflow({
       return;
     }
 
-    try {
-      const imported = await importTemplate.mutateAsync(
-        buildImportPayload(slug, name, productMeta, { templateSlug })
-      );
-      await applyImportedTemplate(imported);
-      if (!onImportApplied) {
-        toast.success(`Research template imported for ${name}. Review your dose, SKU, and specs, then save.`);
-      }
-      setPickerOpen(false);
-    } catch (error: any) {
-      toast.error(friendlyImportError(error, "Unable to import research template."));
-    }
+    const imported = await importTemplate.mutateAsync(
+      buildImportPayload(slug, name, productMeta, { templateSlug })
+    );
+    await applyImportedTemplate(imported);
+    toast.success(`Reference research loaded for ${name}. Review your dose, SKU, and specs, then save.`);
   };
 
-  const runImportFromSourceUrl = async (sourceUrlInput?: string) => {
-    const sourceUrl = String(sourceUrlInput ?? manualSourceUrl ?? value.templateSourceUrl ?? "").trim();
+  const runImportFromSourceUrl = async (sourceUrlInput: string) => {
+    const sourceUrl = String(sourceUrlInput || "").trim();
     const name = String(productName || "").trim();
     const slug = String(productSlug || "").trim();
 
@@ -299,7 +269,7 @@ export function ProductResearchWorkflow({
       return;
     }
     if (!sourceUrl) {
-      toast.error("Paste a source product URL first.");
+      toast.error("Paste a reference product URL first.");
       return;
     }
     if (!parseResearchTemplateSourceUrl(sourceUrl)) {
@@ -307,22 +277,14 @@ export function ProductResearchWorkflow({
       return;
     }
 
-    try {
-      const imported = await importTemplate.mutateAsync(
-        buildImportPayload(slug, name, productMeta, { sourceUrl })
-      );
-      await applyImportedTemplate(imported, sourceUrl);
-      setManualSourceUrl(sourceUrl);
-      if (!onImportApplied) {
-        toast.success(`Research template imported from your source link. Review your dose, SKU, and specs, then save.`);
-      }
-      setPickerOpen(false);
-    } catch (error: any) {
-      toast.error(friendlyImportError(error, "Unable to import from that source URL."));
-    }
+    const imported = await importTemplate.mutateAsync(
+      buildImportPayload(slug, name, productMeta, { sourceUrl })
+    );
+    await applyImportedTemplate(imported, sourceUrl);
+    toast.success(`Reference research loaded for ${name}. Review your dose, SKU, and specs, then save.`);
   };
 
-  const beginTemplateImport = async () => {
+  const pullReferenceResearch = async () => {
     const name = String(productName || "").trim();
     const slug = String(productSlug || "").trim();
     if (!name || !slug) {
@@ -330,8 +292,14 @@ export function ProductResearchWorkflow({
       return;
     }
 
-    setSearchingTemplate(true);
+    const sourceUrl = String(value.templateSourceUrl || "").trim();
+    setPullingReference(true);
     try {
+      if (sourceUrl && parseResearchTemplateSourceUrl(sourceUrl)) {
+        await runImportFromSourceUrl(sourceUrl);
+        return;
+      }
+
       const search = await utils.admin.research.searchTemplate.fetch({
         productSlug: slug,
         productName: name,
@@ -342,13 +310,13 @@ export function ProductResearchWorkflow({
         return;
       }
 
-      setManualSourceUrl(value.templateSourceUrl?.trim() || "");
-      setSuggestions(search.suggestions);
-      setPickerOpen(true);
+      toast.error(
+        "No automatic match found. Paste a reference product URL below (must end in /peptides/product-slug/), then click Pull Reference Research again."
+      );
     } catch (error: any) {
-      toast.error(error?.message || "Unable to search research templates.");
+      toast.error(friendlyImportError(error, "Unable to pull reference research."));
     } finally {
-      setSearchingTemplate(false);
+      setPullingReference(false);
     }
   };
 
@@ -420,83 +388,17 @@ export function ProductResearchWorkflow({
     }
   };
 
-  const importBusy = searchingTemplate || importTemplate.isPending;
+  const researchActionsBusy = pullingReference || importTemplate.isPending;
 
   return (
     <div className="space-y-6">
-      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {suggestions.length ? "Choose a similar template" : "Import from source product URL"}
-            </DialogTitle>
-            <DialogDescription>
-              {suggestions.length
-                ? "No exact match was found. Pick the closest listing below, or paste a direct source product link."
-                : "Paste the full product page URL from your reference catalog. We will import overview, research sections, and citations using your dose, SKU, and specs."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <Label htmlFor="manual-source-url">Source product URL</Label>
-            <Input
-              id="manual-source-url"
-              value={manualSourceUrl}
-              onChange={(e) => setManualSourceUrl(e.target.value)}
-              placeholder="https://www.corepeptides.com/peptides/bpc-157-tb-500-ghk-cu-blend/"
-              className="bg-white"
-            />
-            {manualSourceUrl && parseResearchTemplateSourceUrl(manualSourceUrl) ? (
-              <p className="text-xs text-green-700">
-                Detected template: {parseResearchTemplateSourceUrl(manualSourceUrl)}
-              </p>
-            ) : manualSourceUrl ? (
-              <p className="text-xs text-amber-700">URL should end with /peptides/product-slug/</p>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => runImportFromSourceUrl()}
-              disabled={importTemplate.isPending}
-              className="gap-1.5"
-            >
-              {importTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
-              Import from URL
-            </Button>
-          </div>
-
-          {suggestions.length ? (
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Similar templates</p>
-              {suggestions.map((item) => (
-                <button
-                  key={item.slug}
-                  type="button"
-                  onClick={() => runImport(item.slug)}
-                  disabled={importTemplate.isPending}
-                  className="w-full text-left rounded-lg border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors"
-                >
-                  <p className="font-medium text-slate-900">{item.title}</p>
-                  <p className="text-xs text-slate-500 mt-1">Match score: {Math.round(item.score * 100)}%</p>
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPickerOpen(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
         <p className="text-sm text-blue-900 font-medium mb-1">Research content workflow</p>
         <p className="text-xs text-blue-800/80 leading-relaxed">
-          <strong>Import Research Template</strong> fills overview, chemical makeup, research sections, and references using your product dose, SKU, and specs.
+          <strong>Pull Reference Research</strong> loads overview, chemical makeup, research sections, and citations from the shared reference catalog (matched by product name, or from a URL you paste).
           <strong> Fetch Sources</strong> pulls PubChem / PubMed citations.
           <strong> Generate Draft Copy</strong> uses AI with your Product Brief for original RVR-specific copy.
+          Nothing saves until you click <strong>Save Research Content</strong>.
         </p>
       </div>
 
@@ -504,7 +406,7 @@ export function ProductResearchWorkflow({
         <div>
           <h2 className="font-semibold text-slate-800">Product Brief</h2>
           <p className="text-xs text-slate-400 mt-1">
-            Tell the AI what makes this listing unique — size, use case, audience, and tone. This drives the customer-facing voice.
+            Optional notes for AI draft copy — size, use case, audience, and tone.
           </p>
         </div>
         <div>
@@ -527,58 +429,47 @@ export function ProductResearchWorkflow({
             placeholder="Example: Third-party tested, CoA/HPLC available, same-day processing, research-grade handling standards."
           />
         </div>
-        <div>
-          <Label>Source template URL (optional)</Label>
-          <p className="text-xs text-slate-400 mt-1 mb-1.5">
-            For products without an auto-match, paste the reference product page URL here. It is saved with this listing and reused on the next import.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              value={value.templateSourceUrl || ""}
-              onChange={(e) => update({ templateSourceUrl: e.target.value })}
-              placeholder="https://www.corepeptides.com/peptides/bpc-157-tb-500-ghk-cu-blend/"
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => runImportFromSourceUrl(value.templateSourceUrl)}
-              disabled={importTemplate.isPending || !value.templateSourceUrl?.trim()}
-              className="gap-1.5 shrink-0"
-            >
-              {importTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
-              Import from URL
-            </Button>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={beginTemplateImport}
-            disabled={importBusy}
-            className="gap-1.5"
-          >
-            {importBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            {importBusy ? "Importing..." : "Import Research Template"}
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={fetchSources} disabled={fetchingSources} className="gap-1.5">
-            {fetchingSources ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
-            {fetchingSources ? "Fetching..." : "Fetch Sources"}
-          </Button>
-          <Button type="button" size="sm" onClick={generateCopy} disabled={generateDraft.isPending} className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
-            {generateDraft.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            {generateDraft.isPending ? "Generating..." : "Generate Draft Copy"}
-          </Button>
-        </div>
       </div>
 
       <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-800">Published Research Content</h2>
+            <p className="text-xs text-slate-400 mt-1">Review and edit before saving. This appears on the product detail page.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={pullReferenceResearch}
+              disabled={researchActionsBusy}
+              className="gap-1.5"
+            >
+              {researchActionsBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
+              {researchActionsBusy ? "Pulling..." : "Pull Reference Research"}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={fetchSources} disabled={fetchingSources} className="gap-1.5">
+              {fetchingSources ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
+              {fetchingSources ? "Fetching..." : "Fetch Sources"}
+            </Button>
+            <Button type="button" size="sm" onClick={generateCopy} disabled={generateDraft.isPending} className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
+              {generateDraft.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {generateDraft.isPending ? "Generating..." : "Generate Draft Copy"}
+            </Button>
+          </div>
+        </div>
         <div>
-          <h2 className="font-semibold text-slate-800">Published Research Content</h2>
-          <p className="text-xs text-slate-400 mt-1">Review and edit before saving. This appears on the product detail page.</p>
+          <Label>Reference product URL (optional fallback)</Label>
+          <p className="text-xs text-slate-400 mt-1 mb-1.5">
+            Use when this product has no automatic catalog match. Paste any reference listing URL ending in <code className="text-xs">/peptides/product-slug/</code>, then click Pull Reference Research.
+          </p>
+          <Input
+            value={value.templateSourceUrl || ""}
+            onChange={(e) => update({ templateSourceUrl: e.target.value })}
+            placeholder="https://your-reference-site.com/peptides/product-slug/"
+            className="flex-1"
+          />
         </div>
         <div>
           <Label>Overview</Label>
@@ -671,12 +562,9 @@ export function PersistedProductResearchWorkflow({
   onListingSpecsApply?: (specs: Partial<ProductResearchMeta>) => void;
 }) {
   const researchQuery = trpc.admin.research.get.useQuery({ productId });
-  const suppressSaveToastRef = useRef(false);
   const upsertResearch = trpc.admin.research.upsert.useMutation({
     onSuccess: () => {
-      if (!suppressSaveToastRef.current) {
-        toast.success("Research content saved!");
-      }
+      toast.success("Research content saved!");
       researchQuery.refetch();
     },
     onError: (err: any) => toast.error(err.message),
@@ -764,27 +652,6 @@ export function PersistedProductResearchWorkflow({
     }
   };
 
-  const handleImportApplied = async (nextDraft: ProductResearchDraft) => {
-    setDraft(nextDraft);
-    dirtyRef.current = true;
-    suppressSaveToastRef.current = true;
-    try {
-      await syncDraftToServer(nextDraft);
-      const refreshed = await researchQuery.refetch();
-      if (refreshed.data) {
-        dirtyRef.current = false;
-        setDraft(draftFromServer(refreshed.data.research, refreshed.data.citations || []));
-        setHydrated(true);
-      }
-      toast.success("Research imported and saved. Review your dose, SKU, and specs.");
-    } catch (error: any) {
-      toast.error(error?.message || "Import loaded but could not be saved.");
-      throw error;
-    } finally {
-      suppressSaveToastRef.current = false;
-    }
-  };
-
   const saveAll = async () => {
     await syncDraftToServer(draft);
     dirtyRef.current = false;
@@ -802,7 +669,6 @@ export function PersistedProductResearchWorkflow({
         onChange={handleDraftChange}
         onShortDescriptionChange={onShortDescriptionChange}
         onListingSpecsApply={onListingSpecsApply}
-        onImportApplied={handleImportApplied}
       />
       <div className="flex justify-end">
         <Button type="button" onClick={saveAll} disabled={upsertResearch.isPending} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
