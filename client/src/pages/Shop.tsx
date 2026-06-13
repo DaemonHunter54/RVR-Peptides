@@ -155,8 +155,8 @@ export default function Shop() {
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-5">
-                {products.map((product: any) => (
-                  <ProductCard key={product.id} product={product} />
+                {products.map((product: any, index: number) => (
+                  <ProductCard key={product.id} product={product} cardIndex={index} />
                 ))}
               </div>
             )}

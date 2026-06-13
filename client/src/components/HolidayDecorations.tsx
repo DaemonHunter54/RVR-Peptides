@@ -14,68 +14,16 @@ export default function HolidayDecorations() {
 
   if (theme === "default" || theme === "main" || !theme) return null;
 
+  // Christmas v2 uses section-anchored decor in Home, Navbar, and ProductCard.
+  if (theme === "christmas") return null;
   return (
     <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden" aria-hidden="true">
-      {theme === "christmas" && <ChristmasDecorations />}
       {theme === "halloween" && <HalloweenDecorations />}
       {theme === "easter" && <EasterDecorations />}
       {theme === "valentines" && <ValentinesDecorations />}
       {theme === "4thofjuly" && <FourthOfJulyDecorations />}
       {theme === "blackfriday" && <BlackFridayDecorations />}
     </div>
-  );
-}
-
-// ─── Christmas ──────────────────────────────────────────────────────────
-function ChristmasDecorations() {
-  return (
-    <>
-      {/* Snowflakes falling animation */}
-      <div className="absolute inset-0">
-        {Array.from({ length: 30 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute text-white/70 animate-snowfall"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `-${Math.random() * 20}%`,
-              fontSize: `${Math.random() * 14 + 10}px`,
-              animationDelay: `${Math.random() * 8}s`,
-              animationDuration: `${Math.random() * 5 + 6}s`,
-            }}
-          >
-            ❄
-          </div>
-        ))}
-      </div>
-
-      {/* Christmas trees in corners */}
-      <div className="absolute top-20 left-4 text-4xl opacity-60 animate-gentle-sway">🎄</div>
-      <div className="absolute top-20 right-4 text-4xl opacity-60 animate-gentle-sway" style={{ animationDelay: "1s" }}>🎄</div>
-      <div className="absolute bottom-32 left-8 text-3xl opacity-50">🎄</div>
-      <div className="absolute bottom-32 right-8 text-3xl opacity-50">🎄</div>
-
-      {/* Ornaments and gifts scattered */}
-      <div className="absolute top-40 left-[10%] text-2xl opacity-50 animate-float">🎁</div>
-      <div className="absolute top-60 right-[15%] text-2xl opacity-50 animate-float" style={{ animationDelay: "2s" }}>🎅</div>
-      <div className="absolute bottom-[40%] left-[5%] text-xl opacity-40">⭐</div>
-      <div className="absolute bottom-[60%] right-[8%] text-xl opacity-40 animate-float" style={{ animationDelay: "3s" }}>🔔</div>
-
-      {/* String lights across the top */}
-      <div className="absolute top-0 left-0 right-0 flex justify-between px-4 py-2">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div
-            key={i}
-            className="w-3 h-3 rounded-full animate-twinkle"
-            style={{
-              backgroundColor: ["#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff"][i % 5],
-              animationDelay: `${i * 0.3}s`,
-              opacity: 0.7,
-            }}
-          />
-        ))}
-      </div>
-    </>
   );
 }
 

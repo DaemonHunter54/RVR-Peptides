@@ -9,11 +9,15 @@ import Footer from "@/components/Footer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ASSETS } from "@/lib/assets";
 import { BUSINESS } from "@shared/business";
+import { useHolidayTheme } from "@/hooks/useHolidayTheme";
+import { ChristmasTree } from "@/components/holiday/christmas/ChristmasTree";
+import { SectionSnowfall } from "@/components/holiday/christmas/SectionSnowfall";
 
 export default function Home() {
   const allProductsQuery = trpc.products.list.useQuery({ limit: 100 });
   const allProducts = allProductsQuery.data?.products || [];
   const { settings } = useVisualBuilderSettings();
+  const { isChristmas } = useHolidayTheme();
 
   const heroBg = themeValue(settings, "hero_bg_color");
   const heroText = themeValue(settings, "hero_text_color");
@@ -49,6 +53,8 @@ export default function Home() {
         style={{ background: heroGradient }}
         data-rvr-setting="hero_bg_color"
       >
+        {isChristmas && <SectionSnowfall density={32} seed={1} />}
+
         <div className="absolute inset-0 opacity-[0.06]" style={{
           backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,0.04) 35px, rgba(255,255,255,0.04) 70px)`
         }} />
@@ -80,11 +86,19 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="flex justify-center lg:justify-end" data-rvr-setting="hero_text_color">
+            <div className="relative flex justify-center lg:justify-end" data-rvr-setting="hero_text_color">
+              {isChristmas && (
+                <div
+                  className="absolute z-[2] bottom-4 -left-2 sm:left-4 lg:-left-12 xl:-left-16 w-[88px] sm:w-[110px] lg:w-[130px] animate-gentle-sway pointer-events-none"
+                  aria-hidden
+                >
+                  <ChristmasTree className="w-full h-auto drop-shadow-lg" />
+                </div>
+              )}
               <img
                 src={ASSETS.heroVials}
                 alt="River Valley Research Peptide Vials - BPC-157, TB-500, GHK-Cu"
-                className="w-full max-w-xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-75 -translate-y-14"
+                className="relative z-10 w-full max-w-xl object-contain drop-shadow-[0_20px_50px_rgba(74,158,255,0.3)] scale-75 -translate-y-14"
               />
             </div>
           </div>
@@ -149,8 +163,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16 lg:py-20" style={{ backgroundColor: productsBg }} data-rvr-setting="products_section_bg_color">
-        <div className="container mx-auto px-6 lg:px-12">
+      <section className="relative py-16 lg:py-20" style={{ backgroundColor: productsBg }} data-rvr-setting="products_section_bg_color">
+        {isChristmas && <SectionSnowfall density={24} seed={2} className="opacity-70" />}
+        <div className="container mx-auto px-6 lg:px-12 relative z-[2]">
           {allProductsQuery.isLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 lg:gap-7">
               {Array.from({ length: 12 }).map((_, i) => (
@@ -163,8 +178,8 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 lg:gap-7">
-              {allProducts.map((product: any) => (
-                <ProductCard key={product.id} product={product} />
+              {allProducts.map((product: any, index: number) => (
+                <ProductCard key={product.id} product={product} cardIndex={index} />
               ))}
             </div>
           )}

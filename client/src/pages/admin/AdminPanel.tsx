@@ -1619,7 +1619,7 @@ function CustomizationSection() {
       id: "christmas",
       name: "Christmas",
       icon: "🎄",
-      description: "Festive red & green with snowflakes, Christmas trees & lights",
+      description: "Illustrated tree beside hero vials, garland on navbar, ribbons & gifts on products, section snow",
       settings: {
         holiday_theme: "christmas",
         hero_bg_color: "#1a2e1a",

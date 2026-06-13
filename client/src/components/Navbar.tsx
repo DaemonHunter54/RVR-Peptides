@@ -9,6 +9,8 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
 import { useGuestCart } from "@/hooks/useGuestCart";
+import { useHolidayTheme } from "@/hooks/useHolidayTheme";
+import { ChristmasGarland } from "@/components/holiday/christmas/ChristmasGarland";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +25,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { settings } = useVisualBuilderSettings();
+  const { isChristmas } = useHolidayTheme();
 
   const navbarBg = themeValue(settings, "navbar_bg_color");
   const navbarText = themeValue(settings, "navbar_text_color");
@@ -72,12 +75,13 @@ export default function Navbar() {
 
       <header
         className={cn(
-          "sticky top-0 z-50 transition-all duration-300",
+          "sticky top-0 z-50 transition-all duration-300 relative",
           scrolled && "backdrop-blur-md shadow-lg shadow-black/20"
         )}
         style={headerStyle}
         data-rvr-setting="navbar_bg_color"
       >
+        {isChristmas && <ChristmasGarland />}
         <div className="container">
           <div className="flex items-center justify-between h-16 lg:h-20">
             <Link href="/" className="flex items-center gap-2 shrink-0">

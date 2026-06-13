@@ -156,8 +156,9 @@ button:active {
 
 /* ─── Holiday Decoration Animations ─── */
 @keyframes snowfall {
-  0% { transform: translateY(-10vh) rotate(0deg); opacity: 0.7; }
-  100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+  0% { transform: translateY(-10vh) translateX(0); opacity: 0; }
+  8% { opacity: 0.85; }
+  100% { transform: translateY(110vh) translateX(var(--snow-drift, 0px)) rotate(360deg); opacity: 0; }
 }
 @keyframes gentle-sway {
   0%, 100% { transform: rotate(-3deg); }

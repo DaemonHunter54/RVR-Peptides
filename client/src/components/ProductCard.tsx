@@ -3,6 +3,9 @@ import { ASSETS } from "@/lib/assets";
 import { productImageUrl } from "@/lib/vialDisplay";
 import { useVisualBuilderSettings } from "@/contexts/VisualBuilderContext";
 import { themeValue } from "@/lib/siteTheme";
+import { useHolidayTheme } from "@/hooks/useHolidayTheme";
+import { ChristmasRibbon } from "@/components/holiday/christmas/ChristmasRibbon";
+import { ChristmasGiftStack } from "@/components/holiday/christmas/ChristmasGiftStack";
 
 interface ProductCardProps {
   product: {
@@ -22,10 +25,12 @@ interface ProductCardProps {
     hasVariants?: boolean;
     variantCount?: number;
   };
+  cardIndex?: number;
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
+export default function ProductCard({ product, cardIndex = 0 }: ProductCardProps) {
   const { settings } = useVisualBuilderSettings();
+  const { isChristmas } = useHolidayTheme();
   const nameColor = themeValue(settings, "product_card_name_color");
   const priceColor = themeValue(settings, "product_card_price_color");
   const metaColor = themeValue(settings, "product_card_meta_color");
@@ -38,12 +43,20 @@ export default function ProductCard({ product }: ProductCardProps) {
   const isVialCap = product.slug === "vial-cap";
   const isVialCapOpener = product.slug === "vial-cap-opener";
   const isGiftCard = product.slug === "gift-card";
+  const showChristmasRibbon = isChristmas && (cardIndex % 2 === 0 || Boolean(hasDiscount));
+  const showChristmasGifts = isChristmas && cardIndex % 5 === 2;
 
   return (
     <Link href={`/product/${product.slug}`}>
       <div className="group flex flex-col items-center cursor-pointer h-full">
         {/* Vial Image */}
         <div className="relative w-full h-[205px] sm:h-[220px] lg:h-[235px] flex items-end justify-center mb-1 overflow-visible">
+          {showChristmasRibbon && <ChristmasRibbon variant={hasDiscount ? "sale" : "corner"} />}
+          {showChristmasGifts && (
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-[1] w-14 sm:w-16 pointer-events-none" aria-hidden>
+              <ChristmasGiftStack className="w-full h-auto" />
+            </div>
+          )}
           <div className="relative z-0 w-full h-full flex items-end justify-center p-0">
             <img
               src={productImageUrl(product) || product.imageUrl || `/api/vial/${product.slug}.png?v=2`}
