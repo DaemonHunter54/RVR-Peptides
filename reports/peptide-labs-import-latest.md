@@ -1,6 +1,6 @@
 # Peptide Labs Import Report
 
-- Cleared research rows: 0
+- Cleared research rows: 62
 - Matched: 42
 - Unmatched: 19
 - Failed: 0

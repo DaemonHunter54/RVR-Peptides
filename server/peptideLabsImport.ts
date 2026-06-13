@@ -60,23 +60,43 @@ function rebrandImportedText(text: string): string {
     .trim();
 }
 
-function extractDescriptionPanel(html: string): string {
-  const start = html.indexOf('id="tab-description"');
-  if (start === -1) return "";
-  const panelStart = html.indexOf(">", start) + 1;
-  const endMarkers = ['id="tab-coa"', 'class="woocommerce-Tabs-panel woocommerce-Tabs-panel--coa'];
-  let end = html.length;
-  for (const marker of endMarkers) {
-    const idx = html.indexOf(marker, panelStart);
-    if (idx !== -1 && idx < end) end = idx;
+function extractTabPanel(html: string, tabId: string): string {
+  const marker = `id="${tabId}"`;
+  let searchFrom = 0;
+
+  while (searchFrom < html.length) {
+    const idx = html.indexOf(marker, searchFrom);
+    if (idx === -1) return "";
+
+    const snippet = html.slice(idx, idx + 220);
+    if (!/role\s*=\s*"tabpanel"/i.test(snippet)) {
+      searchFrom = idx + marker.length;
+      continue;
+    }
+
+    const panelStart = html.indexOf(">", idx);
+    if (panelStart === -1) return "";
+    const contentStart = panelStart + 1;
+
+    const nextPanel = html.indexOf('class="woocommerce-Tabs-panel', contentStart + 10);
+    if (nextPanel === -1) {
+      return html.slice(contentStart);
+    }
+
+    return html.slice(contentStart, nextPanel);
   }
-  return html.slice(panelStart, end);
+
+  return "";
 }
 
-function parseDescriptionSections(panelHtml: string) {
-  const text = htmlToText(panelHtml);
+function extractDescriptionPanel(html: string): string {
+  return extractTabPanel(html, "tab-description");
+}
+
+function splitDescriptionTab(text: string) {
   const productDetailsIdx = text.search(/Product Details\s*:/i);
   const researchAppsIdx = text.search(/Potential Research Applications\s*:/i);
+  const formStabilityIdx = text.search(/Form\s*&\s*Stability/i);
 
   let overview = text;
   let productDetails = "";
@@ -90,15 +110,60 @@ function parseDescriptionSections(panelHtml: string) {
     } else {
       productDetails = text.slice(productDetailsIdx).replace(/^Product Details\s*:/i, "").trim();
     }
+  } else if (formStabilityIdx !== -1) {
+    overview = text.slice(0, formStabilityIdx).trim();
+    productDetails = text.slice(formStabilityIdx).trim();
   } else if (researchAppsIdx !== -1) {
     overview = text.slice(0, researchAppsIdx).trim();
     researchApplications = text.slice(researchAppsIdx).replace(/^Potential Research Applications\s*:/i, "").trim();
   }
 
+  return { overview, productDetails, researchApplications };
+}
+
+function parseProductPage(html: string) {
+  const descriptionHtml = extractDescriptionPanel(html);
+  if (!descriptionHtml.trim()) {
+    return { overview: "", productDetails: "", researchApplications: "" };
+  }
+
+  const descriptionText = htmlToText(descriptionHtml);
+  const split = splitDescriptionTab(descriptionText);
+
+  const researchHtml = extractTabPanel(html, "tab-pl_research");
+  const storageHtml = extractTabPanel(html, "tab-pl_storage");
+  const molecularHtml = extractTabPanel(html, "tab-pl_molecular");
+
+  const researchTab = researchHtml ? htmlToText(researchHtml) : "";
+  const storageTab = storageHtml ? htmlToText(storageHtml) : "";
+  const molecularTab = molecularHtml ? htmlToText(molecularHtml) : "";
+
+  let productDetails = split.productDetails;
+  if (molecularTab) {
+    productDetails = productDetails
+      ? `${productDetails}\n\nMolecular Structure\n${molecularTab}`
+      : molecularTab;
+  }
+  if (storageTab) {
+    productDetails = productDetails
+      ? `${productDetails}\n\nStorage\n${storageTab}`
+      : storageTab;
+  }
+
   return {
-    overview: rebrandImportedText(overview),
+    overview: rebrandImportedText(split.overview),
     productDetails: rebrandImportedText(productDetails),
-    researchApplications: rebrandImportedText(researchApplications),
+    researchApplications: rebrandImportedText(split.researchApplications || researchTab),
+  };
+}
+
+function parseDescriptionSections(panelHtml: string) {
+  const text = htmlToText(panelHtml);
+  const split = splitDescriptionTab(text);
+  return {
+    overview: rebrandImportedText(split.overview),
+    productDetails: rebrandImportedText(split.productDetails),
+    researchApplications: rebrandImportedText(split.researchApplications),
   };
 }
 
@@ -191,12 +256,7 @@ export async function fetchPeptideLabsProduct(sourceUrlInput: string): Promise<P
   }
 
   const html = await response.text();
-  const panelHtml = extractDescriptionPanel(html);
-  if (!panelHtml.trim()) {
-    throw new Error("No description content found on that Peptide Labs page.");
-  }
-
-  const parsed = parseDescriptionSections(panelHtml);
+  const parsed = parseProductPage(html);
   const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
   const sourceTitle = decodeHtmlEntities(titleMatch?.[1]?.split("|")[0]?.trim() || parsePeptideLabsSourceUrl(sourceUrl) || "Product");
 

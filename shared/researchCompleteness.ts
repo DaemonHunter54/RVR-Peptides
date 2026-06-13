@@ -18,9 +18,17 @@ export function getMissingResearchFields(research?: ResearchCompletenessInput | 
   const chemicalMakeup = String(research?.chemicalMakeup || "").trim();
   const researchContent = String(research?.researchContent || "").trim();
 
-  if (overview.length < 20) missing.push("description");
-  if (chemicalMakeup.length < 10) missing.push("product details");
-  if (researchContent.length < 20 || isCitationJsonBlob(researchContent)) missing.push("research applications");
+  if (overview.length < 20) {
+    missing.push("description");
+    return missing;
+  }
+
+  // Peptide Labs pages vary: some only have Description, others add Product Details / Research tabs.
+  const hasDetails = chemicalMakeup.length >= 10;
+  const hasApplications = researchContent.length >= 20 && !isCitationJsonBlob(researchContent);
+  if (!hasDetails && !hasApplications && overview.length < 80) {
+    missing.push("product details or research applications");
+  }
 
   return missing;
 }
