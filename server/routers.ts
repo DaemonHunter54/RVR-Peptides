@@ -1,4 +1,10 @@
 import { COOKIE_NAME } from "@shared/const";
+import {
+  SITE_THEME_KEYS,
+  VISUAL_BUILDER_BASELINE_KEY,
+  buildThemeBaselineSnapshot,
+  parseThemeBaseline,
+} from "@shared/siteTheme";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -537,6 +543,7 @@ export const appRouter = router({
         "paymentcloud_transaction_key",
         "paymentcloud_security_key",
         "admin_inbox_email",
+        VISUAL_BUILDER_BASELINE_KEY,
       ];
       const all = await db.getAllSettings();
       const map: Record<string, string> = {};
@@ -914,6 +921,30 @@ export const appRouter = router({
           await db.updateSetting(key, value);
         }
         return { success: true };
+      }),
+      getVisualBuilderBaseline: adminProcedure.query(async () => {
+        const all = await db.getAllSettings();
+        const map: Record<string, string> = {};
+        for (const s of all) map[s.settingKey] = s.settingValue || "";
+        return parseThemeBaseline(map[VISUAL_BUILDER_BASELINE_KEY]);
+      }),
+      revertToVisualBuilderBaseline: adminProcedure.mutation(async () => {
+        const all = await db.getAllSettings();
+        const map: Record<string, string> = {};
+        for (const s of all) map[s.settingKey] = s.settingValue || "";
+        const baseline = parseThemeBaseline(map[VISUAL_BUILDER_BASELINE_KEY]);
+        for (const key of SITE_THEME_KEYS) {
+          await db.updateSetting(key, baseline[key] ?? "");
+        }
+        return { success: true, baseline };
+      }),
+      saveVisualBuilderBaseline: adminProcedure.mutation(async () => {
+        const all = await db.getAllSettings();
+        const map: Record<string, string> = {};
+        for (const s of all) map[s.settingKey] = s.settingValue || "";
+        const snapshot = buildThemeBaselineSnapshot(map);
+        await db.updateSetting(VISUAL_BUILDER_BASELINE_KEY, JSON.stringify(snapshot));
+        return { success: true, baseline: snapshot };
       }),
     }),
 

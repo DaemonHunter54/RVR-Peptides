@@ -1,6 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { ASSETS } from "@/lib/assets";
 import { trpc } from "@/lib/trpc";
+import { useVisualBuilderSettings } from "@/contexts/VisualBuilderContext";
+import { themeValue } from "@/lib/siteTheme";
 import { cn } from "@/lib/utils";
 import { Menu, ShoppingCart, User, X, LogOut, Package, Settings, Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -20,8 +22,14 @@ export default function Navbar() {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const settingsQuery = trpc.settings.public.useQuery();
-  const settings = settingsQuery.data || {};
+  const { settings } = useVisualBuilderSettings();
+
+  const navbarBg = themeValue(settings, "navbar_bg_color");
+  const navbarText = themeValue(settings, "navbar_text_color");
+  const navbarActive = themeValue(settings, "navbar_text_active_color");
+  const cartBadge = themeValue(settings, "navbar_cart_badge_color");
+  const bannerEnabled = settings.banner_enabled === "true";
+  const bannerText = settings.banner_text || "";
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
@@ -42,62 +50,49 @@ export default function Navbar() {
     { href: "/contact", label: "CONTACT" },
   ];
 
-  const bannerEnabled = settings.banner_enabled === "true";
-  const bannerText = settings.banner_text || "";
-
-  // Determine if we're on the homepage for transparent navbar
-  const isHome = location === "/";
+  const headerStyle = {
+    backgroundColor: scrolled ? `${navbarBg}fa` : navbarBg,
+  };
 
   return (
     <>
-      {/* Announcement Banner */}
       {bannerEnabled && bannerText && (
         <div
           className="text-center py-2 px-4 text-sm font-medium"
           style={{
-            backgroundColor: settings.banner_bg_color || "#0a1628",
-            color: settings.banner_text_color || "#94a3b8",
+            backgroundColor: themeValue(settings, "banner_bg_color"),
           }}
+          data-rvr-setting="banner_bg_color"
         >
-          {bannerText}
+          <span style={{ color: themeValue(settings, "banner_text_color") }} data-rvr-setting="banner_text">
+            {bannerText}
+          </span>
         </div>
       )}
 
-      {/* Main Navbar - Dark blue that blends into hero */}
       <header
         className={cn(
           "sticky top-0 z-50 transition-all duration-300",
-          scrolled
-            ? "bg-[#0a1628]/98 backdrop-blur-md shadow-lg shadow-black/20"
-            : isHome
-              ? "bg-[#0a1628]"
-              : "bg-[#0a1628]"
+          scrolled && "backdrop-blur-md shadow-lg shadow-black/20"
         )}
+        style={headerStyle}
+        data-rvr-setting="navbar_bg_color"
       >
         <div className="container">
           <div className="flex items-center justify-between h-16 lg:h-20">
-            {/* Logo */}
             <Link href="/" className="flex items-center gap-2 shrink-0">
-              <img
-                src={ASSETS.logo}
-                alt="River Valley Research Peptides"
-                className="h-10 lg:h-14 w-auto object-contain"
-              />
+              <img src={ASSETS.logo} alt="River Valley Research Peptides" className="h-10 lg:h-14 w-auto object-contain" />
             </Link>
 
-            {/* Desktop: nav links + icons grouped on the right */}
             <div className="hidden lg:flex items-center gap-8 ml-auto">
-              <nav className="flex items-center gap-6">
+              <nav className="flex items-center gap-6" data-rvr-setting="navbar_text_color">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={cn(
-                      "text-sm font-semibold tracking-wide uppercase transition-colors",
-                      location === link.href
-                        ? "text-white"
-                        : "text-slate-200 hover:text-white"
-                    )}
+                    className="text-sm font-semibold tracking-wide uppercase transition-colors"
+                    style={{ color: location === link.href ? navbarActive : navbarText }}
+                    data-rvr-setting={location === link.href ? "navbar_text_active_color" : undefined}
                   >
                     {link.label}
                   </Link>
@@ -108,11 +103,7 @@ export default function Navbar() {
                 {isAuthenticated ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="p-1 text-slate-200 hover:text-white transition-colors"
-                        aria-label="Account menu"
-                      >
+                      <button type="button" className="p-1 transition-colors" style={{ color: navbarText }} aria-label="Account menu">
                         <User className="h-5 w-5" />
                       </button>
                     </DropdownMenuTrigger>
@@ -144,73 +135,58 @@ export default function Navbar() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <Link
-                    href="/login"
-                    className="p-1 text-slate-200 hover:text-white transition-colors"
-                    aria-label="Sign in"
-                  >
+                  <Link href="/login" className="p-1 transition-colors" style={{ color: navbarText }} aria-label="Sign in">
                     <User className="h-5 w-5" />
                   </Link>
                 )}
 
-                <Link
-                  href="/cart"
-                  className="relative p-1 text-slate-200 hover:text-white transition-colors"
-                  aria-label="Shopping cart"
-                >
+                <Link href="/cart" className="relative p-1 transition-colors" style={{ color: navbarText }} aria-label="Shopping cart">
                   <ShoppingCart className="h-5 w-5" />
-                  <span className="absolute -top-1.5 -right-1.5 bg-amber-700 text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center min-w-[18px]">
+                  <span
+                    className="absolute -top-1.5 -right-1.5 text-white text-[10px] font-bold rounded-full h-[18px] w-[18px] flex items-center justify-center min-w-[18px]"
+                    style={{ backgroundColor: cartBadge }}
+                    data-rvr-setting="navbar_cart_badge_color"
+                  >
                     {cartCount}
                   </span>
                 </Link>
 
-                <Link
-                  href="/shop"
-                  className="p-1 text-slate-200 hover:text-white transition-colors"
-                  aria-label="Search products"
-                >
+                <Link href="/shop" className="p-1 transition-colors" style={{ color: navbarText }} aria-label="Search products">
                   <Search className="h-5 w-5" />
                 </Link>
               </div>
             </div>
 
-            {/* Mobile Actions */}
             <div className="flex items-center gap-2 lg:hidden">
-              <Link href="/cart" className="relative p-2 text-slate-300 hover:text-white transition-colors">
+              <Link href="/cart" className="relative p-2 transition-colors" style={{ color: navbarText }}>
                 <ShoppingCart className="h-5 w-5" />
                 {cartCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-blue-500 text-white text-[10px] font-bold rounded-full h-4.5 w-4.5 flex items-center justify-center min-w-[18px]">
+                  <span className="absolute -top-0.5 -right-0.5 text-white text-[10px] font-bold rounded-full h-4.5 w-4.5 flex items-center justify-center min-w-[18px]" style={{ backgroundColor: cartBadge }}>
                     {cartCount}
                   </span>
                 )}
               </Link>
 
-              <button
-                className="p-2 text-slate-300 hover:text-white"
-                onClick={() => setMobileOpen(!mobileOpen)}
-                aria-label={mobileOpen ? "Close menu" : "Open menu"}
-              >
+              <button className="p-2" style={{ color: navbarText }} onClick={() => setMobileOpen(!mobileOpen)} aria-label={mobileOpen ? "Close menu" : "Open menu"}>
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="lg:hidden border-t border-white/10 bg-[#0a1628]">
+          <div className="lg:hidden border-t border-white/10" style={{ backgroundColor: navbarBg }}>
             <nav className="container py-4 space-y-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                    location === link.href
-                      ? "text-white bg-white/10"
-                      : "text-slate-300 hover:bg-white/5 hover:text-white"
-                  )}
+                  className="block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  style={{
+                    color: location === link.href ? navbarActive : navbarText,
+                    backgroundColor: location === link.href ? "rgba(255,255,255,0.1)" : "transparent",
+                  }}
                 >
                   {link.label}
                 </Link>
@@ -218,10 +194,14 @@ export default function Navbar() {
               {!isAuthenticated && (
                 <div className="pt-3 border-t border-white/10 space-y-2 px-4">
                   <Link href="/login" onClick={() => setMobileOpen(false)}>
-                    <Button variant="outline" className="w-full border-slate-500 text-slate-200 bg-transparent hover:bg-white/10">Sign In</Button>
+                    <Button variant="outline" className="w-full border-slate-500 bg-transparent hover:bg-white/10" style={{ color: navbarText }}>
+                      Sign In
+                    </Button>
                   </Link>
                   <Link href="/register" onClick={() => setMobileOpen(false)}>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-500 text-white">Register</Button>
+                    <Button className="w-full text-white" style={{ backgroundColor: themeValue(settings, "accent_color") }}>
+                      Register
+                    </Button>
                   </Link>
                 </div>
               )}

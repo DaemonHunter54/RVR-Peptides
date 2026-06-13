@@ -1,7 +1,8 @@
-import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { ASSETS } from "@/lib/assets";
 import { productImageUrl } from "@/lib/vialDisplay";
+import { useVisualBuilderSettings } from "@/contexts/VisualBuilderContext";
+import { themeValue } from "@/lib/siteTheme";
 
 interface ProductCardProps {
   product: {
@@ -24,6 +25,10 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const { settings } = useVisualBuilderSettings();
+  const nameColor = themeValue(settings, "product_card_name_color");
+  const priceColor = themeValue(settings, "product_card_price_color");
+  const metaColor = themeValue(settings, "product_card_meta_color");
   const price = Number(product.price);
   const hasDiscount = product.discountActive && product.discountPercent;
   const discountedPrice = hasDiscount ? price * (1 - Number(product.discountPercent) / 100) : price;
@@ -81,30 +86,32 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Product Name */}
-        <h3 className="relative z-20 text-center text-sm font-medium text-gray-800 group-hover:text-blue-700 transition-colors leading-snug mb-1 px-2 line-clamp-2">
+        <h3
+          className="relative z-20 text-center text-sm font-medium transition-colors leading-snug mb-1 px-2 line-clamp-2"
+          style={{ color: nameColor }}
+          data-rvr-setting="product_card_name_color"
+        >
           {product.name}
         </h3>
 
-        {/* Multiple doses available indicator */}
         {product.hasVariants && (
-          <p className="relative z-20 text-center text-xs text-gray-500 italic mb-1">
+          <p className="relative z-20 text-center text-xs italic mb-1" style={{ color: metaColor }} data-rvr-setting="product_card_meta_color">
             Multiple doses available
           </p>
         )}
 
-        {/* Price */}
-        <div className="relative z-20 flex items-baseline gap-2 justify-center">
+        <div className="relative z-20 flex items-baseline gap-2 justify-center" data-rvr-setting="product_card_price_color">
           {product.hasVariants ? (
-            <span className="font-bold text-base text-[#4a9eff]">
+            <span className="font-bold text-base" style={{ color: priceColor }}>
               From ${price.toFixed(2)}
             </span>
           ) : (
             <>
-              <span className={cn("font-bold text-base", hasDiscount ? "text-red-600" : "text-[#4a9eff]")}>
+              <span className="font-bold text-base" style={{ color: hasDiscount ? undefined : priceColor }}>
                 ${discountedPrice.toFixed(2)}
               </span>
               {hasDiscount && (
-                <span className="text-sm text-gray-400 line-through">
+                <span className="text-sm line-through" style={{ color: metaColor }}>
                   ${price.toFixed(2)}
                 </span>
               )}

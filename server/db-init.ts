@@ -2,6 +2,11 @@ import mysql, { RowDataPacket } from "mysql2/promise";
 import fs from "fs";
 import path from "path";
 import { DEFAULT_PRODUCTS } from "../shared/rvrProductCatalog";
+import {
+  SITE_THEME_FIELDS,
+  buildThemeBaselineSnapshot,
+  VISUAL_BUILDER_BASELINE_KEY,
+} from "../shared/siteTheme";
 
 const TABLES = [
 `CREATE TABLE IF NOT EXISTS users (
@@ -969,6 +974,34 @@ async function ensureDefaultSiteSettings(conn: mysql.Connection) {
       [key, value, type, label, groupName]
     );
   }
+
+  for (const field of SITE_THEME_FIELDS) {
+    await conn.execute(
+      `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         settingType = COALESCE(settingType, VALUES(settingType)),
+         label = COALESCE(label, VALUES(label)),
+         groupName = COALESCE(groupName, VALUES(groupName))`,
+      [field.key, field.defaultValue, field.type === "toggle" ? "boolean" : "text", field.label, field.group]
+    );
+  }
+
+  await ensureVisualBuilderBaseline(conn);
+}
+
+async function ensureVisualBuilderBaseline(conn: mysql.Connection) {
+  const baselineJson = JSON.stringify(buildThemeBaselineSnapshot());
+  await conn.execute(
+    `INSERT INTO siteSettings (settingKey, settingValue, settingType, label, groupName)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       settingValue = IF(settingValue IS NULL OR settingValue = '', VALUES(settingValue), settingValue),
+       settingType = COALESCE(settingType, VALUES(settingType)),
+       label = COALESCE(label, VALUES(label)),
+       groupName = COALESCE(groupName, VALUES(groupName))`,
+    [VISUAL_BUILDER_BASELINE_KEY, baselineJson, "json", "Visual Builder Baseline", "branding"]
+  );
 }
 
 

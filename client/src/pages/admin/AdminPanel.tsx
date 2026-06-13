@@ -14,10 +14,18 @@ import {
   LayoutDashboard, Package, ShoppingCart, Users, Settings, Tag,
   Plus, Pencil, Trash2, Search, Truck, Save, ArrowLeft,
   DollarSign, AlertCircle, CreditCard, Eye, EyeOff, CheckCircle2, XCircle,
-  Paintbrush, RotateCcw, Sparkles
+  Paintbrush, RotateCcw, Sparkles, PanelLeft, X
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link, useParams } from "wouter";
+import {
+  isVisualBuilderMessage,
+  VISUAL_BUILDER_MESSAGE_SOURCE,
+  type VisualBuilderFieldType,
+} from "@shared/visualBuilderRegions";
+import { SITE_THEME_FIELDS } from "@shared/siteTheme";
+import { themeValue } from "@/lib/siteTheme";
+import { toast } from "sonner";
 import { ProductResearchWorkflow, PersistedProductResearchWorkflow, type ProductResearchDraft } from "@/components/admin/ProductResearchWorkflow";
 
 // ─── Admin Layout ────────────────────────────────────────────────────
@@ -127,7 +135,7 @@ export default function AdminPanel() {
             ))}
           </div>
         </div>
-        <div className="p-6 lg:p-8">
+        <div className={activeSection === "customization" ? "" : "p-6 lg:p-8"}>
           {activeSection === "dashboard" && <DashboardSection />}
           {activeSection === "products" && <ProductsSection />}
           {activeSection === "orders" && <OrdersSection />}
@@ -1556,27 +1564,38 @@ function CustomizationSection() {
     onSuccess: () => { toast.success("Customization saved!"); settingsQuery.refetch(); },
     onError: (err: any) => toast.error(err.message),
   });
+  const revertToBaseline = trpc.admin.settings.revertToVisualBuilderBaseline.useMutation({
+    onSuccess: () => {
+      toast.success("Reverted to baseline look.");
+      settingsQuery.refetch();
+      setUnsavedChanges({});
+      setRevertState(null);
+      setSelectedRegion(null);
+      setPreviewKey((k) => k + 1);
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const settings = settingsQuery.data || {};
   const [activeTab, setActiveTab] = useState<"builder" | "templates">("builder");
   const [previewKey, setPreviewKey] = useState(0);
   const [unsavedChanges, setUnsavedChanges] = useState<Record<string, string>>({});
   const [revertState, setRevertState] = useState<Record<string, string> | null>(null);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<{
+    key: string;
+    label: string;
+    fieldType: VisualBuilderFieldType;
+  } | null>(null);
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
 
   // Editable fields for the visual builder
-  const builderFields = [
-    { key: "site_tagline", label: "Hero Tagline", type: "text", placeholder: "Premium Research Peptides" },
-    { key: "site_description", label: "Hero Description", type: "textarea", placeholder: "We are proud to carry the highest quality peptides..." },
-    { key: "hero_bg_color", label: "Hero Background Color", type: "color", placeholder: "#0d2147" },
-    { key: "hero_text_color", label: "Hero Text Color", type: "color", placeholder: "#ffffff" },
-    { key: "accent_color", label: "Accent / Button Color", type: "color", placeholder: "#2563eb" },
-    { key: "banner_enabled", label: "Show Announcement Banner", type: "toggle", placeholder: "" },
-    { key: "banner_text", label: "Banner Text", type: "text", placeholder: "Research-grade peptides and supplies" },
-    { key: "banner_bg_color", label: "Banner Background Color", type: "color", placeholder: "#0a1628" },
-    { key: "banner_text_color", label: "Banner Text Color", type: "color", placeholder: "#94a3b8" },
-    { key: "logo_url", label: "Logo Image URL", type: "text", placeholder: "/assets/rvr-company-logo-large.png" },
-    { key: "footer_disclaimer", label: "Footer Disclaimer", type: "textarea", placeholder: "All products are sold for research purposes only..." },
-  ];
+  const builderFields = SITE_THEME_FIELDS.map((field) => ({
+    key: field.key,
+    label: field.label,
+    type: field.type,
+    placeholder: field.defaultValue,
+  }));
 
   // Holiday templates
   const holidayTemplates = [
@@ -1702,6 +1721,95 @@ function CustomizationSection() {
     return unsavedChanges[key] !== undefined ? unsavedChanges[key] : (settings[key] || "");
   };
 
+  const mergedPreviewSettings = useMemo(() => {
+    const merged: Record<string, string> = { ...settings };
+    for (const field of SITE_THEME_FIELDS) {
+      merged[field.key] =
+        unsavedChanges[field.key] !== undefined ? unsavedChanges[field.key] : themeValue(settings, field.key);
+    }
+    Object.assign(merged, unsavedChanges);
+    return merged;
+  }, [settings, unsavedChanges]);
+
+  const pushPreviewPatch = useCallback(() => {
+    previewFrameRef.current?.contentWindow?.postMessage(
+      {
+        source: VISUAL_BUILDER_MESSAGE_SOURCE,
+        type: "patch",
+        settings: mergedPreviewSettings,
+      },
+      "*"
+    );
+  }, [mergedPreviewSettings]);
+
+  useEffect(() => {
+    pushPreviewPatch();
+  }, [pushPreviewPatch]);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!isVisualBuilderMessage(event.data)) return;
+      if (event.data.type === "ready") {
+        pushPreviewPatch();
+        return;
+      }
+      if (event.data.type === "select") {
+        setSelectedRegion({
+          key: event.data.key,
+          label: event.data.label,
+          fieldType: event.data.fieldType,
+        });
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [pushPreviewPatch]);
+
+  const getFieldMeta = (key: string) => builderFields.find((field) => field.key === key);
+
+  const renderBuilderField = (field: (typeof builderFields)[number]) => (
+    <div key={field.key}>
+      <Label className="text-sm text-slate-600 mb-1.5 block">{field.label}</Label>
+      {field.type === "toggle" ? (
+        <div className="flex items-center gap-3">
+          <Switch
+            checked={getFieldValue(field.key) === "true"}
+            onCheckedChange={(checked) => handleFieldChange(field.key, checked ? "true" : "false")}
+          />
+          <span className="text-sm text-slate-500">{getFieldValue(field.key) === "true" ? "Enabled" : "Disabled"}</span>
+        </div>
+      ) : field.type === "color" ? (
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={getFieldValue(field.key) || field.placeholder}
+            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            className="h-9 w-14 rounded border border-slate-200 cursor-pointer"
+          />
+          <Input
+            value={getFieldValue(field.key)}
+            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            placeholder={field.placeholder}
+            className="flex-1"
+          />
+        </div>
+      ) : field.type === "textarea" ? (
+        <Textarea
+          value={getFieldValue(field.key)}
+          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+          placeholder={field.placeholder}
+          rows={3}
+        />
+      ) : (
+        <Input
+          value={getFieldValue(field.key)}
+          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+          placeholder={field.placeholder}
+        />
+      )}
+    </div>
+  );
+
   const applyTemplate = async (template: typeof holidayTemplates[0]) => {
     // Save current state for revert
     const currentState: Record<string, string> = {};
@@ -1754,8 +1862,8 @@ function CustomizationSection() {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className={activeTab === "builder" ? "flex flex-col min-h-screen" : ""}>
+      <div className={`flex items-center justify-between mb-6 ${activeTab === "builder" ? "px-6 lg:px-8 pt-6 lg:pt-8 mb-4" : ""}`}>
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Paintbrush className="h-6 w-6 text-blue-600" /> Website Customization
@@ -1763,9 +1871,18 @@ function CustomizationSection() {
           <p className="text-sm text-slate-500 mt-1">Customize your website's look and feel without touching code</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => revertToBaseline.mutate()}
+            disabled={revertToBaseline.isPending}
+            className="gap-1.5 text-slate-700 border-slate-200 hover:bg-slate-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Revert to Baseline
+          </Button>
           {revertState && (
             <Button variant="outline" size="sm" onClick={revertChanges} className="gap-1.5 text-orange-600 border-orange-200 hover:bg-orange-50">
-              <RotateCcw className="h-3.5 w-3.5" /> Revert
+              <RotateCcw className="h-3.5 w-3.5" /> Undo Last Save
             </Button>
           )}
           {Object.keys(unsavedChanges).length > 0 && (
@@ -1777,7 +1894,7 @@ function CustomizationSection() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-slate-200">
+      <div className={`flex gap-1 mb-0 border-b border-slate-200 ${activeTab === "builder" ? "px-6 lg:px-8" : "mb-6"}`}>
         <button
           onClick={() => setActiveTab("builder")}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
@@ -1797,81 +1914,71 @@ function CustomizationSection() {
       </div>
 
       {activeTab === "builder" && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Builder Controls */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 className="font-semibold text-slate-800 mb-4">Customize Your Website</h3>
-              <div className="space-y-4">
-                {builderFields.map((field) => (
-                  <div key={field.key}>
-                    <Label className="text-sm text-slate-600 mb-1.5 block">{field.label}</Label>
-                    {field.type === "toggle" ? (
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={getFieldValue(field.key) === "true"}
-                          onCheckedChange={(checked) => handleFieldChange(field.key, checked ? "true" : "false")}
-                        />
-                        <span className="text-sm text-slate-500">{getFieldValue(field.key) === "true" ? "Enabled" : "Disabled"}</span>
-                      </div>
-                    ) : field.type === "color" ? (
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={getFieldValue(field.key) || field.placeholder}
-                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                          className="h-9 w-14 rounded border border-slate-200 cursor-pointer"
-                        />
-                        <Input
-                          value={getFieldValue(field.key)}
-                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                          placeholder={field.placeholder}
-                          className="flex-1"
-                        />
-                      </div>
-                    ) : field.type === "textarea" ? (
-                      <Textarea
-                        value={getFieldValue(field.key)}
-                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                        placeholder={field.placeholder}
-                        rows={3}
-                      />
-                    ) : (
-                      <Input
-                        value={getFieldValue(field.key)}
-                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                        placeholder={field.placeholder}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Live Preview */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
-              <span className="text-sm font-medium text-slate-700">Live Preview</span>
+        <div className="relative flex-1 min-h-0 flex flex-col bg-slate-100 border-t border-slate-200">
+          <div className="flex items-center justify-between gap-3 px-4 py-2 bg-white border-b border-slate-200">
+            <p className="text-sm text-slate-600">
+              Click highlighted areas to edit colors and text. Use <strong>Revert to Baseline</strong> to restore the original site look.
+            </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => setShowSettingsPanel((open) => !open)} className="gap-1.5">
+                <PanelLeft className="h-3.5 w-3.5" />
+                {showSettingsPanel ? "Hide Settings" : "All Settings"}
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => setPreviewKey((k) => k + 1)} className="text-xs">
                 Refresh
               </Button>
             </div>
-            <div className="h-[500px] overflow-hidden">
-              <iframe
-                key={previewKey}
-                src="/?preview=true"
-                className="w-full h-full border-0 transform scale-[0.6] origin-top-left"
-                style={{ width: "166.67%", height: "166.67%" }}
-                title="Website Preview"
-              />
-            </div>
+          </div>
+
+          <div className="relative flex-1 min-h-[calc(100vh-220px)]">
+            <iframe
+              ref={previewFrameRef}
+              key={previewKey}
+              src="/?visualBuilder=1"
+              className="absolute inset-0 w-full h-full border-0 bg-white"
+              title="Website Preview"
+            />
+
+            {showSettingsPanel && (
+              <div className="absolute top-0 left-0 bottom-0 w-full max-w-sm bg-white border-r border-slate-200 shadow-xl z-20 overflow-y-auto">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+                  <h3 className="font-semibold text-slate-800">All Settings</h3>
+                  <button type="button" onClick={() => setShowSettingsPanel(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="p-4 space-y-4">
+                  {builderFields.map((field) => renderBuilderField(field))}
+                </div>
+              </div>
+            )}
+
+            {selectedRegion && (
+              <div className="absolute bottom-6 right-6 z-20 w-full max-w-sm bg-white rounded-xl border border-slate-200 shadow-2xl p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Selected area</p>
+                    <h3 className="font-semibold text-slate-800">{selectedRegion.label}</h3>
+                  </div>
+                  <button type="button" onClick={() => setSelectedRegion(null)} className="text-slate-400 hover:text-slate-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {getFieldMeta(selectedRegion.key)
+                  ? renderBuilderField(getFieldMeta(selectedRegion.key)!)
+                  : (
+                    <p className="text-sm text-slate-500">
+                      This area is not editable yet. Use All Settings for now.
+                    </p>
+                  )}
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {activeTab === "templates" && (
-        <div>
+        <div className="px-6 lg:px-8 pb-8">
           <p className="text-sm text-slate-500 mb-4">
             Click a template to instantly apply it to your website. You can always revert back using the Revert button above.
           </p>
