@@ -11,11 +11,13 @@ Product descriptions now follow the **Peptide Labs** layout: **Description**, **
 
 ## One-time setup (developer / Railway)
 
-After deploy, run this once against production to **clear old research content** and **auto-fill from Peptide Labs** for matched products:
+After deploy, run this once from your computer (with `railway login` + `railway link` already done):
 
 ```bash
-npm run peptide-labs:import -- --apply
+npm run peptide-labs:import:prod -- --apply
 ```
+
+This automatically uses Railway's public MySQL URL — no manual `DATABASE_URL` copy/paste.
 
 Preview matches only (no database changes):
 
@@ -62,7 +64,7 @@ These are **not** on Peptide Labs or have no reliable auto-match. Paste the clos
 
 ## Products auto-filled from Peptide Labs (41)
 
-Run `npm run peptide-labs:import -- --apply` on production to load these. Re-check dose wording after import — some RVR doses differ from the closest Peptide Labs listing (e.g. 5mg vs 10mg).
+Run `npm run peptide-labs:import:prod -- --apply` to load these. Re-check dose wording after import — some RVR doses differ from the closest Peptide Labs listing (e.g. 5mg vs 10mg).
 
 | Product | Peptide Labs source |
 |---------|---------------------|
@@ -133,4 +135,4 @@ Full URL list: `reports/peptide-labs-import-latest.json`
 - Admin shows only: URL, **Pull Reference Research**, and three description fields.  
 - Removed: AI draft copy, PubMed fetch, citations editor, product brief, quality notes.  
 - Storefront **Description** tab matches Peptide Labs section titles.  
-- Old research / citations cleared when `peptide-labs:import --apply` is run on production.
+- Old research / citations cleared when `peptide-labs:import:prod -- --apply` is run.

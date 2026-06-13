@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "peptide-labs:report": "tsx scripts/peptide-labs-match-report.ts",
-    "peptide-labs:import": "tsx scripts/peptide-labs-import.ts"
+    "peptide-labs:import": "tsx scripts/peptide-labs-import.ts",
+    "peptide-labs:import:prod": "tsx scripts/peptide-labs-import-prod.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
