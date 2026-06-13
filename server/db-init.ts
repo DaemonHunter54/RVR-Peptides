@@ -302,6 +302,7 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
 
   ["productResearch", "productBrief", "text"],
   ["productResearch", "qualityNotes", "text"],
+  ["productResearch", "templateSourceUrl", "text"],
 
   // Gift card checkout, lifecycle, and audit columns for existing Railway DBs.
   ["orders", "giftCardCode", "varchar(9)"],

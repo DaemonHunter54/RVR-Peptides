@@ -450,6 +450,7 @@ export async function getProductResearch(productId: number) {
 export async function upsertProductResearch(productId: number, data: {
   productBrief?: string;
   qualityNotes?: string;
+  templateSourceUrl?: string;
   overview?: string;
   chemicalMakeup?: string;
   researchContent?: string;

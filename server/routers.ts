@@ -863,10 +863,25 @@ export const appRouter = router({
         const { searchResearchTemplates } = await import("./corePeptidesImport");
         return searchResearchTemplates(input.productSlug, input.productName);
       }),
+      resolveTemplateSource: adminProcedure.input(z.object({
+        sourceUrl: z.string(),
+      })).query(async ({ input }) => {
+        const { parseResearchTemplateSourceUrl } = await import("../shared/researchTemplateSource");
+        const { slugToTitle } = await import("../shared/researchTemplateMatch");
+        const templateSlug = parseResearchTemplateSourceUrl(input.sourceUrl);
+        if (!templateSlug) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Could not read a product slug from that URL. Use a link that ends with /peptides/product-slug/",
+          });
+        }
+        return { templateSlug, title: slugToTitle(templateSlug) };
+      }),
       importTemplate: adminProcedure.input(z.object({
         productSlug: z.string(),
         productName: z.string(),
-        templateSlug: z.string(),
+        templateSlug: z.string().optional(),
+        sourceUrl: z.string().optional(),
         size: z.string().optional(),
         purity: z.string().optional(),
         form: z.string().optional(),
@@ -877,8 +892,30 @@ export const appRouter = router({
         molecularWeight: z.string().optional(),
       })).mutation(async ({ input }) => {
         const { fetchResearchTemplate } = await import("./corePeptidesImport");
-        const { productSlug, productName, templateSlug, ...specs } = input;
-        return fetchResearchTemplate(templateSlug, { productName, ...specs }, productSlug);
+        const { parseResearchTemplateSourceUrl } = await import("../shared/researchTemplateSource");
+        const { productSlug, productName, templateSlug, sourceUrl, ...specs } = input;
+        const resolvedTemplateSlug =
+          templateSlug?.trim() ||
+          (sourceUrl ? parseResearchTemplateSourceUrl(sourceUrl) : null);
+
+        if (!resolvedTemplateSlug) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Provide a template slug or a source product URL ending in /peptides/product-slug/",
+          });
+        }
+
+        const result = await fetchResearchTemplate(
+          resolvedTemplateSlug,
+          { productName, ...specs },
+          productSlug
+        );
+
+        return {
+          ...result,
+          sourceUrl: sourceUrl?.trim() || null,
+          resolvedTemplateSlug,
+        };
       }),
       importFromCore: adminProcedure.input(z.object({
         productSlug: z.string(),
@@ -937,6 +974,7 @@ export const appRouter = router({
         productId: z.number(),
         productBrief: z.string().optional(),
         qualityNotes: z.string().optional(),
+        templateSourceUrl: z.string().optional(),
         overview: z.string().optional(),
         chemicalMakeup: z.string().optional(),
         researchContent: z.string().optional(),

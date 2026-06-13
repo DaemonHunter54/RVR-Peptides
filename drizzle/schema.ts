@@ -119,6 +119,7 @@ export const productResearch = mysqlTable("productResearch", {
   productId: int("productId").notNull(),
   productBrief: text("productBrief"),
   qualityNotes: text("qualityNotes"),
+  templateSourceUrl: text("templateSourceUrl"),
   overview: text("overview"),
   chemicalMakeup: text("chemicalMakeup"),
   researchContent: text("researchContent"), // Rich text / markdown
