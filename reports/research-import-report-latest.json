@@ -1,0 +1,445 @@
+{
+  "generatedAt": "2026-06-13T16:48:29.414Z",
+  "knowledgeBaseTemplates": 103,
+  "catalogTemplates": 103,
+  "totalProducts": 54,
+  "matched": [
+    {
+      "slug": "bpc-157-5mg",
+      "name": "BPC-157 5mg",
+      "category": "Peptides",
+      "templateSlug": "bpc-157",
+      "templateTitle": "BPC 157",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "bpc-157-10mg",
+      "name": "BPC-157 10mg",
+      "category": "Peptides",
+      "templateSlug": "bpc-157",
+      "templateTitle": "BPC 157",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "bpc-157-capsules-500mcg-30",
+      "name": "BPC-157 Capsules 500mcg (30)",
+      "category": "Peptides",
+      "templateSlug": "bpc-157",
+      "templateTitle": "BPC 157",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "tb-500",
+      "name": "TB-500",
+      "category": "Peptides",
+      "templateSlug": "tb-500",
+      "templateTitle": "TB 500",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "cjc-1295-no-dac-ipamorelin-5mg-5mg",
+      "name": "CJC-1295 No DAC/Ipamorelin 5mg/5mg",
+      "category": "Blends",
+      "templateSlug": "cjc-1295-ipamorelin-10mg-blend",
+      "templateTitle": "CJC 1295 Ipamorelin 10MG Blend",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "dsip-5mg",
+      "name": "DSIP 5mg",
+      "category": "Peptides",
+      "templateSlug": "dsip-5mg",
+      "templateTitle": "DSIP 5MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "epithalon-10mg",
+      "name": "Epithalon 10mg",
+      "category": "Peptides",
+      "templateSlug": "epitalon-25mg",
+      "templateTitle": "Epitalon 25MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "ghk-cu-50mg",
+      "name": "GHK-Cu 50mg",
+      "category": "Peptides",
+      "templateSlug": "ghk-cu-50mg-copper",
+      "templateTitle": "GHK Cu 50MG Copper",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "kisspeptin-10mg",
+      "name": "Kisspeptin 10mg",
+      "category": "Peptides",
+      "templateSlug": "kisspeptin-10mg",
+      "templateTitle": "Kisspeptin 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "kpv-10mg",
+      "name": "KPV 10mg",
+      "category": "Peptides",
+      "templateSlug": "kpv-4mg",
+      "templateTitle": "KPV 4MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "melanotan-1-10mg",
+      "name": "Melanotan 1 10mg",
+      "category": "Peptides",
+      "templateSlug": "melanotan-1-10mg",
+      "templateTitle": "Melanotan 1 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "melanotan-2-10mg",
+      "name": "Melanotan 2 10mg",
+      "category": "Peptides",
+      "templateSlug": "melanotan-1-10mg",
+      "templateTitle": "Melanotan 1 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "mots-c-5mg",
+      "name": "MOTS-c 5mg",
+      "category": "Peptides",
+      "templateSlug": "mots-c-10mg",
+      "templateTitle": "MOTS C 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "mots-c-10mg",
+      "name": "MOTS-c 10mg",
+      "category": "Peptides",
+      "templateSlug": "mots-c-10mg",
+      "templateTitle": "MOTS C 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "nad-500mg",
+      "name": "NAD+ 500mg",
+      "category": "Wellness",
+      "templateSlug": "nad-100mg-750mg",
+      "templateTitle": "NAD 100MG 750MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "nad-1000mg",
+      "name": "NAD+ 1000mg",
+      "category": "Wellness",
+      "templateSlug": "nad-100mg-750mg",
+      "templateTitle": "NAD 100MG 750MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "oxytocin-acetate-5mg",
+      "name": "Oxytocin Acetate 5mg",
+      "category": "Peptides",
+      "templateSlug": "oxytocin-10mg",
+      "templateTitle": "Oxytocin 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "pe-22-28-10mg",
+      "name": "PE-22-28 10mg",
+      "category": "Peptides",
+      "templateSlug": "pe-22-28-8mg",
+      "templateTitle": "PE 22 28 8MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "pinealon-20mg",
+      "name": "Pinealon 20mg",
+      "category": "Peptides",
+      "templateSlug": "pinealon-20mg",
+      "templateTitle": "Pinealon 20MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "pt-141-10mg",
+      "name": "PT-141 10mg",
+      "category": "Peptides",
+      "templateSlug": "pt-141-10mg-bremelanotide",
+      "templateTitle": "PT 141 10MG Bremelanotide",
+      "score": 0.75,
+      "applied": false
+    },
+    {
+      "slug": "selank-10mg",
+      "name": "Selank 10mg",
+      "category": "Peptides",
+      "templateSlug": "selank-10mg",
+      "templateTitle": "Selank 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "selank-semax-blend-10mg-10mg",
+      "name": "Selank/Semax Blend 10mg/10mg",
+      "category": "Blends",
+      "templateSlug": "selank-10mg",
+      "templateTitle": "Selank 10MG",
+      "score": 0.75,
+      "applied": false
+    },
+    {
+      "slug": "semax-10mg",
+      "name": "Semax 10mg",
+      "category": "Peptides",
+      "templateSlug": "semax-25mg",
+      "templateTitle": "Semax 25MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "sermorelin-10mg",
+      "name": "Sermorelin 10mg",
+      "category": "Peptides",
+      "templateSlug": "sermorelin-5mg",
+      "templateTitle": "Sermorelin 5MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "super-wolf-10mg-10mg-10mg",
+      "name": "Super Wolf 10mg/10mg/10mg",
+      "category": "Blends",
+      "templateSlug": "bpc-157-tb-500-ghk-cu-blend",
+      "templateTitle": "BPC 157 TB 500 GHK Cu Blend",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "tesamorelin-10mg",
+      "name": "Tesamorelin 10mg",
+      "category": "Peptides",
+      "templateSlug": "tesamorelin-10mg",
+      "templateTitle": "Tesamorelin 10MG",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "thymosin-alpha-1-10mg",
+      "name": "Thymosin Alpha-1 10mg",
+      "category": "Peptides",
+      "templateSlug": "thymosin-alpha-1",
+      "templateTitle": "Thymosin Alpha 1",
+      "score": 1,
+      "applied": false
+    },
+    {
+      "slug": "wolverine-blend-20mg",
+      "name": "Wolverine Blend 20mg",
+      "category": "Blends",
+      "templateSlug": "bpc-157-tb-500-10mg-blend",
+      "templateTitle": "BPC 157 TB 500 10MG Blend",
+      "score": 1,
+      "applied": false
+    }
+  ],
+  "unmatched": [
+    {
+      "slug": "cagrilintide-5mg",
+      "name": "Cagrilintide 5mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "cagrilintide-semaglutide-5mg-5mg",
+      "name": "Cagrilintide/Semaglutide 5mg/5mg",
+      "category": "Blends",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "glp-1-semaglutide-5mg",
+      "name": "GLP-1 Semaglutide 5mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "glp-1-semaglutide-10mg",
+      "name": "GLP-1 Semaglutide 10mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "mazdutide-5mg",
+      "name": "Mazdutide 5mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "retatrutide-5mg",
+      "name": "Retatrutide 5mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "retatrutide-15mg",
+      "name": "Retatrutide 15mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "ss-31-30mg",
+      "name": "SS-31 30mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "survodutide-5mg",
+      "name": "Survodutide 5mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "tirzepatide-5mg",
+      "name": "Tirzepatide 5mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "tirzepatide-15mg",
+      "name": "Tirzepatide 15mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "5-amino-1mq-50mg",
+      "name": "5-Amino-1MQ 50mg",
+      "category": "Peptides",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "bacteriostatic-water-10ml",
+      "name": "Bacteriostatic Water 10ml",
+      "category": "Reconstitution",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "bacteriostatic-water-30ml",
+      "name": "Bacteriostatic Water 30ml",
+      "category": "Reconstitution",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "hospira-bacteriostatic-water-30ml",
+      "name": "Hospira Bacteriostatic Water 30ml",
+      "category": "Reconstitution",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "reconstitution-kit",
+      "name": "Reconstitution Kit",
+      "category": "Reconstitution",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "glutathione-1200mg",
+      "name": "Glutathione 1200mg",
+      "category": "Wellness",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "l-carnitine-300mg-ml-30ml",
+      "name": "L-Carnitine 300mg/ml 30ml",
+      "category": "Wellness",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "vitamin-b-complex",
+      "name": "Vitamin B Complex",
+      "category": "Wellness",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "vitamin-d-100-000-iu-ml",
+      "name": "Vitamin D 100,000 IU/ml",
+      "category": "Wellness",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "curenex-daily-care-rejuvenating-cream",
+      "name": "Curenex Daily Care Rejuvenating Cream",
+      "category": "Skin Care",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "curenex-daily-care-skin-booster",
+      "name": "Curenex Daily Care Skin Booster",
+      "category": "Skin Care",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "curenex-hydrating-cleanser",
+      "name": "Curenex Hydrating Cleanser",
+      "category": "Skin Care",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "curenex-sheer-sunscreen-50-spf",
+      "name": "Curenex Sheer Sunscreen 50 SPF",
+      "category": "Skin Care",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "rm-repair-moisturizing-cream",
+      "name": "RM Repair Moisturizing Cream",
+      "category": "Skin Care",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    },
+    {
+      "slug": "urea-cream-skin-softener",
+      "name": "Urea Cream Skin Softener",
+      "category": "Skin Care",
+      "suggestions": [],
+      "recommendation": "create-from-scratch"
+    }
+  ],
+  "errors": []
+}

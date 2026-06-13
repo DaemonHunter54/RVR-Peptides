@@ -7,6 +7,7 @@ import {
   productCategories,
   researchCitations, InsertResearchCitation,
   productResearch,
+  researchKnowledgeTemplates, InsertResearchKnowledgeTemplate,
   orders, InsertOrder,
   orderItems,
   discountCodes, InsertDiscountCode,
@@ -491,6 +492,79 @@ export async function deleteProductCitations(productId: number) {
   const db = await getDb();
   if (!db) return;
   await db.delete(researchCitations).where(eq(researchCitations.productId, productId));
+}
+
+// ─── Research Knowledge Base ─────────────────────────────────────────
+export async function getResearchKnowledgeTemplate(templateSlug: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(researchKnowledgeTemplates)
+    .where(eq(researchKnowledgeTemplates.templateSlug, templateSlug))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    templateSlug: row.templateSlug,
+    title: row.title,
+    sourceSize: row.sourceSize || "",
+    sourceContents: row.sourceContents || "",
+    sourceForm: row.sourceForm || "",
+    sourcePurity: row.sourcePurity || "",
+    sourceSku: row.sourceSku || "",
+    overview: row.overview,
+    chemicalBlock: row.chemicalBlock,
+    researchContent: row.researchContent,
+    citations: Array.isArray(row.citations) ? row.citations : [],
+  };
+}
+
+export async function upsertResearchKnowledgeTemplate(data: {
+  templateSlug: string;
+  title: string;
+  sourceSize?: string;
+  sourceContents?: string;
+  sourceForm?: string;
+  sourcePurity?: string;
+  sourceSku?: string;
+  overview: string;
+  chemicalBlock: string;
+  researchContent: string;
+  citations: unknown[];
+}) {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await getResearchKnowledgeTemplate(data.templateSlug);
+  const payload: InsertResearchKnowledgeTemplate = {
+    templateSlug: data.templateSlug,
+    title: data.title,
+    sourceSize: data.sourceSize || null,
+    sourceContents: data.sourceContents || null,
+    sourceForm: data.sourceForm || null,
+    sourcePurity: data.sourcePurity || null,
+    sourceSku: data.sourceSku || null,
+    overview: data.overview,
+    chemicalBlock: data.chemicalBlock,
+    researchContent: data.researchContent,
+    citations: data.citations as InsertResearchKnowledgeTemplate["citations"],
+  };
+
+  if (existing) {
+    await db
+      .update(researchKnowledgeTemplates)
+      .set(payload)
+      .where(eq(researchKnowledgeTemplates.templateSlug, data.templateSlug));
+  } else {
+    await db.insert(researchKnowledgeTemplates).values(payload);
+  }
+}
+
+export async function getResearchKnowledgeTemplateCount() {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db.select({ count: sql<number>`count(*)` }).from(researchKnowledgeTemplates);
+  return Number(rows[0]?.count || 0);
 }
 
 // ─── Orders ──────────────────────────────────────────────────────────

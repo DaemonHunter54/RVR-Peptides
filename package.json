@@ -10,6 +10,9 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "research:sync-kb": "npx tsx scripts/research-knowledge-sync.ts",
+    "research:bulk-report": "npx tsx scripts/research-bulk-import.ts",
+    "research:bulk-import": "npx tsx scripts/research-bulk-import.ts --sync-kb --apply",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

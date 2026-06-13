@@ -128,6 +128,27 @@ export const productResearch = mysqlTable("productResearch", {
 
 export type ProductResearch = typeof productResearch.$inferSelect;
 
+// ─── Research Knowledge Base (cached template library) ─────────────
+export const researchKnowledgeTemplates = mysqlTable("researchKnowledgeTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  templateSlug: varchar("templateSlug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  sourceSize: varchar("sourceSize", { length: 100 }),
+  sourceContents: varchar("sourceContents", { length: 255 }),
+  sourceForm: varchar("sourceForm", { length: 100 }),
+  sourcePurity: varchar("sourcePurity", { length: 50 }),
+  sourceSku: varchar("sourceSku", { length: 50 }),
+  overview: text("overview").notNull(),
+  chemicalBlock: text("chemicalBlock").notNull(),
+  researchContent: text("researchContent").notNull(),
+  citations: json("citations").notNull(),
+  syncedAt: timestamp("syncedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ResearchKnowledgeTemplate = typeof researchKnowledgeTemplates.$inferSelect;
+export type InsertResearchKnowledgeTemplate = typeof researchKnowledgeTemplates.$inferInsert;
+
 // ─── Orders ──────────────────────────────────────────────────────────
 export const orders = mysqlTable("orders", {
   id: int("id").autoincrement().primaryKey(),

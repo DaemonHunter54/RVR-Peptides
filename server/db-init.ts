@@ -1,6 +1,7 @@
 import mysql, { RowDataPacket } from "mysql2/promise";
 import fs from "fs";
 import path from "path";
+import { DEFAULT_PRODUCTS } from "../shared/rvrProductCatalog";
 
 const TABLES = [
 `CREATE TABLE IF NOT EXISTS users (
@@ -95,6 +96,24 @@ const TABLES = [
   sortOrder int NOT NULL DEFAULT 0,
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
+)`,
+`CREATE TABLE IF NOT EXISTS researchKnowledgeTemplates (
+  id int AUTO_INCREMENT NOT NULL,
+  templateSlug varchar(255) NOT NULL,
+  title varchar(255) NOT NULL,
+  sourceSize varchar(100),
+  sourceContents varchar(255),
+  sourceForm varchar(100),
+  sourcePurity varchar(50),
+  sourceSku varchar(50),
+  overview text NOT NULL,
+  chemicalBlock text NOT NULL,
+  researchContent text NOT NULL,
+  citations json NOT NULL,
+  syncedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY researchKnowledgeTemplates_slug_unique (templateSlug)
 )`,
 `CREATE TABLE IF NOT EXISTS orders (
   id int AUTO_INCREMENT NOT NULL,
@@ -293,71 +312,6 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
   ["giftCards", "lastUsedAt", "timestamp NULL"],
 ];
 
-
-type SeedProduct = {
-  slug: string;
-  name: string;
-  image: string;
-  category: string;
-  price: string;
-};
-
-const DEFAULT_PRODUCTS: SeedProduct[] = [
-  { slug: "bpc-157-5mg", name: "BPC-157 5mg", image: "", category: "Peptides", price: "39.99" },
-  { slug: "bpc-157-10mg", name: "BPC-157 10mg", image: "", category: "Peptides", price: "69.99" },
-  { slug: "bpc-157-capsules-500mcg-30", name: "BPC-157 Capsules 500mcg (30)", image: "/assets/bpc-157-capsules-500mcg-30_hd.webp?v=4", category: "Peptides", price: "49.99" },
-  { slug: "tb-500", name: "TB-500", image: "/api/vial/tb-500.png?name=TB-500&v=rvr-photoreal-adaptive-fit-v1", category: "Peptides", price: "49.99" },
-  { slug: "cagrilintide-5mg", name: "Cagrilintide 5mg", image: "", category: "Peptides", price: "99.99" },
-  { slug: "cagrilintide-semaglutide-5mg-5mg", name: "Cagrilintide/Semaglutide 5mg/5mg", image: "", category: "Blends", price: "129.99" },
-  { slug: "cjc-1295-no-dac-ipamorelin-5mg-5mg", name: "CJC-1295 No DAC/Ipamorelin 5mg/5mg", image: "", category: "Blends", price: "79.99" },
-  { slug: "dsip-5mg", name: "DSIP 5mg", image: "", category: "Peptides", price: "39.99" },
-  { slug: "epithalon-10mg", name: "Epithalon 10mg", image: "", category: "Peptides", price: "49.99" },
-  { slug: "ghk-cu-50mg", name: "GHK-Cu 50mg", image: "", category: "Peptides", price: "59.99" },
-  { slug: "glp-1-semaglutide-5mg", name: "GLP-1 Semaglutide 5mg", image: "", category: "Peptides", price: "89.99" },
-  { slug: "glp-1-semaglutide-10mg", name: "GLP-1 Semaglutide 10mg", image: "", category: "Peptides", price: "149.99" },
-  { slug: "kisspeptin-10mg", name: "Kisspeptin 10mg", image: "", category: "Peptides", price: "49.99" },
-  { slug: "kpv-10mg", name: "KPV 10mg", image: "", category: "Peptides", price: "44.99" },
-  { slug: "mazdutide-5mg", name: "Mazdutide 5mg", image: "", category: "Peptides", price: "99.99" },
-  { slug: "melanotan-1-10mg", name: "Melanotan 1 10mg", image: "", category: "Peptides", price: "39.99" },
-  { slug: "melanotan-2-10mg", name: "Melanotan 2 10mg", image: "", category: "Peptides", price: "39.99" },
-  { slug: "mots-c-5mg", name: "MOTS-c 5mg", image: "", category: "Peptides", price: "49.99" },
-  { slug: "mots-c-10mg", name: "MOTS-c 10mg", image: "", category: "Peptides", price: "79.99" },
-  { slug: "nad-500mg", name: "NAD+ 500mg", image: "", category: "Wellness", price: "79.99" },
-  { slug: "nad-1000mg", name: "NAD+ 1000mg", image: "", category: "Wellness", price: "129.99" },
-  { slug: "oxytocin-acetate-5mg", name: "Oxytocin Acetate 5mg", image: "", category: "Peptides", price: "39.99" },
-  { slug: "pe-22-28-10mg", name: "PE-22-28 10mg", image: "", category: "Peptides", price: "49.99" },
-  { slug: "pinealon-20mg", name: "Pinealon 20mg", image: "", category: "Peptides", price: "49.99" },
-  { slug: "pt-141-10mg", name: "PT-141 10mg", image: "", category: "Peptides", price: "44.99" },
-  { slug: "retatrutide-5mg", name: "Retatrutide 5mg", image: "", category: "Peptides", price: "99.99" },
-  { slug: "retatrutide-15mg", name: "Retatrutide 15mg", image: "", category: "Peptides", price: "199.99" },
-  { slug: "selank-10mg", name: "Selank 10mg", image: "", category: "Peptides", price: "39.99" },
-  { slug: "selank-semax-blend-10mg-10mg", name: "Selank/Semax Blend 10mg/10mg", image: "", category: "Blends", price: "69.99" },
-  { slug: "semax-10mg", name: "Semax 10mg", image: "", category: "Peptides", price: "39.99" },
-  { slug: "sermorelin-10mg", name: "Sermorelin 10mg", image: "", category: "Peptides", price: "49.99" },
-  { slug: "ss-31-30mg", name: "SS-31 30mg", image: "", category: "Peptides", price: "89.99" },
-  { slug: "super-wolf-10mg-10mg-10mg", name: "Super Wolf 10mg/10mg/10mg", image: "", category: "Blends", price: "99.99" },
-  { slug: "survodutide-5mg", name: "Survodutide 5mg", image: "", category: "Peptides", price: "99.99" },
-  { slug: "tesamorelin-10mg", name: "Tesamorelin 10mg", image: "", category: "Peptides", price: "89.99" },
-  { slug: "thymosin-alpha-1-10mg", name: "Thymosin Alpha-1 10mg", image: "", category: "Peptides", price: "49.99" },
-  { slug: "tirzepatide-5mg", name: "Tirzepatide 5mg", image: "", category: "Peptides", price: "99.99" },
-  { slug: "tirzepatide-15mg", name: "Tirzepatide 15mg", image: "", category: "Peptides", price: "199.99" },
-  { slug: "wolverine-blend-20mg", name: "Wolverine Blend 20mg", image: "", category: "Blends", price: "89.99" },
-  { slug: "5-amino-1mq-50mg", name: "5-Amino-1MQ 50mg", image: "", category: "Peptides", price: "59.99" },
-  { slug: "bacteriostatic-water-10ml", name: "Bacteriostatic Water 10ml", image: "", category: "Reconstitution", price: "9.99" },
-  { slug: "bacteriostatic-water-30ml", name: "Bacteriostatic Water 30ml", image: "", category: "Reconstitution", price: "14.99" },
-  { slug: "hospira-bacteriostatic-water-30ml", name: "Hospira Bacteriostatic Water 30ml", image: "", category: "Reconstitution", price: "19.99" },
-  { slug: "reconstitution-kit", name: "Reconstitution Kit", image: "/assets/reconstitution-kit-hd.png", category: "Reconstitution", price: "24.99" },
-  { slug: "glutathione-1200mg", name: "Glutathione 1200mg", image: "", category: "Wellness", price: "79.99" },
-  { slug: "l-carnitine-300mg-ml-30ml", name: "L-Carnitine 300mg/ml 30ml", image: "", category: "Wellness", price: "59.99" },
-  { slug: "vitamin-b-complex", name: "Vitamin B Complex", image: "", category: "Wellness", price: "39.99" },
-  { slug: "vitamin-d-100-000-iu-ml", name: "Vitamin D 100,000 IU/ml", image: "", category: "Wellness", price: "39.99" },
-  { slug: "curenex-daily-care-rejuvenating-cream", name: "Curenex Daily Care Rejuvenating Cream", image: "/assets/curenex-daily-care-rejuvenating-cream-hd-tube.png", category: "Skin Care", price: "49.99" },
-  { slug: "curenex-daily-care-skin-booster", name: "Curenex Daily Care Skin Booster", image: "/assets/curenex-daily-care-skin-booster-hd-tube.png", category: "Skin Care", price: "59.99" },
-  { slug: "curenex-hydrating-cleanser", name: "Curenex Hydrating Cleanser", image: "/assets/curenex-hydrating-cleanser-hd-tube.png", category: "Skin Care", price: "34.99" },
-  { slug: "curenex-sheer-sunscreen-50-spf", name: "Curenex Sheer Sunscreen 50 SPF", image: "/assets/curenex-sheer-sunscreen-50-spf-hd-tube.png", category: "Skin Care", price: "34.99" },
-  { slug: "rm-repair-moisturizing-cream", name: "RM Repair Moisturizing Cream", image: "/assets/rm-repair-moisturizing-cream-hd-tube.png", category: "Skin Care", price: "49.99" },
-  { slug: "urea-cream-skin-softener", name: "Urea Cream Skin Softener", image: "/assets/urea-cream-skin-softener-hd-tube.png", category: "Skin Care", price: "29.99" },
-];
 
 const DEFAULT_CATEGORIES = ["Peptides", "Blends", "Reconstitution", "Wellness", "Skin Care"];
 

@@ -235,7 +235,9 @@ function ProductsSection() {
   });
   const importAllFromCore = trpc.admin.research.importAllFromCore.useMutation({
     onSuccess: (result) => {
-      toast.success(`Imported ${result.imported} product research template(s)${result.failed ? ` (${result.failed} skipped)` : ""}.`);
+      const imported = result.matched?.filter((item: any) => item.applied).length ?? result.imported ?? 0;
+      const unmatched = result.unmatched?.length ?? 0;
+      toast.success(`Imported ${imported} product research template(s)${unmatched ? ` (${unmatched} need manual review)` : ""}.`);
       productsQuery.refetch();
     },
     onError: (err: any) => toast.error(err.message),

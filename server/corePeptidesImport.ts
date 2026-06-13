@@ -37,6 +37,20 @@ export type TemplateImportResult = {
   templateTitle: string;
 };
 
+export type RawKnowledgeTemplate = {
+  templateSlug: string;
+  title: string;
+  sourceSize: string;
+  sourceContents: string;
+  sourceForm: string;
+  sourcePurity: string;
+  sourceSku: string;
+  overview: string;
+  chemicalBlock: string;
+  researchContent: string;
+  citations: TemplateImportResult["citations"];
+};
+
 const CATALOG_URL = "https://www.corepeptides.com/peptides/";
 const CATALOG_TTL_MS = 60 * 60 * 1000;
 
@@ -202,6 +216,40 @@ function inferSku(productSlug: string): string {
   return base ? `P-${base}` : "";
 }
 
+function parseSpecs(text: string) {
+  const sizeMatch = text.match(/Size:\s*([^\n]+)/i);
+  const contentsMatch = text.match(/Contents:\s*([^\n]+)/i);
+  const formMatch = text.match(/Form:\s*([^\n]+)/i);
+  const purityMatch = text.match(/Purity:\s*([^\n]+)/i);
+  const skuMatch = text.match(/SKU:\s*([^\n]+)/i);
+  return {
+    size: sizeMatch?.[1]?.trim() || "",
+    contents: contentsMatch?.[1]?.trim() || "",
+    form: formMatch?.[1]?.trim() || "",
+    purity: purityMatch?.[1]?.trim() || "",
+    sku: skuMatch?.[1]?.trim() || "",
+  };
+}
+
+export function parseRawKnowledgeTemplateFromHtml(html: string, templateSlug: string): RawKnowledgeTemplate {
+  const text = htmlToText(html);
+  const specs = parseSpecs(text);
+
+  return {
+    templateSlug,
+    title: slugToTitle(templateSlug),
+    sourceSize: specs.size,
+    sourceContents: specs.contents,
+    sourceForm: specs.form,
+    sourcePurity: specs.purity,
+    sourceSku: specs.sku,
+    overview: parseOverview(text),
+    chemicalBlock: parseChemicalBlock(text),
+    researchContent: parseResearchContent(text),
+    citations: parseReferences(text),
+  };
+}
+
 export function resolveListingSpecs(specs: ListingSpecs, productSlug: string): ListingSpecs {
   const size = specs.size?.trim() || inferSize(productSlug, specs.productName);
   const contents = specs.contents?.trim() || inferContents(specs.productName, productSlug);
@@ -311,7 +359,7 @@ export async function searchResearchTemplates(
   return { match: null, suggestions };
 }
 
-async function fetchTemplatePage(templateSlug: string): Promise<string> {
+async function fetchTemplatePageHtml(templateSlug: string): Promise<string> {
   const sourceUrl = `https://www.corepeptides.com/peptides/${templateSlug}/`;
   const response = await fetch(sourceUrl, {
     headers: {
@@ -327,19 +375,27 @@ async function fetchTemplatePage(templateSlug: string): Promise<string> {
   return response.text();
 }
 
+export { fetchTemplatePageHtml };
+
+async function loadKnowledgeTemplate(templateSlug: string): Promise<RawKnowledgeTemplate> {
+  const { getKnowledgeTemplate, syncKnowledgeTemplate } = await import("./researchKnowledgeBase");
+  const cached = await getKnowledgeTemplate(templateSlug);
+  if (cached) return cached;
+  return syncKnowledgeTemplate(templateSlug);
+}
+
 export async function fetchResearchTemplate(
   templateSlug: string,
   listingSpecs: ListingSpecs,
   productSlug: string
 ): Promise<TemplateImportResult> {
-  const html = await fetchTemplatePage(templateSlug);
-  const text = htmlToText(html);
+  const knowledge = await loadKnowledgeTemplate(templateSlug);
   const resolved = resolveListingSpecs(listingSpecs, productSlug);
 
-  const overview = applyListingSpecsToText(parseOverview(text), resolved);
-  const chemicalMakeup = buildChemicalMakeup(resolved, parseChemicalBlock(text));
-  const researchContent = applyListingSpecsToText(parseResearchContent(text), resolved);
-  const citations = parseReferences(text);
+  const overview = applyListingSpecsToText(knowledge.overview, resolved);
+  const chemicalMakeup = buildChemicalMakeup(resolved, knowledge.chemicalBlock);
+  const researchContent = applyListingSpecsToText(knowledge.researchContent, resolved);
+  const citations = knowledge.citations;
 
   if (!overview && !researchContent) {
     throw new Error("Template loaded but research content could not be parsed.");
@@ -360,7 +416,7 @@ export async function fetchResearchTemplate(
     citations,
     appliedSpecs: resolved,
     templateSlug,
-    templateTitle: slugToTitle(templateSlug),
+    templateTitle: knowledge.title,
   };
 }
 

@@ -904,94 +904,34 @@ export const appRouter = router({
 
         return fetchResearchTemplate(resolvedTemplateSlug, { productName, ...specs }, productSlug);
       }),
-      importAllFromCore: adminProcedure.mutation(async () => {
-        const { fetchResearchTemplate, searchResearchTemplates } = await import("./corePeptidesImport");
-        const { DIRECT_MATCH_SCORE } = await import("../shared/researchTemplateMatch");
+      syncKnowledgeBase: adminProcedure
+        .input(z.object({ force: z.boolean().optional() }).optional())
+        .mutation(async ({ input }) => {
+          const { syncFullKnowledgeBase } = await import("./researchKnowledgeBase");
+          return syncFullKnowledgeBase({ force: input?.force });
+        }),
+      bulkImportReport: adminProcedure.query(async () => {
+        const { buildBulkImportReport } = await import("./researchBulkImport");
         const { products: allProducts } = await db.getAllProducts({});
-        const results: Array<{ slug: string; name: string; success: boolean; error?: string }> = [];
-
-        for (const product of allProducts) {
-          try {
-            const search = await searchResearchTemplates(product.slug, product.name);
-            const templateSlug =
-              search.match?.slug ||
-              search.suggestions.find((item) => item.score >= DIRECT_MATCH_SCORE)?.slug ||
-              search.suggestions[0]?.slug;
-
-            if (!templateSlug) {
-              results.push({
-                slug: product.slug,
-                name: product.name,
-                success: false,
-                error: "No similar research template found",
-              });
-              continue;
-            }
-
-            const imported = await fetchResearchTemplate(
-              templateSlug,
-              {
-                productName: product.name,
-                size: product.size || undefined,
-                purity: product.purity || undefined,
-                form: product.form || undefined,
-                contents: product.contents || undefined,
-                sku: product.sku || undefined,
-                otherNames: product.otherNames || undefined,
-                molecularFormula: product.molecularFormula || undefined,
-                molecularWeight: product.molecularWeight || undefined,
-              },
-              product.slug
-            );
-
-            await db.upsertProductResearch(product.id, {
-              overview: imported.overview,
-              chemicalMakeup: imported.chemicalMakeup,
-              researchContent: imported.researchContent,
-            });
-            const existing = await db.getProductCitations(product.id);
-            for (const citation of existing) {
-              await db.deleteCitation(citation.id);
-            }
-            for (let index = 0; index < imported.citations.length; index++) {
-              const citation = imported.citations[index];
-              await db.createCitation({
-                productId: product.id,
-                citationNumber: index + 1,
-                title: citation.title,
-                authors: citation.authors,
-                journal: citation.journal,
-                year: citation.year,
-                url: citation.url,
-                summary: citation.summary,
-              });
-            }
-
-            const productPatch: Record<string, string> = { shortDescription: imported.shortDescription };
-            const applied = imported.appliedSpecs;
-            if (!product.size && applied.size) productPatch.size = applied.size;
-            if (!product.purity && applied.purity) productPatch.purity = applied.purity;
-            if (!product.form && applied.form) productPatch.form = applied.form;
-            if (!product.contents && applied.contents) productPatch.contents = applied.contents;
-            if (!product.sku && applied.sku) productPatch.sku = applied.sku;
-
-            await db.updateProduct(product.id, productPatch as any);
-            results.push({ slug: product.slug, name: product.name, success: true });
-          } catch (error: any) {
-            results.push({
-              slug: product.slug,
-              name: product.name,
-              success: false,
-              error: error?.message || "Import failed",
-            });
-          }
-        }
-
-        return {
-          imported: results.filter((item) => item.success).length,
-          failed: results.filter((item) => !item.success).length,
-          results,
-        };
+        return buildBulkImportReport(
+          allProducts.map((product) => ({
+            id: product.id,
+            slug: product.slug,
+            name: product.name,
+            size: product.size,
+            purity: product.purity,
+            form: product.form,
+            contents: product.contents,
+            sku: product.sku,
+            otherNames: product.otherNames,
+            molecularFormula: product.molecularFormula,
+            molecularWeight: product.molecularWeight,
+          }))
+        );
+      }),
+      importAllFromCore: adminProcedure.mutation(async () => {
+        const { runBulkResearchImport } = await import("./researchBulkImport");
+        return runBulkResearchImport({ apply: true, syncKnowledgeBase: true });
       }),
       upsert: adminProcedure.input(z.object({
         productId: z.number(),
