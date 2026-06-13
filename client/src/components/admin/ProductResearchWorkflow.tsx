@@ -143,6 +143,30 @@ function buildImportPayload(
   };
 }
 
+function mergeImportedDraft(
+  prev: ProductResearchDraft,
+  imported: any,
+  sourceUrl?: string
+): ProductResearchDraft {
+  return {
+    ...prev,
+    overview: imported.overview || "",
+    chemicalMakeup: imported.chemicalMakeup || "",
+    researchContent: imported.researchContent || "",
+    citations: imported.citations?.length ? imported.citations : prev.citations,
+    templateSourceUrl: sourceUrl || imported.sourceUrl || prev.templateSourceUrl,
+  };
+}
+
+const emptyResearchDraft = (): ProductResearchDraft => ({
+  productBrief: "",
+  qualityNotes: "",
+  overview: "",
+  chemicalMakeup: "",
+  researchContent: "",
+  citations: [],
+});
+
 export function ProductResearchWorkflow({
   productName,
   productSlug,
@@ -152,6 +176,7 @@ export function ProductResearchWorkflow({
   onShortDescriptionChange,
   onOverviewPreview,
   onListingSpecsApply,
+  onImportApplied,
 }: {
   productName: string;
   productSlug?: string;
@@ -161,12 +186,14 @@ export function ProductResearchWorkflow({
   onShortDescriptionChange?: (shortDescription: string) => void;
   onOverviewPreview?: (overview: string) => void;
   onListingSpecsApply?: (specs: Partial<ProductResearchMeta>) => void;
+  onImportApplied?: (draft: ProductResearchDraft) => Promise<void> | void;
 }) {
   const [fetchingSources, setFetchingSources] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<TemplateSuggestion[]>([]);
   const [searchingTemplate, setSearchingTemplate] = useState(false);
   const [manualSourceUrl, setManualSourceUrl] = useState("");
+  const [importRevision, setImportRevision] = useState(0);
 
   const utils = trpc.useUtils();
   const generateDraft = trpc.admin.research.generateDraft.useMutation();
@@ -189,21 +216,20 @@ export function ProductResearchWorkflow({
         (Array.isArray(imported.citations) && imported.citations.length > 0)
     );
 
-  const applyImportedTemplate = (imported: any, sourceUrl?: string) => {
+  const applyImportedTemplate = async (imported: any, sourceUrl?: string) => {
     if (!importedHasContent(imported)) {
       throw new Error("Import returned no research content. Try a different source URL or re-sync the knowledge base.");
     }
 
-    onChange((prev) => ({
-      ...prev,
-      overview: imported.overview || "",
-      chemicalMakeup: imported.chemicalMakeup || "",
-      researchContent: imported.researchContent || "",
-      citations: imported.citations?.length ? imported.citations : prev.citations,
-      templateSourceUrl: sourceUrl || imported.sourceUrl || prev.templateSourceUrl,
-    }));
+    let merged = mergeImportedDraft(value, imported, sourceUrl);
+    onChange((prev) => {
+      merged = mergeImportedDraft(prev, imported, sourceUrl);
+      return merged;
+    });
+    setImportRevision((revision) => revision + 1);
+
     onShortDescriptionChange?.(imported.shortDescription);
-    onOverviewPreview?.(imported.overview);
+    onOverviewPreview?.(imported.overview || merged.overview);
 
     const applied = imported.appliedSpecs || {};
     onListingSpecsApply?.({
@@ -215,6 +241,10 @@ export function ProductResearchWorkflow({
       molecularFormula: productMeta?.molecularFormula ? undefined : applied.molecularFormula,
       molecularWeight: productMeta?.molecularWeight ? undefined : applied.molecularWeight,
     });
+
+    if (onImportApplied) {
+      await onImportApplied(merged);
+    }
   };
 
   const runImport = async (templateSlug: string) => {
@@ -229,8 +259,10 @@ export function ProductResearchWorkflow({
       const imported = await importTemplate.mutateAsync(
         buildImportPayload(slug, name, productMeta, { templateSlug })
       );
-      applyImportedTemplate(imported);
-      toast.success(`Research template imported for ${name}. Review your dose, SKU, and specs, then save.`);
+      await applyImportedTemplate(imported);
+      if (!onImportApplied) {
+        toast.success(`Research template imported for ${name}. Review your dose, SKU, and specs, then save.`);
+      }
       setPickerOpen(false);
     } catch (error: any) {
       toast.error(error?.message || "Unable to import research template.");
@@ -259,9 +291,11 @@ export function ProductResearchWorkflow({
       const imported = await importTemplate.mutateAsync(
         buildImportPayload(slug, name, productMeta, { sourceUrl })
       );
-      applyImportedTemplate(imported, sourceUrl);
+      await applyImportedTemplate(imported, sourceUrl);
       setManualSourceUrl(sourceUrl);
-      toast.success(`Research template imported from your source link. Review your dose, SKU, and specs, then save.`);
+      if (!onImportApplied) {
+        toast.success(`Research template imported from your source link. Review your dose, SKU, and specs, then save.`);
+      }
       setPickerOpen(false);
     } catch (error: any) {
       toast.error(error?.message || "Unable to import from that source URL.");
@@ -529,6 +563,7 @@ export function ProductResearchWorkflow({
         <div>
           <Label>Overview</Label>
           <Textarea
+            key={`overview-${importRevision}`}
             value={value.overview || ""}
             onChange={(e) => update({ overview: e.target.value })}
             className="mt-1.5"
@@ -539,6 +574,7 @@ export function ProductResearchWorkflow({
         <div>
           <Label>Chemical Makeup</Label>
           <Textarea
+            key={`chemical-${importRevision}`}
             value={value.chemicalMakeup}
             onChange={(e) => update({ chemicalMakeup: e.target.value })}
             className="mt-1.5 font-mono text-sm"
@@ -549,6 +585,7 @@ export function ProductResearchWorkflow({
         <div>
           <Label>Research Content</Label>
           <Textarea
+            key={`research-${importRevision}`}
             value={value.researchContent}
             onChange={(e) => update({ researchContent: e.target.value })}
             className="mt-1.5"
@@ -614,9 +651,12 @@ export function PersistedProductResearchWorkflow({
   onListingSpecsApply?: (specs: Partial<ProductResearchMeta>) => void;
 }) {
   const researchQuery = trpc.admin.research.get.useQuery({ productId });
+  const suppressSaveToastRef = useRef(false);
   const upsertResearch = trpc.admin.research.upsert.useMutation({
     onSuccess: () => {
-      toast.success("Research content saved!");
+      if (!suppressSaveToastRef.current) {
+        toast.success("Research content saved!");
+      }
       researchQuery.refetch();
     },
     onError: (err: any) => toast.error(err.message),
@@ -624,62 +664,63 @@ export function PersistedProductResearchWorkflow({
   const addCitation = trpc.admin.research.addCitation.useMutation();
   const deleteCitation = trpc.admin.research.deleteCitation.useMutation();
 
-  const [draft, setDraft] = useState<ProductResearchDraft>({
-    productBrief: "",
-    qualityNotes: "",
-    overview: "",
-    chemicalMakeup: "",
-    researchContent: "",
-    citations: [],
-  });
-  const [loaded, setLoaded] = useState(false);
+  const [draft, setDraft] = useState<ProductResearchDraft>(emptyResearchDraft());
+  const [hydrated, setHydrated] = useState(false);
   const dirtyRef = useRef(false);
+
+  const draftFromServer = (research: any, citations: any[]): ProductResearchDraft => ({
+    productBrief: research?.productBrief || "",
+    qualityNotes: research?.qualityNotes || "",
+    templateSourceUrl: research?.templateSourceUrl || "",
+    overview: research?.overview || "",
+    chemicalMakeup: research?.chemicalMakeup || "",
+    researchContent: research?.researchContent || "",
+    citations: citations.map((citation: any) => ({
+      title: citation.title || "",
+      authors: citation.authors || "",
+      journal: citation.journal || "",
+      year: citation.year || "",
+      url: citation.url || "",
+      summary: citation.summary || "",
+    })),
+  });
+
+  useEffect(() => {
+    dirtyRef.current = false;
+    setHydrated(false);
+    setDraft(emptyResearchDraft());
+  }, [productId]);
+
+  useEffect(() => {
+    if (hydrated || researchQuery.isLoading || dirtyRef.current) return;
+    if (!researchQuery.data) return;
+
+    setDraft(draftFromServer(researchQuery.data.research, researchQuery.data.citations || []));
+    setHydrated(true);
+  }, [hydrated, researchQuery.data, researchQuery.isLoading, productId]);
 
   const handleDraftChange: Dispatch<SetStateAction<ProductResearchDraft>> = (action) => {
     dirtyRef.current = true;
     setDraft(action);
   };
 
-  useEffect(() => {
-    if (loaded || researchQuery.isLoading || dirtyRef.current) return;
-    const research = researchQuery.data?.research;
-    const citations = researchQuery.data?.citations || [];
-    setDraft({
-      productBrief: research?.productBrief || "",
-      qualityNotes: research?.qualityNotes || "",
-      templateSourceUrl: research?.templateSourceUrl || "",
-      overview: research?.overview || "",
-      chemicalMakeup: research?.chemicalMakeup || "",
-      researchContent: research?.researchContent || "",
-      citations: citations.map((citation: any) => ({
-        title: citation.title || "",
-        authors: citation.authors || "",
-        journal: citation.journal || "",
-        year: citation.year || "",
-        url: citation.url || "",
-        summary: citation.summary || "",
-      })),
-    });
-    setLoaded(true);
-  }, [researchQuery.data, researchQuery.isLoading, loaded]);
-
-  const saveAll = async () => {
+  const syncDraftToServer = async (nextDraft: ProductResearchDraft) => {
     await upsertResearch.mutateAsync({
       productId,
-      productBrief: draft.productBrief || "",
-      qualityNotes: draft.qualityNotes || "",
-      templateSourceUrl: draft.templateSourceUrl || "",
-      overview: draft.overview || "",
-      chemicalMakeup: draft.chemicalMakeup || "",
-      researchContent: draft.researchContent || "",
+      productBrief: nextDraft.productBrief || "",
+      qualityNotes: nextDraft.qualityNotes || "",
+      templateSourceUrl: nextDraft.templateSourceUrl || "",
+      overview: nextDraft.overview || "",
+      chemicalMakeup: nextDraft.chemicalMakeup || "",
+      researchContent: nextDraft.researchContent || "",
     });
 
     const existing = researchQuery.data?.citations || [];
     for (const citation of existing) {
       await deleteCitation.mutateAsync({ id: citation.id });
     }
-    for (let index = 0; index < draft.citations.length; index++) {
-      const citation = draft.citations[index];
+    for (let index = 0; index < nextDraft.citations.length; index++) {
+      const citation = nextDraft.citations[index];
       if (!String(citation.title || "").trim()) continue;
       await addCitation.mutateAsync({
         productId,
@@ -692,9 +733,34 @@ export function PersistedProductResearchWorkflow({
         summary: citation.summary || "",
       });
     }
-    await researchQuery.refetch();
+  };
+
+  const handleImportApplied = async (nextDraft: ProductResearchDraft) => {
+    setDraft(nextDraft);
+    dirtyRef.current = true;
+    suppressSaveToastRef.current = true;
+    try {
+      await syncDraftToServer(nextDraft);
+      const refreshed = await researchQuery.refetch();
+      if (refreshed.data) {
+        dirtyRef.current = false;
+        setDraft(draftFromServer(refreshed.data.research, refreshed.data.citations || []));
+        setHydrated(true);
+      }
+      toast.success("Research imported and saved. Review your dose, SKU, and specs.");
+    } catch (error: any) {
+      toast.error(error?.message || "Import loaded but could not be saved.");
+      throw error;
+    } finally {
+      suppressSaveToastRef.current = false;
+    }
+  };
+
+  const saveAll = async () => {
+    await syncDraftToServer(draft);
     dirtyRef.current = false;
-    setLoaded(false);
+    setHydrated(false);
+    await researchQuery.refetch();
   };
 
   return (
@@ -707,6 +773,7 @@ export function PersistedProductResearchWorkflow({
         onChange={handleDraftChange}
         onShortDescriptionChange={onShortDescriptionChange}
         onListingSpecsApply={onListingSpecsApply}
+        onImportApplied={handleImportApplied}
       />
       <div className="flex justify-end">
         <Button type="button" onClick={saveAll} disabled={upsertResearch.isPending} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">

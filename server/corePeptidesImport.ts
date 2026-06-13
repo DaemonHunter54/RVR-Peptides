@@ -415,19 +415,25 @@ async function fetchTemplatePageHtml(templateSlug: string): Promise<string> {
 
 export { fetchTemplatePageHtml };
 
-async function loadKnowledgeTemplate(templateSlug: string): Promise<RawKnowledgeTemplate> {
+async function loadKnowledgeTemplate(
+  templateSlug: string,
+  options?: { forceFresh?: boolean }
+): Promise<RawKnowledgeTemplate> {
   const { getKnowledgeTemplate, syncKnowledgeTemplate } = await import("./researchKnowledgeBase");
-  const cached = await getKnowledgeTemplate(templateSlug);
-  if (cached) return cached;
+  if (!options?.forceFresh) {
+    const cached = await getKnowledgeTemplate(templateSlug);
+    if (cached) return cached;
+  }
   return syncKnowledgeTemplate(templateSlug);
 }
 
 export async function fetchResearchTemplate(
   templateSlug: string,
   listingSpecs: ListingSpecs,
-  productSlug: string
+  productSlug: string,
+  options?: { forceFresh?: boolean }
 ): Promise<TemplateImportResult> {
-  const knowledge = await loadKnowledgeTemplate(templateSlug);
+  const knowledge = await loadKnowledgeTemplate(templateSlug, options);
   const resolved = resolveListingSpecs(listingSpecs, productSlug);
 
   const chemicalMakeup = buildChemicalMakeup(resolved, knowledge.chemicalBlock);

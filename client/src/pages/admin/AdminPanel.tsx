@@ -923,9 +923,10 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         {!isGiftCardTemplate && (
           product?.id ? (
             <PersistedProductResearchWorkflow
+              key={product.id}
               productId={product.id}
               productName={form.name}
-              productSlug={form.slug}
+              productSlug={form.slug || autoSlug}
               productMeta={productResearchMetaFromForm(form)}
               onShortDescriptionChange={(shortDescription) => updateField("shortDescription", shortDescription)}
               onListingSpecsApply={(specs) => applyListingSpecsToForm(updateField, form, specs)}

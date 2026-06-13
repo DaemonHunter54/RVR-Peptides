@@ -908,7 +908,8 @@ export const appRouter = router({
         const result = await fetchResearchTemplate(
           resolvedTemplateSlug,
           { productName, ...specs },
-          productSlug
+          productSlug,
+          { forceFresh: Boolean(sourceUrl?.trim()) }
         );
 
         return {
