@@ -220,7 +220,7 @@ export const pickupSlots = mysqlTable("pickupSlots", {
   id: int("id").autoincrement().primaryKey(),
   startsAt: timestamp("startsAt").notNull(),
   endsAt: timestamp("endsAt").notNull(),
-  status: mysqlEnum("status", ["available", "booked"]).default("available").notNull(),
+  status: mysqlEnum("status", ["available", "booked", "blocked"]).default("available").notNull(),
   orderId: int("orderId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

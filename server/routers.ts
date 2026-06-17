@@ -926,8 +926,14 @@ export const appRouter = router({
     }),
 
     pickup: router({
+      listMonth: adminProcedure.input(z.object({ year: z.number(), month: z.number().min(1).max(12) })).query(async ({ input }) => {
+        return pickupSlotService.listPickupSlotsSummaryForMonth(input.year, input.month);
+      }),
       listDay: adminProcedure.input(z.object({ date: z.string() })).query(async ({ input }) => {
         return pickupSlotService.listPickupSlotsForDay(input.date);
+      }),
+      toggleSlot: adminProcedure.input(z.object({ slotId: z.number() })).mutation(async ({ input }) => {
+        return pickupSlotService.togglePickupSlotAvailability(input.slotId);
       }),
       generateDay: adminProcedure.input(z.object({
         date: z.string(),

@@ -258,7 +258,7 @@ const TABLES = [
   id int AUTO_INCREMENT NOT NULL,
   startsAt timestamp NOT NULL,
   endsAt timestamp NOT NULL,
-  status enum('available','booked') NOT NULL DEFAULT 'available',
+  status enum('available','booked','blocked') NOT NULL DEFAULT 'available',
   orderId int,
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -923,6 +923,16 @@ async function ensureProductColumnTypes(conn: mysql.Connection) {
 }
 
 
+async function ensurePickupSlotStatusEnum(conn: mysql.Connection) {
+  try {
+    await conn.execute(
+      "ALTER TABLE pickupSlots MODIFY COLUMN status enum('available','booked','blocked') NOT NULL DEFAULT 'available'"
+    );
+  } catch (error) {
+    console.warn("[DB init] Could not normalize pickupSlots.status enum:", error);
+  }
+}
+
 async function ensureUserRoleEnum(conn: mysql.Connection) {
   try {
     await conn.execute("ALTER TABLE users MODIFY COLUMN role enum('user','admin','super_admin') NOT NULL DEFAULT 'user'");
@@ -1118,6 +1128,7 @@ export async function ensureDatabaseReady() {
         await addColumnIfMissing(conn, table, column, definition);
       }
       await ensureUserRoleEnum(conn);
+      await ensurePickupSlotStatusEnum(conn);
       await ensureConfiguredSuperAdmin(conn);
       await ensureProductColumnTypes(conn);
       await ensureDefaultSiteSettings(conn);
