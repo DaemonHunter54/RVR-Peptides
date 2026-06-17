@@ -28,6 +28,39 @@ function formatSlotTime(startsAt: string | Date) {
   return new Date(startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+const PICKUP_PREVIEW_DAYS = 10;
+
+function buildTimeSlotLayout(slotCount: number) {
+  if (slotCount <= 0) return { cols: 1, rows: 1, stretch: true, textClass: "text-xs" };
+
+  let cols: number;
+  let textClass: string;
+  if (slotCount === 1) {
+    cols = 1;
+    textClass = "text-base";
+  } else if (slotCount === 2) {
+    cols = 2;
+    textClass = "text-sm";
+  } else if (slotCount <= 4) {
+    cols = 2;
+    textClass = "text-sm";
+  } else if (slotCount <= 6) {
+    cols = 3;
+    textClass = "text-xs";
+  } else if (slotCount <= 9) {
+    cols = 3;
+    textClass = "text-xs";
+  } else {
+    cols = 4;
+    textClass = "text-[11px]";
+  }
+
+  const rows = Math.ceil(slotCount / cols);
+  const stretch = rows <= 3;
+
+  return { cols, rows, stretch, textClass };
+}
+
 function ChoiceButton({
   onClick,
   title,
@@ -150,12 +183,12 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
     return map;
   }, [pickupSlots]);
 
-  const nextSevenDays = useMemo(() => {
+  const pickupPreviewDays = useMemo(() => {
     const days: Array<{ key: string; date: Date; weekday: string; dayNum: number; isToday: boolean; hasSlots: boolean }> = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayKey = dateKey(today);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < PICKUP_PREVIEW_DAYS; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       const key = dateKey(date);
@@ -172,14 +205,19 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
   }, [slotsByDate]);
 
   const selectedPickupDay = useMemo(
-    () => nextSevenDays.find((day) => day.key === pickupDayKey) || null,
-    [nextSevenDays, pickupDayKey]
+    () => pickupPreviewDays.find((day) => day.key === pickupDayKey) || null,
+    [pickupPreviewDays, pickupDayKey]
   );
 
   const timesForSelectedDay = useMemo(() => {
     if (!pickupDayKey) return [];
     return slotsByDate.get(pickupDayKey) || [];
   }, [pickupDayKey, slotsByDate]);
+
+  const timeSlotLayout = useMemo(
+    () => buildTimeSlotLayout(timesForSelectedDay.length),
+    [timesForSelectedDay.length]
+  );
 
   const stepSequence = useMemo((): WizardStep[] => {
     if (fulfillmentMethod === "ship") {
@@ -356,8 +394,8 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
         {showPanel("pickup-schedule") ? (
           <div className={panelClass}>
-            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-4 space-y-2.5">
-              <h2 className="text-base font-bold text-slate-900">Choose a meetup day and time</h2>
+            <div className="flex-1 flex flex-col max-w-lg mx-auto w-full pt-3 space-y-2 overflow-hidden">
+              <h2 className="text-base font-bold text-slate-900 shrink-0">Choose a meetup day and time</h2>
               {pickupSlotsLoading ? (
                 <p className="text-sm text-slate-500">Loading available times...</p>
               ) : pickupSlots.length === 0 ? (
@@ -366,10 +404,10 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                 </p>
               ) : (
                 <>
-                  <div>
-                    <p className="text-[11px] font-medium text-slate-500 mb-1.5">Next 7 days</p>
-                    <div className="grid grid-cols-7 gap-1">
-                      {nextSevenDays.map((day) => {
+                  <div className="shrink-0">
+                    <p className="text-[11px] font-medium text-slate-500 mb-1.5">Next {PICKUP_PREVIEW_DAYS} days</p>
+                    <div className="grid grid-cols-5 gap-1">
+                      {pickupPreviewDays.map((day) => {
                         const selected = pickupDayKey === day.key;
                         return (
                           <button
@@ -387,12 +425,12 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                               day.hasSlots && selected && "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20"
                             )}
                           >
-                            <span className={cn("text-[9px] font-semibold uppercase leading-none", selected ? "text-blue-100" : "text-slate-500")}>
+                            <span className={cn("text-[8px] font-semibold uppercase leading-none", selected ? "text-blue-100" : "text-slate-500")}>
                               {day.weekday}
                             </span>
-                            <span className="text-sm font-bold leading-tight mt-0.5">{day.dayNum}</span>
+                            <span className="text-xs font-bold leading-tight mt-0.5">{day.dayNum}</span>
                             {day.isToday ? (
-                              <span className={cn("text-[8px] leading-none mt-0.5", selected ? "text-blue-100" : "text-blue-600")}>Today</span>
+                              <span className={cn("text-[7px] leading-none mt-0.5", selected ? "text-blue-100" : "text-blue-600")}>Today</span>
                             ) : day.hasSlots ? (
                               <span className={cn("h-1 w-1 rounded-full mt-0.5", selected ? "bg-blue-200" : "bg-blue-500")} />
                             ) : null}
@@ -402,47 +440,61 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                     </div>
                   </div>
 
-                  <div className={cn("transition-all duration-300", !pickupDayKey && "opacity-50")}>
-                    <p className="text-[11px] font-medium text-slate-500 mb-1.5">
+                  <div className={cn("flex flex-col min-h-0 flex-1 transition-all duration-300", !pickupDayKey && "opacity-50")}>
+                    <p className="text-[11px] font-medium text-slate-500 mb-1.5 shrink-0">
                       {selectedPickupDay
                         ? `Available times — ${selectedPickupDay.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
                         : "Select a highlighted day above"}
                     </p>
                     {!pickupDayKey ? (
-                      <p className="text-[11px] text-slate-400 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3 py-4 text-center">
-                        Time slots appear here once you pick a day.
-                      </p>
+                      <div className="flex-1 min-h-[108px] flex items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3">
+                        <p className="text-[11px] text-slate-400 text-center">Time slots appear here once you pick a day.</p>
+                      </div>
                     ) : timesForSelectedDay.length === 0 ? (
-                      <p className="text-[11px] text-slate-500">No times available for this day.</p>
+                      <div className="flex-1 min-h-[108px] flex items-center justify-center">
+                        <p className="text-[11px] text-slate-500">No times available for this day.</p>
+                      </div>
                     ) : (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-[88px] overflow-y-auto pr-0.5">
-                        {timesForSelectedDay.map((slot) => {
-                          const active = pickupSlotId === slot.id;
-                          return (
-                            <button
-                              key={slot.id}
-                              type="button"
-                              onClick={() => onPickupSlotChange(slot.id)}
-                              className={cn(
-                                "rounded-lg border px-1.5 py-1.5 text-[11px] font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
-                                active
-                                  ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
-                                  : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/80"
-                              )}
-                            >
-                              {formatSlotTime(slot.startsAt)}
-                            </button>
-                          );
-                        })}
+                      <div className="h-[108px] overflow-y-auto overscroll-contain rounded-lg border border-slate-100 bg-slate-50/50 p-1.5 shrink-0">
+                        <div
+                          className="grid gap-1.5 min-h-full"
+                          style={{
+                            gridTemplateColumns: `repeat(${timeSlotLayout.cols}, minmax(0, 1fr))`,
+                            ...(timeSlotLayout.stretch
+                              ? { gridTemplateRows: `repeat(${timeSlotLayout.rows}, minmax(0, 1fr))` }
+                              : { gridAutoRows: "minmax(28px, auto)" }),
+                          }}
+                        >
+                          {timesForSelectedDay.map((slot) => {
+                            const active = pickupSlotId === slot.id;
+                            return (
+                              <button
+                                key={slot.id}
+                                type="button"
+                                onClick={() => onPickupSlotChange(slot.id)}
+                                className={cn(
+                                  "rounded-lg border font-semibold transition-all flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
+                                  timeSlotLayout.stretch ? "min-h-0 h-full" : "min-h-[28px]",
+                                  timeSlotLayout.textClass,
+                                  active
+                                    ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                                    : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/80"
+                                )}
+                              >
+                                {formatSlotTime(slot.startsAt)}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div>
+                  <div className="shrink-0">
                     <Label className="text-[11px]">Order notes (optional)</Label>
                     <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-0.5 min-h-[36px] text-xs resize-none" rows={1} placeholder="Preferred meetup location..." />
                   </div>
-                  <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm" disabled={!pickupSlotId} onClick={goNext}>
+                  <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm shrink-0" disabled={!pickupSlotId} onClick={goNext}>
                     Continue
                   </Button>
                 </>
