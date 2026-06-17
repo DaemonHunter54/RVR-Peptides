@@ -26,7 +26,7 @@ import {
 import { SITE_THEME_FIELDS } from "@shared/siteTheme";
 import { themeValue } from "@/lib/siteTheme";
 import { toast } from "sonner";
-import { ProductResearchWorkflow, PersistedProductResearchWorkflow, type ProductResearchDraft } from "@/components/admin/ProductResearchWorkflow";
+import { ProductResearchWorkflow, type ProductResearchDraft } from "@/components/admin/ProductResearchWorkflow";
 import AdminPickupCalendar from "@/components/admin/AdminPickupCalendar";
 import AdminMailInbox from "@/components/admin/AdminMailInbox";
 
@@ -509,6 +509,11 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
     })) : [],
   });
   const [draftResearch, setDraftResearch] = useState<ProductResearchDraft>(blankResearchDraft());
+  const [researchHydrated, setResearchHydrated] = useState(false);
+  const researchQuery = trpc.admin.research.get.useQuery(
+    { productId: product!.id },
+    { enabled: Boolean(product?.id) }
+  );
   const [showTestingDocuments, setShowTestingDocuments] = useState(false);
   const [showSpecifications, setShowSpecifications] = useState(false);
 
@@ -525,6 +530,23 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [product?.id]);
+
+  useEffect(() => {
+    setResearchHydrated(false);
+    setDraftResearch(blankResearchDraft());
+  }, [product?.id]);
+
+  useEffect(() => {
+    if (!product?.id || researchHydrated || researchQuery.isLoading) return;
+    const research = researchQuery.data?.research;
+    setDraftResearch({
+      templateSourceUrl: research?.templateSourceUrl || "",
+      overview: research?.overview || "",
+      chemicalMakeup: research?.chemicalMakeup || "",
+      researchContent: research?.researchContent || "",
+    });
+    setResearchHydrated(true);
+  }, [product?.id, researchQuery.data, researchQuery.isLoading, researchHydrated]);
 
 
   useEffect(() => {
@@ -706,7 +728,7 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
       stockQuantity: previewType === "gift-card" ? 9999 : form.stockQuantity,
       imageUrl: linkedImageUrl || form.imageUrl || imageUrlForSlug(slug),
       variants,
-      researchDraft: previewType !== "gift-card" && !product?.id ? draftResearch : undefined,
+      researchDraft: previewType !== "gift-card" ? draftResearch : undefined,
     };
 
     onSave(payload);
@@ -920,19 +942,11 @@ function ProductForm({ product, onSave, onCancel, saving }: any) {
         )}
 
         {!isGiftCardTemplate && (
-          product?.id ? (
-            <PersistedProductResearchWorkflow
-              key={product.id}
-              productId={product.id}
-              productName={form.name}
-            />
-          ) : (
-            <ProductResearchWorkflow
-              productName={form.name}
-              value={draftResearch}
-              onChange={setDraftResearch}
-            />
-          )
+          <ProductResearchWorkflow
+            productName={form.name}
+            value={draftResearch}
+            onChange={setDraftResearch}
+          />
         )}
 
         {/* Save */}
