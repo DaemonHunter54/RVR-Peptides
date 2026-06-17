@@ -71,7 +71,7 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-slate-200 fixed h-full overflow-y-auto hidden lg:block">
         <div className="p-4 border-b border-slate-100">
@@ -102,8 +102,8 @@ export default function AdminPanel() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-64">
-        <div className="lg:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
+      <main className={`flex-1 lg:ml-64 flex flex-col min-h-0 ${activeSection === "email" ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
+        <div className={`lg:hidden shrink-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between ${activeSection === "email" ? "" : ""}`}>
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2">
               <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
@@ -120,7 +120,15 @@ export default function AdminPanel() {
             ))}
           </div>
         </div>
-        <div className={activeSection === "customization" || activeSection === "email" ? "" : "p-6 lg:p-8"}>
+        <div
+          className={
+            activeSection === "email"
+              ? "flex-1 flex flex-col min-h-0 overflow-hidden"
+              : activeSection === "customization"
+                ? ""
+                : "p-6 lg:p-8"
+          }
+        >
           {activeSection === "dashboard" && <DashboardSection />}
           {activeSection === "products" && <ProductsSection />}
           {activeSection === "orders" && <OrdersSection />}
