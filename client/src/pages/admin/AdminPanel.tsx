@@ -103,7 +103,8 @@ export default function AdminPanel() {
 
       {/* Main Content */}
       <main className={`flex-1 lg:ml-64 flex flex-col min-h-0 ${activeSection === "email" ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
-        <div className={`lg:hidden shrink-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between ${activeSection === "email" ? "" : ""}`}>
+        {activeSection !== "email" ? (
+        <div className="lg:hidden shrink-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2">
               <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
@@ -120,6 +121,7 @@ export default function AdminPanel() {
             ))}
           </div>
         </div>
+        ) : null}
         <div
           className={
             activeSection === "email"
