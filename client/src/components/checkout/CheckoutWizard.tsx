@@ -47,9 +47,9 @@ function ChoiceButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex-1 rounded-xl border-2 px-4 py-5 text-left transition-all duration-300 border-slate-200 bg-white hover:border-blue-500 hover:bg-blue-50/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+      className="flex-1 rounded-lg border-2 px-3 py-3 text-left transition-all duration-300 border-slate-200 bg-white hover:border-blue-500 hover:bg-blue-50/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
     >
-      <Icon className="h-5 w-5 mb-2 text-blue-600" />
+      <Icon className="h-4 w-4 mb-1.5 text-blue-600" />
       <p className="font-semibold text-slate-900 text-sm">{title}</p>
       <p className="text-xs text-slate-500 mt-1 leading-relaxed">{subtitle}</p>
     </button>
@@ -73,7 +73,7 @@ function PaymentButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex-1 rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-300",
+        "flex-1 rounded-lg border-2 px-2 py-2.5 text-xs font-semibold transition-all duration-300",
         disabled && "opacity-40 cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400",
         !disabled && active && "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20",
         !disabled && !active && "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50"
@@ -236,7 +236,7 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
   }, [slidePhase]);
 
   const panelClass = cn(
-    "absolute inset-0 flex flex-col px-6 sm:px-8 py-6 transition-all duration-300 ease-in-out",
+    "absolute inset-0 flex flex-col px-4 sm:px-5 py-3 transition-all duration-300 ease-in-out",
     slidePhase === "exit" && "-translate-y-6 opacity-0 pointer-events-none",
     slidePhase === "enter" && "translate-y-6 opacity-0",
     slidePhase === "idle" && "translate-y-0 opacity-100"
@@ -245,8 +245,8 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
   const showPanel = (name: WizardStep) => step === name;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/60 overflow-hidden">
-      <div className="px-6 sm:px-8 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-white">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-md shadow-slate-200/50 overflow-hidden">
+      <div className="px-4 sm:px-5 py-2.5 border-b border-slate-100 flex items-center justify-between gap-2 bg-gradient-to-r from-slate-50 to-white">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Checkout</p>
           <p className="text-sm font-semibold text-slate-900">
@@ -266,12 +266,12 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
         </div>
       </div>
 
-      <div className="relative h-[min(560px,72vh)] min-h-[480px] overflow-hidden">
+      <div className="relative h-[min(375px,48vh)] min-h-[320px] overflow-hidden">
         {step !== "fulfillment" ? (
           <button
             type="button"
             onClick={goBack}
-            className="absolute top-4 left-4 z-20 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600"
+            className="absolute top-2 left-3 z-20 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-600"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Back
           </button>
@@ -280,9 +280,9 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
         {showPanel("fulfillment") ? (
           <div className={panelClass}>
             <div className="flex-1 flex flex-col justify-center max-w-xl mx-auto w-full">
-              <h2 className="text-xl font-bold text-slate-900 text-center mb-2">How would you like to receive your order?</h2>
-              <p className="text-sm text-slate-500 text-center mb-6">Choose one option to continue.</p>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <h2 className="text-base font-bold text-slate-900 text-center mb-1">How would you like to receive your order?</h2>
+              <p className="text-xs text-slate-500 text-center mb-3">Choose one option to continue.</p>
+              <div className="flex flex-col sm:flex-row gap-2">
                 <ChoiceButton
                   icon={Truck}
                   title="Ship to my home"
@@ -302,26 +302,26 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
         {showPanel("ship-details") ? (
           <div className={panelClass}>
-            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-6 space-y-3">
-              <h2 className="text-lg font-bold text-slate-900">Shipping details</h2>
-              <p className="text-xs text-slate-500 mb-1">Invoice will be emailed when you submit your order.</p>
+            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-4 space-y-2">
+              <h2 className="text-base font-bold text-slate-900">Shipping details</h2>
+              <p className="text-[11px] text-slate-500">Invoice will be emailed when you submit your order.</p>
               <div>
-                <Label className="text-xs">Full name</Label>
-                <Input value={form.shippingName} onChange={(e) => onFormChange({ shippingName: e.target.value })} className="mt-1 h-9" placeholder="John Doe" />
+                <Label className="text-[11px]">Full name</Label>
+                <Input value={form.shippingName} onChange={(e) => onFormChange({ shippingName: e.target.value })} className="mt-0.5 h-8 text-sm" placeholder="John Doe" />
               </div>
               <div>
-                <Label className="text-xs">Address</Label>
-                <Input value={form.shippingAddress} onChange={(e) => onFormChange({ shippingAddress: e.target.value })} className="mt-1 h-9" placeholder="123 Main St" />
+                <Label className="text-[11px]">Address</Label>
+                <Input value={form.shippingAddress} onChange={(e) => onFormChange({ shippingAddress: e.target.value })} className="mt-0.5 h-8 text-sm" placeholder="123 Main St" />
               </div>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-1.5">
                 <div className="col-span-2">
-                  <Label className="text-xs">City</Label>
-                  <Input value={form.shippingCity} onChange={(e) => onFormChange({ shippingCity: e.target.value })} className="mt-1 h-9" />
+                  <Label className="text-[11px]">City</Label>
+                  <Input value={form.shippingCity} onChange={(e) => onFormChange({ shippingCity: e.target.value })} className="mt-0.5 h-8 text-sm" />
                 </div>
                 <div className="col-span-1">
-                  <Label className="text-xs">State</Label>
+                  <Label className="text-[11px]">State</Label>
                   <Select value={form.shippingState} onValueChange={(v) => onFormChange({ shippingState: v })}>
-                    <SelectTrigger className="mt-1 h-9 text-xs"><SelectValue placeholder="ST" /></SelectTrigger>
+                    <SelectTrigger className="mt-0.5 h-8 text-xs"><SelectValue placeholder="ST" /></SelectTrigger>
                     <SelectContent>
                       {US_STATES.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -330,15 +330,15 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                   </Select>
                 </div>
                 <div className="col-span-2">
-                  <Label className="text-xs">ZIP code</Label>
-                  <Input value={form.shippingZip} onChange={(e) => onFormChange({ shippingZip: e.target.value })} className="mt-1 h-9" />
+                  <Label className="text-[11px]">ZIP code</Label>
+                  <Input value={form.shippingZip} onChange={(e) => onFormChange({ shippingZip: e.target.value })} className="mt-0.5 h-8 text-sm" />
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Order notes (optional)</Label>
-                <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-1 min-h-[56px] text-sm resize-none" rows={2} placeholder="Delivery instructions..." />
+                <Label className="text-[11px]">Order notes (optional)</Label>
+                <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-0.5 min-h-[36px] text-xs resize-none" rows={1} placeholder="Delivery instructions..." />
               </div>
-              <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-10 mt-1" onClick={goNext}>
+              <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm mt-0.5" onClick={goNext}>
                 Continue
               </Button>
             </div>
@@ -347,19 +347,19 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
         {showPanel("pickup-schedule") ? (
           <div className={panelClass}>
-            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-6 space-y-4">
-              <h2 className="text-lg font-bold text-slate-900">Choose a meetup day and time</h2>
+            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-4 space-y-2.5">
+              <h2 className="text-base font-bold text-slate-900">Choose a meetup day and time</h2>
               {pickupSlotsLoading ? (
                 <p className="text-sm text-slate-500">Loading available times...</p>
               ) : pickupSlots.length === 0 ? (
-                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
                   No meetup times are open right now. Go back and choose shipping instead.
                 </p>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs">Day</Label>
+                      <Label className="text-[11px]">Day</Label>
                       <Select
                         value={pickupDayKey}
                         onValueChange={(v) => {
@@ -367,7 +367,7 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                           onPickupSlotChange(null);
                         }}
                       >
-                        <SelectTrigger className="mt-1 h-10"><SelectValue placeholder="Select a day" /></SelectTrigger>
+                        <SelectTrigger className="mt-0.5 h-8 text-sm"><SelectValue placeholder="Select a day" /></SelectTrigger>
                         <SelectContent>
                           {nextSevenDays.map((day) => (
                             <SelectItem key={day.key} value={day.key} disabled={!day.hasSlots}>
@@ -378,13 +378,13 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-xs">Time</Label>
+                      <Label className="text-[11px]">Time</Label>
                       <Select
                         value={pickupSlotId ? String(pickupSlotId) : ""}
                         onValueChange={(v) => onPickupSlotChange(Number(v))}
                         disabled={!pickupDayKey}
                       >
-                        <SelectTrigger className={cn("mt-1 h-10", !pickupDayKey && "opacity-50")}>
+                        <SelectTrigger className={cn("mt-0.5 h-8 text-sm", !pickupDayKey && "opacity-50")}>
                           <SelectValue placeholder={pickupDayKey ? "Select a time" : "Select a day first"} />
                         </SelectTrigger>
                         <SelectContent>
@@ -398,10 +398,10 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs">Order notes (optional)</Label>
-                    <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-1 min-h-[56px] text-sm resize-none" rows={2} placeholder="Preferred meetup location..." />
+                    <Label className="text-[11px]">Order notes (optional)</Label>
+                    <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-0.5 min-h-[36px] text-xs resize-none" rows={1} placeholder="Preferred meetup location..." />
                   </div>
-                  <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-10" disabled={!pickupSlotId} onClick={goNext}>
+                  <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm" disabled={!pickupSlotId} onClick={goNext}>
                     Continue
                   </Button>
                 </>
@@ -413,8 +413,8 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
         {showPanel("payment") ? (
           <div className={panelClass}>
             <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
-              <h2 className="text-lg font-bold text-slate-900 text-center mb-2">Payment method</h2>
-              <p className="text-xs text-slate-500 text-center mb-6">
+              <h2 className="text-base font-bold text-slate-900 text-center mb-1">Payment method</h2>
+              <p className="text-[11px] text-slate-500 text-center mb-3">
                 {fulfillmentMethod === "ship"
                   ? "Shipped orders are paid by email invoice."
                   : "Choose how you will pay at your local meetup."}
@@ -435,7 +435,7 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                 )}
               </div>
               {fulfillmentMethod === "ship" ? (
-                <p className="text-[11px] text-slate-400 text-center mt-4">Card and cash are available for local pickup orders.</p>
+                <p className="text-[10px] text-slate-400 text-center mt-2">Card and cash are available for local pickup orders.</p>
               ) : null}
             </div>
           </div>
@@ -443,23 +443,23 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
         {showPanel("agreements") ? (
           <div className={panelClass}>
-            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-4 space-y-3">
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Confirm & submit</h2>
-              <p className="text-xs text-slate-500 mb-2">Accept the following, then submit your order using the button on the right.</p>
-              <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <Checkbox checked={agreedToAge} onCheckedChange={(c) => onAgreedToAgeChange(c === true)} className="mt-0.5" />
-                  <span className="text-xs text-slate-700 leading-snug">I confirm that I am 18 years of age or older.</span>
+            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-3 space-y-2">
+              <h2 className="text-base font-bold text-slate-900">Confirm & submit</h2>
+              <p className="text-[11px] text-slate-500">Accept the following, then submit using the button on the right.</p>
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/80 p-2.5">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox checked={agreedToAge} onCheckedChange={(c) => onAgreedToAgeChange(c === true)} className="mt-0.5 h-3.5 w-3.5" />
+                  <span className="text-[11px] text-slate-700 leading-snug">I confirm that I am 18 years of age or older.</span>
                 </label>
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <Checkbox checked={agreedToResearch} onCheckedChange={(c) => onAgreedToResearchChange(c === true)} className="mt-0.5" />
-                  <span className="text-xs text-slate-700 leading-snug">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox checked={agreedToResearch} onCheckedChange={(c) => onAgreedToResearchChange(c === true)} className="mt-0.5 h-3.5 w-3.5" />
+                  <span className="text-[11px] text-slate-700 leading-snug">
                     I confirm that all products are for laboratory, in-vitro research, or analytical purposes only — not for human or animal consumption.
                   </span>
                 </label>
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <Checkbox checked={agreedToTerms} onCheckedChange={(c) => onAgreedToTermsChange(c === true)} className="mt-0.5" />
-                  <span className="text-xs text-slate-700 leading-snug">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox checked={agreedToTerms} onCheckedChange={(c) => onAgreedToTermsChange(c === true)} className="mt-0.5 h-3.5 w-3.5" />
+                  <span className="text-[11px] text-slate-700 leading-snug">
                     I agree to the{" "}
                     <Link href="/terms" className="text-blue-600 hover:underline">Terms</Link>,{" "}
                     <Link href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</Link>, and{" "}
@@ -467,8 +467,8 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                   </span>
                 </label>
               </div>
-              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                <Home className="h-3.5 w-3.5 shrink-0" />
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5">
+                <Home className="h-3 w-3 shrink-0" />
                 {fulfillmentMethod === "ship" ? "Ready to submit — invoice will be emailed." : "Ready to submit — we will confirm your meetup."}
               </div>
             </div>
