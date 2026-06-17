@@ -606,20 +606,20 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
             <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-3 space-y-2">
               <h2 className="text-base font-bold text-slate-900">Confirm & submit</h2>
               <p className="text-[11px] text-slate-500">Accept the following, then submit using the button on the right.</p>
-              <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/80 p-2.5">
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <Checkbox checked={agreedToAge} onCheckedChange={(c) => onAgreedToAgeChange(c === true)} className="mt-0.5 h-3.5 w-3.5" />
-                  <span className="text-[11px] text-slate-700 leading-snug">I confirm that I am 18 years of age or older.</span>
+              <div className="space-y-2.5 rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <Checkbox checked={agreedToAge} onCheckedChange={(c) => onAgreedToAgeChange(c === true)} className="mt-0.5 size-5 shrink-0 [&_svg]:size-3.5" />
+                  <span className="text-xs text-slate-700 leading-snug">I confirm that I am 18 years of age or older.</span>
                 </label>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <Checkbox checked={agreedToResearch} onCheckedChange={(c) => onAgreedToResearchChange(c === true)} className="mt-0.5 h-3.5 w-3.5" />
-                  <span className="text-[11px] text-slate-700 leading-snug">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <Checkbox checked={agreedToResearch} onCheckedChange={(c) => onAgreedToResearchChange(c === true)} className="mt-0.5 size-5 shrink-0 [&_svg]:size-3.5" />
+                  <span className="text-xs text-slate-700 leading-snug">
                     I confirm that all products are for laboratory, in-vitro research, or analytical purposes only — not for human or animal consumption.
                   </span>
                 </label>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <Checkbox checked={agreedToTerms} onCheckedChange={(c) => onAgreedToTermsChange(c === true)} className="mt-0.5 h-3.5 w-3.5" />
-                  <span className="text-[11px] text-slate-700 leading-snug">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <Checkbox checked={agreedToTerms} onCheckedChange={(c) => onAgreedToTermsChange(c === true)} className="mt-0.5 size-5 shrink-0 [&_svg]:size-3.5" />
+                  <span className="text-xs text-slate-700 leading-snug">
                     I agree to the{" "}
                     <Link href="/terms" className="text-blue-600 hover:underline">Terms</Link>,{" "}
                     <Link href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</Link>, and{" "}
