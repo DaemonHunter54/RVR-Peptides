@@ -29,6 +29,13 @@ function formatSlotTime(value: string | Date) {
   return new Date(value).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+function formatHourLabel(hour: number) {
+  if (hour === 0) return "12 AM";
+  if (hour < 12) return `${hour} AM`;
+  if (hour === 12) return "12 PM";
+  return `${hour - 12} PM`;
+}
+
 function buildMonthGrid(year: number, monthIndex: number) {
   const firstDay = new Date(year, monthIndex, 1).getDay();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -116,10 +123,13 @@ export default function AdminPickupCalendar() {
     year: "numeric",
   });
 
-  const setAllDay30 = () => {
-    setIntervalMinutes(30);
-    setStartHour(9);
-    setEndHour(18);
+  const allDayLabel = useMemo(
+    () => `All day (${formatHourLabel(startHour)} – ${formatHourLabel(endHour)}, ${intervalMinutes} min)`,
+    [startHour, endHour, intervalMinutes]
+  );
+
+  const generateSlotsForDay = () => {
+    generateMutation.mutate({ date, intervalMinutes, startHour, endHour });
   };
 
   const shiftMonth = (delta: number) => {
@@ -205,14 +215,20 @@ export default function AdminPickupCalendar() {
                 </Select>
               </div>
             </div>
-            <Button type="button" variant="outline" className="w-full" onClick={setAllDay30}>
-              All day (9 AM – 6 PM, 30 min)
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={generateMutation.isPending || endHour <= startHour}
+              onClick={generateSlotsForDay}
+            >
+              {allDayLabel}
             </Button>
             <Button
               type="button"
               className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
               disabled={generateMutation.isPending || endHour <= startHour}
-              onClick={() => generateMutation.mutate({ date, intervalMinutes, startHour, endHour })}
+              onClick={generateSlotsForDay}
             >
               {generateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Generate slots for selected day
