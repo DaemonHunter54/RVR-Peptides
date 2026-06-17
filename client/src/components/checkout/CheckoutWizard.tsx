@@ -24,10 +24,6 @@ function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function formatDayLabel(date: Date) {
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
-
 function formatSlotTime(startsAt: string | Date) {
   return new Date(startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
@@ -155,17 +151,30 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
   }, [pickupSlots]);
 
   const nextSevenDays = useMemo(() => {
-    const days: Array<{ key: string; date: Date; label: string; hasSlots: boolean }> = [];
+    const days: Array<{ key: string; date: Date; weekday: string; dayNum: number; isToday: boolean; hasSlots: boolean }> = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayKey = dateKey(today);
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       const key = dateKey(date);
-      days.push({ key, date, label: formatDayLabel(date), hasSlots: slotsByDate.has(key) });
+      days.push({
+        key,
+        date,
+        weekday: date.toLocaleDateString("en-US", { weekday: "short" }),
+        dayNum: date.getDate(),
+        isToday: key === todayKey,
+        hasSlots: slotsByDate.has(key),
+      });
     }
     return days;
   }, [slotsByDate]);
+
+  const selectedPickupDay = useMemo(
+    () => nextSevenDays.find((day) => day.key === pickupDayKey) || null,
+    [nextSevenDays, pickupDayKey]
+  );
 
   const timesForSelectedDay = useMemo(() => {
     if (!pickupDayKey) return [];
@@ -357,46 +366,78 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                 </p>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-[11px]">Day</Label>
-                      <Select
-                        value={pickupDayKey}
-                        onValueChange={(v) => {
-                          setPickupDayKey(v);
-                          onPickupSlotChange(null);
-                        }}
-                      >
-                        <SelectTrigger className="mt-0.5 h-8 text-sm"><SelectValue placeholder="Select a day" /></SelectTrigger>
-                        <SelectContent>
-                          {nextSevenDays.map((day) => (
-                            <SelectItem key={day.key} value={day.key} disabled={!day.hasSlots}>
-                              {day.label}{!day.hasSlots ? " — unavailable" : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[11px]">Time</Label>
-                      <Select
-                        value={pickupSlotId ? String(pickupSlotId) : ""}
-                        onValueChange={(v) => onPickupSlotChange(Number(v))}
-                        disabled={!pickupDayKey}
-                      >
-                        <SelectTrigger className={cn("mt-0.5 h-8 text-sm", !pickupDayKey && "opacity-50")}>
-                          <SelectValue placeholder={pickupDayKey ? "Select a time" : "Select a day first"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timesForSelectedDay.map((slot) => (
-                            <SelectItem key={slot.id} value={String(slot.id)}>
-                              {formatSlotTime(slot.startsAt)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div>
+                    <p className="text-[11px] font-medium text-slate-500 mb-1.5">Next 7 days</p>
+                    <div className="grid grid-cols-7 gap-1">
+                      {nextSevenDays.map((day) => {
+                        const selected = pickupDayKey === day.key;
+                        return (
+                          <button
+                            key={day.key}
+                            type="button"
+                            disabled={!day.hasSlots}
+                            onClick={() => {
+                              setPickupDayKey(day.key);
+                              onPickupSlotChange(null);
+                            }}
+                            className={cn(
+                              "aspect-square flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 min-w-0 p-0.5",
+                              !day.hasSlots && "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
+                              day.hasSlots && !selected && "border-slate-200 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50/60",
+                              day.hasSlots && selected && "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                            )}
+                          >
+                            <span className={cn("text-[9px] font-semibold uppercase leading-none", selected ? "text-blue-100" : "text-slate-500")}>
+                              {day.weekday}
+                            </span>
+                            <span className="text-sm font-bold leading-tight mt-0.5">{day.dayNum}</span>
+                            {day.isToday ? (
+                              <span className={cn("text-[8px] leading-none mt-0.5", selected ? "text-blue-100" : "text-blue-600")}>Today</span>
+                            ) : day.hasSlots ? (
+                              <span className={cn("h-1 w-1 rounded-full mt-0.5", selected ? "bg-blue-200" : "bg-blue-500")} />
+                            ) : null}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
+
+                  <div className={cn("transition-all duration-300", !pickupDayKey && "opacity-50")}>
+                    <p className="text-[11px] font-medium text-slate-500 mb-1.5">
+                      {selectedPickupDay
+                        ? `Available times — ${selectedPickupDay.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
+                        : "Select a highlighted day above"}
+                    </p>
+                    {!pickupDayKey ? (
+                      <p className="text-[11px] text-slate-400 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3 py-4 text-center">
+                        Time slots appear here once you pick a day.
+                      </p>
+                    ) : timesForSelectedDay.length === 0 ? (
+                      <p className="text-[11px] text-slate-500">No times available for this day.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-[88px] overflow-y-auto pr-0.5">
+                        {timesForSelectedDay.map((slot) => {
+                          const active = pickupSlotId === slot.id;
+                          return (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              onClick={() => onPickupSlotChange(slot.id)}
+                              className={cn(
+                                "rounded-lg border px-1.5 py-1.5 text-[11px] font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
+                                active
+                                  ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                                  : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/80"
+                              )}
+                            >
+                              {formatSlotTime(slot.startsAt)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <Label className="text-[11px]">Order notes (optional)</Label>
                     <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-0.5 min-h-[36px] text-xs resize-none" rows={1} placeholder="Preferred meetup location..." />
