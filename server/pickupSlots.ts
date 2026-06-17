@@ -1,4 +1,9 @@
-import { and, asc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import {
+  businessDateKeyFromUtc,
+  businessDayBoundsUtc,
+  businessLocalSlotToUtc,
+} from "../shared/pickupTime";
 import { pickupSlots } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -33,32 +38,28 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function dateStrFromUtcParts(d: Date) {
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-}
-
 export async function listPickupSlotsSummaryForMonth(year: number, month: number): Promise<DaySlotSummary[]> {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db.execute(sql`
-    SELECT DATE(startsAt) as day, status, COUNT(*) as cnt
-    FROM pickupSlots
-    WHERE YEAR(startsAt) = ${year} AND MONTH(startsAt) = ${month}
-    GROUP BY DATE(startsAt), status
-  `);
-  const raw = ((rows as unknown as [{ day: Date | string; status: string; cnt: number }[]])[0] || []);
-  const map = new Map<string, DaySlotSummary>();
 
-  for (const row of raw) {
-    const date =
-      typeof row.day === "string"
-        ? row.day.slice(0, 10)
-        : dateStrFromUtcParts(row.day as Date);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDay = `${year}-${pad(month)}-01`;
+  const lastDay = `${year}-${pad(month)}-${pad(daysInMonth)}`;
+  const { start } = businessDayBoundsUtc(firstDay);
+  const { end } = businessDayBoundsUtc(lastDay);
+
+  const rows = await db
+    .select()
+    .from(pickupSlots)
+    .where(and(gte(pickupSlots.startsAt, start), lte(pickupSlots.startsAt, end)));
+
+  const map = new Map<string, DaySlotSummary>();
+  for (const row of rows) {
+    const date = businessDateKeyFromUtc(row.startsAt);
     const entry = map.get(date) || { date, available: 0, booked: 0, blocked: 0 };
-    const count = Number(row.cnt || 0);
-    if (row.status === "available") entry.available = count;
-    else if (row.status === "booked") entry.booked = count;
-    else if (row.status === "blocked") entry.blocked = count;
+    if (row.status === "available") entry.available += 1;
+    else if (row.status === "booked") entry.booked += 1;
+    else if (row.status === "blocked") entry.blocked += 1;
     map.set(date, entry);
   }
 
@@ -79,22 +80,24 @@ export async function togglePickupSlotAvailability(slotId: number) {
 export async function listPickupSlotsForDay(dateStr: string): Promise<PickupSlotRow[]> {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db.execute(sql`
-    SELECT id, startsAt, endsAt, status, orderId
-    FROM pickupSlots
-    WHERE DATE(startsAt) = ${dateStr}
-    ORDER BY startsAt ASC
-  `);
-  return ((rows as unknown as [PickupSlotRow[]])[0] || []) as PickupSlotRow[];
+  const { start, end } = businessDayBoundsUtc(dateStr);
+  const rows = await db
+    .select()
+    .from(pickupSlots)
+    .where(and(gte(pickupSlots.startsAt, start), lte(pickupSlots.startsAt, end)))
+    .orderBy(asc(pickupSlots.startsAt));
+
+  return (rows as PickupSlotRow[]).filter((row) => businessDateKeyFromUtc(row.startsAt) === dateStr);
 }
 
 export async function clearPickupSlotsForDay(dateStr: string) {
   const db = await getDb();
   if (!db) return;
-  await db.execute(sql`
-    DELETE FROM pickupSlots
-    WHERE DATE(startsAt) = ${dateStr} AND status = 'available'
-  `);
+  const openIds = (await listPickupSlotsForDay(dateStr))
+    .filter((slot) => slot.status === "available")
+    .map((slot) => slot.id);
+  if (openIds.length === 0) return;
+  await db.delete(pickupSlots).where(inArray(pickupSlots.id, openIds));
 }
 
 export async function generatePickupSlotsForDay(input: {
@@ -117,9 +120,9 @@ export async function generatePickupSlotsForDay(input: {
     const next = cursor + intervalMinutes;
     const eh = Math.floor(next / 60);
     const em = next % 60;
-    const startsAt = `${dateStr} ${pad(sh)}:${pad(sm)}:00`;
-    const endsAt = `${dateStr} ${pad(eh)}:${pad(em)}:00`;
-    await db.insert(pickupSlots).values({ startsAt: new Date(startsAt), endsAt: new Date(endsAt), status: "available" });
+    const startsAt = businessLocalSlotToUtc(dateStr, sh, sm);
+    const endsAt = businessLocalSlotToUtc(dateStr, eh, em);
+    await db.insert(pickupSlots).values({ startsAt, endsAt, status: "available" });
     created += 1;
     cursor = next;
   }

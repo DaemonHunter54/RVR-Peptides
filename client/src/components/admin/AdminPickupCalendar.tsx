@@ -8,6 +8,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock, Loader2, RefreshCw, Tra
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PICKUP_INTERVALS } from "@shared/checkoutOptions";
+import { formatPickupSlotTime } from "@shared/pickupTime";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -26,7 +27,7 @@ function parseDateStr(value: string) {
 }
 
 function formatSlotTime(value: string | Date) {
-  return new Date(value).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return formatPickupSlotTime(value);
 }
 
 function formatHourLabel(hour: number) {

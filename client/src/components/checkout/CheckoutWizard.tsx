@@ -9,6 +9,13 @@ import { ArrowLeft, CalendarDays, Home, MapPin, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import type { FulfillmentMethod, PaymentChoice } from "@shared/checkoutOptions";
+import {
+  businessDateKeyFromUtc,
+  businessLocalSlotToUtc,
+  businessPreviewDays,
+  formatPickupSlotDay,
+  formatPickupSlotTime,
+} from "@shared/pickupTime";
 
 const US_STATES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -19,14 +26,6 @@ const US_STATES = [
 type PickupSlot = { id: number; startsAt: string | Date; endsAt: string | Date };
 
 type WizardStep = "fulfillment" | "ship-details" | "pickup-schedule" | "payment" | "agreements";
-
-function dateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function formatSlotTime(startsAt: string | Date) {
-  return new Date(startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
 
 const PICKUP_PREVIEW_DAYS = 10;
 
@@ -208,7 +207,7 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
   const slotsByDate = useMemo(() => {
     const map = new Map<string, PickupSlot[]>();
     for (const slot of pickupSlots) {
-      const key = dateKey(new Date(slot.startsAt));
+      const key = businessDateKeyFromUtc(slot.startsAt);
       const list = map.get(key) || [];
       list.push(slot);
       map.set(key, list);
@@ -219,26 +218,14 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
     return map;
   }, [pickupSlots]);
 
-  const pickupPreviewDays = useMemo(() => {
-    const days: Array<{ key: string; date: Date; weekday: string; dayNum: number; isToday: boolean; hasSlots: boolean }> = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayKey = dateKey(today);
-    for (let i = 0; i < PICKUP_PREVIEW_DAYS; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      const key = dateKey(date);
-      days.push({
-        key,
-        date,
-        weekday: date.toLocaleDateString("en-US", { weekday: "short" }),
-        dayNum: date.getDate(),
-        isToday: key === todayKey,
-        hasSlots: slotsByDate.has(key),
-      });
-    }
-    return days;
-  }, [slotsByDate]);
+  const pickupPreviewDays = useMemo(
+    () =>
+      businessPreviewDays(PICKUP_PREVIEW_DAYS).map((day) => ({
+        ...day,
+        hasSlots: slotsByDate.has(day.key),
+      })),
+    [slotsByDate]
+  );
 
   const selectedPickupDay = useMemo(
     () => pickupPreviewDays.find((day) => day.key === pickupDayKey) || null,
@@ -506,7 +493,11 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                       <h2 className="text-base font-bold text-slate-900">Pick a time</h2>
                       {selectedPickupDay ? (
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                          {selectedPickupDay.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                          {formatPickupSlotDay(businessLocalSlotToUtc(selectedPickupDay.key, 12, 0), {
+                            weekday: "long",
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </p>
                       ) : null}
                     </div>
@@ -539,7 +530,7 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                                 : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/80"
                             )}
                           >
-                            {formatSlotTime(slot.startsAt)}
+                              {formatPickupSlotTime(slot.startsAt)}
                           </button>
                         );
                       })}

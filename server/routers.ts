@@ -17,6 +17,7 @@ import { nanoid } from "nanoid";
 import { createHostedPayment, getHostedPaymentForm, getApiStatus } from "./paymentcloud";
 import { sendNewOrderEmails, sendAdminComposeEmail } from "./orderEmail";
 import * as pickupSlotService from "./pickupSlots";
+import { formatPickupSlotDay, formatPickupSlotTime } from "../shared/pickupTime";
 import { generateVialImage, generateHeroVialsImage, generateVialBuffer, generateHeroVialsBuffer } from "./vialGenerator";
 import crypto from "crypto";
 import fs from "fs";
@@ -615,7 +616,7 @@ export const appRouter = router({
         id: slot.id,
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
-        label: new Date(slot.startsAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+        label: `${formatPickupSlotDay(slot.startsAt, { weekday: "short", month: "short", day: "numeric" })} ${formatPickupSlotTime(slot.startsAt)}`,
       }));
     }),
   }),
