@@ -21,6 +21,7 @@ import {
   type FulfillmentMethod,
   type PaymentChoice,
 } from "@shared/checkoutOptions";
+import PickupMeetupPicker from "@/components/checkout/PickupMeetupPicker";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -386,25 +387,15 @@ export default function Checkout() {
                 {fulfillmentMethod === "local_pickup" && (
                   <div>
                     <h2 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                      <CalendarClock className="h-5 w-5 text-blue-600" /> Choose a meetup time
+                      <CalendarClock className="h-5 w-5 text-blue-600" /> Choose a meetup day and time
                     </h2>
-                    {pickupSlotsQuery.isLoading ? (
-                      <p className="text-sm text-slate-500">Loading available times...</p>
-                    ) : (pickupSlotsQuery.data || []).length === 0 ? (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        No meetup times are open right now. Please check back soon or choose shipping instead.
-                      </div>
-                    ) : (
-                      <Select value={pickupSlotId ? String(pickupSlotId) : ""} onValueChange={(v) => setPickupSlotId(Number(v))}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Select a time slot" /></SelectTrigger>
-                        <SelectContent>
-                          {(pickupSlotsQuery.data || []).map((slot) => (
-                            <SelectItem key={slot.id} value={String(slot.id)}>{slot.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <p className="text-xs text-slate-500 mt-2">
+                    <PickupMeetupPicker
+                      slots={pickupSlotsQuery.data || []}
+                      isLoading={pickupSlotsQuery.isLoading}
+                      selectedSlotId={pickupSlotId}
+                      onSelectSlot={setPickupSlotId}
+                    />
+                    <p className="text-xs text-slate-500 mt-3">
                       We will email or text you to confirm your appointment after you submit the order.
                     </p>
                   </div>
