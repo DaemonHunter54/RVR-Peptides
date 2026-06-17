@@ -10,12 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Lock, CreditCard, Loader2, UserPlus, Mail } from "lucide-react";
-import { useState, useMemo } from "react";
+import { Loader2, UserPlus, Mail, MapPin, CalendarClock, Send } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { BUSINESS } from "@shared/business";
-import AcceptedPaymentMethods from "@/components/AcceptedPaymentMethods";
+import {
+  FULFILLMENT_METHODS,
+  paymentOptionsForFulfillment,
+  type FulfillmentMethod,
+  type PaymentChoice,
+} from "@shared/checkoutOptions";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -69,9 +74,21 @@ export default function Checkout() {
   const createOrder = trpc.orders.create.useMutation({
     onError: (err) => { toast.error(err.message); setIsProcessing(false); },
   });
-  const createInvoice = trpc.payments.createInvoice.useMutation({
-    onError: (err) => { toast.error("Payment error: " + err.message); setIsProcessing(false); },
-  });
+  const pickupSlotsQuery = trpc.pickup.listAvailable.useQuery(undefined, { staleTime: 30_000 });
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>("ship");
+  const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>("email_invoice");
+  const [pickupSlotId, setPickupSlotId] = useState<number | null>(null);
+
+  const paymentOptions = useMemo(() => paymentOptionsForFulfillment(fulfillmentMethod), [fulfillmentMethod]);
+
+  useEffect(() => {
+    const allowed = paymentOptionsForFulfillment(fulfillmentMethod);
+    if (!allowed.some((option) => option.id === paymentChoice)) {
+      setPaymentChoice(allowed[0]?.id || "email_invoice");
+    }
+    if (fulfillmentMethod !== "local_pickup") setPickupSlotId(null);
+  }, [fulfillmentMethod, paymentChoice]);
+
   const registerMutation = trpc.auth.register.useMutation({
     onError: (err) => { toast.error("Account creation failed: " + err.message); },
   });
@@ -104,7 +121,8 @@ export default function Checkout() {
   }, 0);
   const hasShippableItems = items.some((item) => !isGiftCardProduct(item.product));
   const flatRateShipping = 9.99;
-  const shippingCost = hasShippableItems ? flatRateShipping : 0;
+  const shippingCost =
+    fulfillmentMethod === "local_pickup" ? 0 : hasShippableItems ? flatRateShipping : 0;
   const total = subtotal + shippingCost;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,14 +132,19 @@ export default function Checkout() {
       return;
     }
 
-    // Validate guest email is provided for guest checkout
-    if (!isAuthenticated && !form.guestEmail) {
-      toast.error("Email address is required for order updates and tracking information.");
+    const contactEmail = form.guestEmail || user?.email || "";
+    if (!contactEmail) {
+      toast.error("Email address is required so we can send your invoice and order updates.");
       return;
     }
 
-    if (hasShippableItems && (!form.shippingName || !form.shippingAddress || !form.shippingCity || !form.shippingState || !form.shippingZip)) {
-      toast.error("Shipping address is required when your cart contains physical products.");
+    if (fulfillmentMethod === "ship" && hasShippableItems && (!form.shippingName || !form.shippingAddress || !form.shippingCity || !form.shippingState || !form.shippingZip)) {
+      toast.error("Shipping address is required for shipped orders.");
+      return;
+    }
+
+    if (fulfillmentMethod === "local_pickup" && !pickupSlotId) {
+      toast.error("Please select an available local meetup time.");
       return;
     }
 
@@ -176,14 +199,17 @@ export default function Checkout() {
       // Step 1: Create the order
       const orderData = await createOrder.mutateAsync({
         userId: isAuthenticated ? user?.id : newUserId,
-        guestEmail: (!isAuthenticated && !newUserId) ? form.guestEmail : undefined,
-        guestName: (!isAuthenticated && !newUserId) ? form.guestName : undefined,
-        shippingName: form.shippingName,
-        shippingAddress: form.shippingAddress,
-        shippingCity: form.shippingCity,
-        shippingState: form.shippingState,
-        shippingZip: form.shippingZip,
+        guestEmail: !isAuthenticated || !user?.email ? contactEmail : undefined,
+        guestName: (!isAuthenticated && !newUserId) ? form.guestName : form.guestName || user?.name || undefined,
+        shippingName: fulfillmentMethod === "ship" ? form.shippingName : form.guestName || user?.name || form.shippingName,
+        shippingAddress: fulfillmentMethod === "ship" ? form.shippingAddress : undefined,
+        shippingCity: fulfillmentMethod === "ship" ? form.shippingCity : undefined,
+        shippingState: fulfillmentMethod === "ship" ? form.shippingState : undefined,
+        shippingZip: fulfillmentMethod === "ship" ? form.shippingZip : undefined,
         shippingCountry: form.shippingCountry,
+        fulfillmentMethod,
+        paymentChoice,
+        pickupSlotId: fulfillmentMethod === "local_pickup" ? pickupSlotId || undefined : undefined,
         discountCode: discountCode || undefined,
         giftCardCode: useGiftCard && giftCardCode.trim() ? giftCardCode.trim() : undefined,
         items: items.map(item => ({ productId: item.productId, quantity: item.quantity, variantId: (item as any).variantId, variantLabel: (item as any).variantLabel })),
@@ -201,27 +227,8 @@ export default function Checkout() {
         return;
       }
 
-      // Step 2: Create PaymentCloud hosted checkout
-      try {
-        const invoice = await createInvoice.mutateAsync({
-          orderNumber: orderData.orderNumber,
-          email: form.guestEmail || user?.email || undefined,
-        });
-
-        if (invoice.invoiceUrl) {
-          if (String(invoice.invoiceUrl).startsWith("/")) {
-            setLocation(invoice.invoiceUrl);
-          } else {
-            window.location.href = invoice.invoiceUrl;
-          }
-          return;
-        }
-      } catch {
-        // Payment creation failed but order exists - redirect to order page
-        toast.info("Order created. You can complete payment later.");
-      }
-
-      setLocation(`/order/${orderData.orderNumber}`);
+      toast.success("Order submitted! We will email you shortly to confirm payment or your meetup time.");
+      setLocation(`/order/${orderData.orderNumber}?status=submitted`);
     } catch {
       // Order creation failed - error already shown by mutation
     } finally {
@@ -342,8 +349,70 @@ export default function Checkout() {
                 </div>
               </div>
 
+              {/* Fulfillment & payment */}
+              <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-5">
+                <div>
+                  <h2 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-blue-600" /> How would you like to receive your order?
+                  </h2>
+                  <Select value={fulfillmentMethod} onValueChange={(v) => setFulfillmentMethod(v as FulfillmentMethod)}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.values(FULFILLMENT_METHODS).map((method) => (
+                        <SelectItem key={method.id} value={method.id}>{method.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500 mt-2">{FULFILLMENT_METHODS[fulfillmentMethod].description}</p>
+                </div>
+
+                <div>
+                  <h2 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <Send className="h-5 w-5 text-blue-600" /> Payment method
+                  </h2>
+                  <Select value={paymentChoice} onValueChange={(v) => setPaymentChoice(v as PaymentChoice)}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {paymentOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {paymentOptions.find((o) => o.id === paymentChoice)?.description}
+                  </p>
+                </div>
+
+                {fulfillmentMethod === "local_pickup" && (
+                  <div>
+                    <h2 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                      <CalendarClock className="h-5 w-5 text-blue-600" /> Choose a meetup time
+                    </h2>
+                    {pickupSlotsQuery.isLoading ? (
+                      <p className="text-sm text-slate-500">Loading available times...</p>
+                    ) : (pickupSlotsQuery.data || []).length === 0 ? (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        No meetup times are open right now. Please check back soon or choose shipping instead.
+                      </div>
+                    ) : (
+                      <Select value={pickupSlotId ? String(pickupSlotId) : ""} onValueChange={(v) => setPickupSlotId(Number(v))}>
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Select a time slot" /></SelectTrigger>
+                        <SelectContent>
+                          {(pickupSlotsQuery.data || []).map((slot) => (
+                            <SelectItem key={slot.id} value={String(slot.id)}>{slot.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <p className="text-xs text-slate-500 mt-2">
+                      We will email or text you to confirm your appointment after you submit the order.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Shipping */}
-              {hasShippableItems ? (
+              {fulfillmentMethod === "ship" && hasShippableItems ? (
               <div className="bg-white rounded-xl p-6 border border-slate-200">
                 <h2 className="font-semibold text-slate-800 mb-4">Shipping Address</h2>
                 <div className="space-y-4">
@@ -380,30 +449,32 @@ export default function Checkout() {
                   </div>
                 </div>
               </div>
-              ) : (
+              ) : fulfillmentMethod === "ship" ? (
               <div className="bg-white rounded-xl p-6 border border-slate-200">
                 <h2 className="font-semibold text-slate-800 mb-2">Email Delivery</h2>
                 <p className="text-sm text-slate-500">This order contains only gift cards, so no shipping address or shipping fee is required.</p>
               </div>
+              ) : null}
+
+              {fulfillmentMethod === "local_pickup" && (
+                <div className="bg-white rounded-xl p-6 border border-slate-200">
+                  <h2 className="font-semibold text-slate-800 mb-2">Local pickup</h2>
+                  <p className="text-sm text-slate-500">No shipping address needed. Meet locally at your selected time.</p>
+                  <div className="mt-4">
+                    <Label>Order Notes (optional)</Label>
+                    <Textarea value={form.notes} onChange={(e) => updateField("notes", e.target.value)} className="mt-1.5" placeholder="Preferred meetup location or special instructions..." rows={3} />
+                  </div>
+                </div>
               )}
 
-              {/* Payment */}
               <div className="bg-white rounded-xl p-6 border border-slate-200">
-                <h2 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-blue-600" /> Payment
-                </h2>
-                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 space-y-4">
-                  <p className="text-sm text-slate-800 font-medium">
-                    Secure card and bank payments via PaymentCloud
-                  </p>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    After placing your order, you will be redirected to our secure hosted payment page to complete checkout.
-                    We accept major credit and debit cards, Apple Pay, Google Pay, and ACH where enabled by your gateway.
-                  </p>
-                  <AcceptedPaymentMethods compact />
-                  <p className="text-xs text-slate-500">
-                    Your card statement will show <strong>{BUSINESS.billingDescriptor}</strong>.
-                    All prices are in USD. Sales tax is not collected unless shown above.
+                <div className="bg-gradient-to-br from-slate-50 to-blue-50/40 rounded-lg p-4 border border-slate-200">
+                  <p className="text-sm text-slate-800 font-medium">No online payment at checkout</p>
+                  <p className="text-xs text-slate-600 leading-relaxed mt-2">
+                    When you submit your order, {BUSINESS.legalName} receives your order details by email.
+                    {fulfillmentMethod === "ship"
+                      ? " You will receive an invoice by email to pay before your order ships."
+                      : " We will confirm your meetup time and you can pay by invoice, card, or cash in person."}
                   </p>
                 </div>
               </div>
@@ -482,7 +553,13 @@ export default function Checkout() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Shipping</span>
-                    <span>{hasShippableItems ? `$${shippingCost.toFixed(2)}` : "Email delivery — Free"}</span>
+                    <span>
+                      {fulfillmentMethod === "local_pickup"
+                        ? "Local pickup — Free"
+                        : hasShippableItems
+                          ? `$${shippingCost.toFixed(2)}`
+                          : "Email delivery — Free"}
+                    </span>
                   </div>
                   <div className="flex justify-between font-semibold text-base pt-2 border-t border-slate-100">
                     <span>Total</span>
@@ -496,14 +573,14 @@ export default function Checkout() {
                   disabled={isProcessing || items.length === 0 || !agreedToTerms || !agreedToResearch || !agreedToAge}
                 >
                   {isProcessing ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Submitting...</>
                   ) : (
-                    <><Lock className="h-4 w-4" /> Place Order & Pay</>
+                    <><Send className="h-4 w-4" /> Submit Order</>
                   )}
                 </Button>
 
                 <p className="text-xs text-slate-400 text-center mt-3">
-                  All amounts in USD. Secure checkout powered by PaymentCloud.
+                  All amounts in USD. The owner will follow up by email to confirm payment or your meetup.
                 </p>
               </div>
             </div>

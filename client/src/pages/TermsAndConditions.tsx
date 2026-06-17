@@ -163,19 +163,15 @@ export default function TermsAndConditions() {
           at the time of purchase.
         </p>
         <p>
-          <strong>SECURE CHECKOUT.</strong> Card and bank payments are processed through PaymentCloud
-          using a secure hosted payment page. We do not collect or store full credit or debit card
-          numbers on our servers. You will be redirected to complete payment after placing your
-          order.
+          <strong>CHECKOUT &amp; PAYMENT.</strong> {SITE} does not process online card payments at checkout.
+          When you submit an order, we notify our team by email. For shipped orders, you will receive an
+          email invoice to pay before dispatch. For local pickup, you may pay by invoice, card, or cash
+          at your scheduled meetup, as selected at checkout.
         </p>
         <p>
-          <strong>BILLING DESCRIPTOR.</strong> Charges on your card or bank statement will appear as{" "}
-          <strong>{BUSINESS.billingDescriptor}</strong>.
-        </p>
-        <p>
-          <strong>WHEN YOU ARE CHARGED.</strong> Your payment method is authorized and captured when
-          you complete checkout on the secure payment page, subject to approval by your card issuer
-          or bank.
+          <strong>WHEN YOU ARE CHARGED.</strong> Payment is collected after order submission—either when
+          you pay the email invoice for shipped products or in person for local pickup—subject to approval
+          by your card issuer or bank where applicable.
         </p>
         <p>
           <strong>ACH.</strong> If you choose ACH bank payment where offered by our payment gateway,

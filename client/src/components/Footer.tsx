@@ -164,7 +164,7 @@ export default function Footer() {
               </h4>
               <AcceptedPaymentMethods />
               <p className="text-xs mt-3" style={{ color: footerCopyrightText }}>
-                Secure card and bank payments processed by PaymentCloud. All prices in USD.
+                Invoicing and local payment options. All prices in USD.
               </p>
             </div>
           </div>

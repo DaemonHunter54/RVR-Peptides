@@ -5,8 +5,10 @@ import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Package, Truck, Clock, CheckCircle } from "lucide-react";
-import { Link, useParams } from "wouter";
+import { ArrowLeft, Package, Truck, Clock, CheckCircle, MapPin, CalendarClock } from "lucide-react";
+import { Link, useParams, useSearch } from "wouter";
+import { useMemo } from "react";
+import { formatFulfillmentMethod, formatPaymentChoice } from "@shared/checkoutOptions";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -18,6 +20,8 @@ const statusColors: Record<string, string> = {
 
 export default function OrderDetail() {
   const { orderNumber } = useParams<{ orderNumber: string }>();
+  const searchParams = useSearch();
+  const statusParam = useMemo(() => new URLSearchParams(searchParams).get("status"), [searchParams]);
   const orderQuery = trpc.orders.byNumber.useQuery({ orderNumber: orderNumber || "" });
   const order = orderQuery.data;
 
@@ -69,6 +73,24 @@ export default function OrderDetail() {
             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
           </Badge>
         </div>
+
+        {(statusParam === "submitted" || statusParam === "success") && (
+          <div className={`rounded-xl p-5 mb-8 border flex items-start gap-3 ${statusParam === "success" ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
+            <CheckCircle className={`h-6 w-6 shrink-0 ${statusParam === "success" ? "text-green-600" : "text-blue-600"}`} />
+            <div>
+              <h2 className={`font-semibold ${statusParam === "success" ? "text-green-900" : "text-blue-900"}`}>
+                {statusParam === "success" ? "Order complete" : "Order submitted"}
+              </h2>
+              <p className={`text-sm mt-1 ${statusParam === "success" ? "text-green-800" : "text-blue-800"}`}>
+                {statusParam === "success"
+                  ? "Thank you! Your order has been processed."
+                  : order.fulfillmentMethod === "local_pickup"
+                    ? "We received your order and will email or text you to confirm your meetup time."
+                    : "We received your order and will send an email invoice shortly so you can pay before shipping."}
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Order Items */}
@@ -140,7 +162,26 @@ export default function OrderDetail() {
               </div>
             </div>
 
+            {/* Fulfillment & payment */}
+            <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
+              <h3 className="font-semibold text-slate-800 mb-3">Fulfillment & Payment</h3>
+              <div className="text-sm text-slate-600 space-y-2">
+                <p className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  {formatFulfillmentMethod(order.fulfillmentMethod || "ship")}
+                </p>
+                <p>{formatPaymentChoice(order.paymentChoice || order.paymentMethod || "email_invoice")}</p>
+                {order.pickupSlotStart ? (
+                  <p className="flex items-center gap-2">
+                    <CalendarClock className="h-4 w-4 text-slate-400" />
+                    {new Date(order.pickupSlotStart).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
             {/* Shipping Address */}
+            {order.shippingAddress ? (
             <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
               <h3 className="font-semibold text-slate-800 mb-3">Shipping Address</h3>
               <div className="text-sm text-slate-600 space-y-1">
@@ -150,6 +191,7 @@ export default function OrderDetail() {
                 <p>{order.shippingCountry}</p>
               </div>
             </div>
+            ) : null}
           </div>
         </div>
       </div>

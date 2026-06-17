@@ -15,6 +15,8 @@ import { SignJWT, jwtVerify } from "jose";
 import * as db from "./db";
 import { nanoid } from "nanoid";
 import { createHostedPayment, getHostedPaymentForm, getApiStatus } from "./paymentcloud";
+import { sendNewOrderEmails, sendAdminComposeEmail } from "./orderEmail";
+import * as pickupSlotService from "./pickupSlots";
 import { generateVialImage, generateHeroVialsImage, generateVialBuffer, generateHeroVialsBuffer } from "./vialGenerator";
 import crypto from "crypto";
 import fs from "fs";
@@ -384,12 +386,15 @@ export const appRouter = router({
       userId: z.number().optional(),
       guestEmail: z.string().optional(),
       guestName: z.string().optional(),
-      shippingName: z.string(),
-      shippingAddress: z.string(),
-      shippingCity: z.string(),
-      shippingState: z.string(),
-      shippingZip: z.string(),
+      shippingName: z.string().optional(),
+      shippingAddress: z.string().optional(),
+      shippingCity: z.string().optional(),
+      shippingState: z.string().optional(),
+      shippingZip: z.string().optional(),
       shippingCountry: z.string().default("US"),
+      fulfillmentMethod: z.enum(["ship", "local_pickup"]).default("ship"),
+      paymentChoice: z.enum(["email_invoice", "local_invoice", "local_card", "local_cash"]),
+      pickupSlotId: z.number().optional(),
       discountCode: z.string().optional(),
       giftCardCode: z.string().optional(),
       items: z.array(z.object({
@@ -445,7 +450,27 @@ export const appRouter = router({
 
       // Shipping: gift-card-only orders are delivered by email and do not need shipping.
       const flatRateShipping = Number(await db.getSetting("flat_rate_shipping") || "9.99");
-      const shippingCost = hasShippableItems ? flatRateShipping : 0;
+      const fulfillmentMethod = input.fulfillmentMethod || "ship";
+      const shippingCost =
+        fulfillmentMethod === "local_pickup" ? 0 : hasShippableItems ? flatRateShipping : 0;
+
+      if (fulfillmentMethod === "ship" && hasShippableItems) {
+        if (!input.shippingName || !input.shippingAddress || !input.shippingCity || !input.shippingState || !input.shippingZip) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Shipping address is required for shipped orders." });
+        }
+        if (input.paymentChoice !== "email_invoice") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Shipped orders must use email invoice payment." });
+        }
+      }
+
+      if (fulfillmentMethod === "local_pickup") {
+        if (!input.pickupSlotId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Select an available local meetup time." });
+        }
+        if (!["local_invoice", "local_card", "local_cash"].includes(input.paymentChoice)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a local payment option for pickup orders." });
+        }
+      }
 
       // Reserve gift card value after discounts + shipping are known. Balance is only depleted after payment is verified.
       let giftCardApplied = 0;
@@ -466,11 +491,11 @@ export const appRouter = router({
         guestEmail: input.guestEmail,
         guestName: input.guestName,
         status: "pending",
-        shippingName: input.shippingName,
-        shippingAddress: input.shippingAddress,
-        shippingCity: input.shippingCity,
-        shippingState: input.shippingState,
-        shippingZip: input.shippingZip,
+        shippingName: input.shippingName || input.guestName || null,
+        shippingAddress: input.shippingAddress || null,
+        shippingCity: input.shippingCity || null,
+        shippingState: input.shippingState || null,
+        shippingZip: input.shippingZip || null,
         shippingCountry: input.shippingCountry,
         subtotal: subtotal.toFixed(2),
         discountAmount: discountAmount.toFixed(2),
@@ -480,7 +505,21 @@ export const appRouter = router({
         giftCardCode: input.giftCardCode ? String(input.giftCardCode).replace(/[^A-Za-z0-9]/g, "").replace(/^(.{4})(.+)$/, "$1-$2").slice(0, 9) : null,
         giftCardAmount: giftCardApplied.toFixed(2),
         notes: input.notes,
+        fulfillmentMethod,
+        paymentChoice: input.paymentChoice,
+        paymentMethod: input.paymentChoice,
+        paymentStatus: total <= 0 ? "gift_card_paid" : "awaiting_owner",
+        pickupSlotId: input.pickupSlotId || null,
       }, orderItems);
+
+      if (input.pickupSlotId && fulfillmentMethod === "local_pickup") {
+        try {
+          const booked = await pickupSlotService.bookPickupSlot(input.pickupSlotId, orderId);
+          await db.updateOrder(orderId, { pickupSlotStart: booked.startsAt } as any);
+        } catch (error: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error?.message || "Meetup time unavailable." });
+        }
+      }
 
       if (input.giftCardCode && giftCardApplied > 0) {
         await db.reserveGiftCardForOrder(input.giftCardCode, giftCardApplied, orderId);
@@ -490,12 +529,18 @@ export const appRouter = router({
         await db.updateOrder(orderId, { status: "paid", paymentStatus: "gift_card_paid" } as any);
         await db.finalizeGiftCardRedemptionForOrder(orderId);
         await db.issueGiftCardsForOrder(orderId, input.guestEmail || undefined);
+      } else {
+        try {
+          await sendNewOrderEmails(orderId);
+        } catch (error) {
+          console.warn("[Order Email] Failed to send order notifications.", error);
+        }
       }
 
       // Clear cart if logged in user
       if (input.userId) await db.clearCart(input.userId);
 
-      return { orderId, orderNumber, total: total.toFixed(2), subtotal: subtotal.toFixed(2), discountAmount: discountAmount.toFixed(2), shippingCost: shippingCost.toFixed(2), giftCardApplied: giftCardApplied.toFixed(2), paid: total <= 0 };
+      return { orderId, orderNumber, total: total.toFixed(2), subtotal: subtotal.toFixed(2), discountAmount: discountAmount.toFixed(2), shippingCost: shippingCost.toFixed(2), giftCardApplied: giftCardApplied.toFixed(2), paid: total <= 0, submitted: true };
     }),
   }),
 
@@ -563,7 +608,19 @@ export const appRouter = router({
     }),
   }),
 
-  // ─── Payments ─────────────────────────────────────────────────
+  pickup: router({
+    listAvailable: publicProcedure.query(async () => {
+      const slots = await pickupSlotService.listAvailablePickupSlots();
+      return slots.map((slot) => ({
+        id: slot.id,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        label: new Date(slot.startsAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+      }));
+    }),
+  }),
+
+  // ─── Payments (legacy hosted checkout — no longer used at checkout) ──
   payments: router({
     createInvoice: publicProcedure.input(z.object({
       orderNumber: z.string(),
@@ -864,6 +921,41 @@ export const appRouter = router({
       }),
       updateTracking: adminProcedure.input(z.object({ id: z.number(), trackingNumber: z.string(), trackingCarrier: z.string() })).mutation(async ({ input }) => {
         await db.updateOrderTracking(input.id, input.trackingNumber, input.trackingCarrier);
+        return { success: true };
+      }),
+    }),
+
+    pickup: router({
+      listDay: adminProcedure.input(z.object({ date: z.string() })).query(async ({ input }) => {
+        return pickupSlotService.listPickupSlotsForDay(input.date);
+      }),
+      generateDay: adminProcedure.input(z.object({
+        date: z.string(),
+        intervalMinutes: z.union([z.literal(15), z.literal(30), z.literal(60)]),
+        startHour: z.number().min(0).max(23).default(9),
+        endHour: z.number().min(1).max(24).default(18),
+      })).mutation(async ({ input }) => {
+        const created = await pickupSlotService.generatePickupSlotsForDay({
+          dateStr: input.date,
+          intervalMinutes: input.intervalMinutes,
+          startHour: input.startHour,
+          endHour: input.endHour,
+        });
+        return { created };
+      }),
+      clearDay: adminProcedure.input(z.object({ date: z.string() })).mutation(async ({ input }) => {
+        await pickupSlotService.clearPickupSlotsForDay(input.date);
+        return { success: true };
+      }),
+    }),
+
+    mail: router({
+      send: adminProcedure.input(z.object({
+        to: z.string().email(),
+        subject: z.string().min(1),
+        body: z.string().min(1),
+      })).mutation(async ({ input }) => {
+        await sendAdminComposeEmail(input);
         return { success: true };
       }),
     }),

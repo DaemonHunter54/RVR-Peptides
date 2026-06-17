@@ -239,7 +239,7 @@ export default function Account() {
                 <CreditCard className="h-4 w-4" /> Payment Information
               </h2>
               <p className="text-sm text-slate-700 leading-relaxed">
-                Payments are completed securely at checkout through PaymentCloud. We do not store
+                Orders are invoiced by email for shipping, or paid in person for local pickup. We do not store
                 credit or debit card numbers on our servers.
               </p>
               <p className="text-sm text-slate-500 leading-relaxed mt-3">

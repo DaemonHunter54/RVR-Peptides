@@ -189,6 +189,10 @@ export const orders = mysqlTable("orders", {
   giftCardCode: varchar("giftCardCode", { length: 9 }),
   giftCardAmount: decimal("giftCardAmount", { precision: 10, scale: 2 }).default("0.00"),
   notes: text("notes"),
+  fulfillmentMethod: varchar("fulfillmentMethod", { length: 32 }).default("ship"),
+  paymentChoice: varchar("paymentChoice", { length: 32 }).default("email_invoice"),
+  pickupSlotId: int("pickupSlotId"),
+  pickupSlotStart: timestamp("pickupSlotStart"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -210,6 +214,18 @@ export const orderItems = mysqlTable("orderItems", {
 });
 
 export type OrderItem = typeof orderItems.$inferSelect;
+
+// ─── Local pickup availability ─────────────────────────────────────
+export const pickupSlots = mysqlTable("pickupSlots", {
+  id: int("id").autoincrement().primaryKey(),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt").notNull(),
+  status: mysqlEnum("status", ["available", "booked"]).default("available").notNull(),
+  orderId: int("orderId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PickupSlot = typeof pickupSlots.$inferSelect;
 
 // ─── Discount Codes ──────────────────────────────────────────────────
 export const discountCodes = mysqlTable("discountCodes", {

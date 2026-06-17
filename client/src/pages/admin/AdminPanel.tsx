@@ -13,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Settings, Tag,
   Plus, Pencil, Trash2, Search, Truck, Save, ArrowLeft,
-  DollarSign, AlertCircle, CreditCard, Eye, EyeOff, CheckCircle2, XCircle,
-  Paintbrush, RotateCcw, Sparkles, PanelLeft, X
+  DollarSign, AlertCircle, Eye, EyeOff, CheckCircle2, XCircle,
+  Paintbrush, RotateCcw, Sparkles, PanelLeft, X, CalendarDays, Mail, Gift
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link, useParams } from "wouter";
@@ -27,24 +27,14 @@ import { SITE_THEME_FIELDS } from "@shared/siteTheme";
 import { themeValue } from "@/lib/siteTheme";
 import { toast } from "sonner";
 import { ProductResearchWorkflow, PersistedProductResearchWorkflow, type ProductResearchDraft } from "@/components/admin/ProductResearchWorkflow";
+import AdminPickupCalendar from "@/components/admin/AdminPickupCalendar";
+import AdminMailInbox from "@/components/admin/AdminMailInbox";
 
 // ─── Admin Layout ────────────────────────────────────────────────────
 export default function AdminPanel() {
   const { user, isAuthenticated, loading } = useAuth();
   const { section } = useParams<{ section?: string }>();
   const activeSection = section || "dashboard";
-  const adminSettingsQuery = trpc.settings.all.useQuery(undefined, {
-    enabled: isAuthenticated && (user?.role === "admin" || user?.role === "super_admin"),
-  });
-  const adminInboxEmail = adminSettingsQuery.data?.admin_inbox_email || "";
-
-  const openAdminEmail = () => {
-    if (adminInboxEmail) {
-      window.location.href = `mailto:${adminInboxEmail}`;
-      return;
-    }
-    toast.info("Set Admin Inbox Email in Settings to link this button to your Gmail hub.");
-  };
 
   if (loading) {
     return (
@@ -71,9 +61,10 @@ export default function AdminPanel() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "products", label: "Products", icon: Package },
     { id: "orders", label: "Orders", icon: ShoppingCart },
+    { id: "calendar", label: "Meetup Calendar", icon: CalendarDays },
+    { id: "email", label: "Email", icon: Mail },
     { id: "discounts", label: "Discounts", icon: Tag },
-    { id: "payments", label: "Payments", icon: CreditCard },
-    { id: "gift-cards", label: "Gift Cards", icon: CreditCard },
+    { id: "gift-cards", label: "Gift Cards", icon: Gift },
     { id: "customers", label: "Customers", icon: Users },
     { id: "customization", label: "Website Customization", icon: Paintbrush },
     { id: "settings", label: "Site Settings", icon: Settings },
@@ -91,11 +82,8 @@ export default function AdminPanel() {
               className="w-full h-auto object-contain"
             />
           </Link>
-          <div className="mt-2 flex items-center justify-between">
+          <div className="mt-2">
             <span className="font-bold text-slate-800 text-sm">Admin Panel</span>
-            <button onClick={openAdminEmail} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
-              Email
-            </button>
           </div>
         </div>
         <nav className="p-3 space-y-1">
@@ -121,9 +109,6 @@ export default function AdminPanel() {
               <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
               <span className="font-bold text-slate-800 text-sm">Admin</span>
             </Link>
-            <button onClick={openAdminEmail} className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline">
-              Email
-            </button>
           </div>
           <div className="flex gap-1 overflow-x-auto">
             {menuItems.map((item) => (
@@ -135,13 +120,14 @@ export default function AdminPanel() {
             ))}
           </div>
         </div>
-        <div className={activeSection === "customization" ? "" : "p-6 lg:p-8"}>
+        <div className={activeSection === "customization" || activeSection === "email" ? "" : "p-6 lg:p-8"}>
           {activeSection === "dashboard" && <DashboardSection />}
           {activeSection === "products" && <ProductsSection />}
           {activeSection === "orders" && <OrdersSection />}
+          {activeSection === "calendar" && <AdminPickupCalendar />}
+          {activeSection === "email" && <AdminMailInbox />}
           {activeSection === "discounts" && <DiscountsSection />}
           {activeSection === "customers" && <CustomersSection />}
-          {activeSection === "payments" && <PaymentsSection />}
           {activeSection === "gift-cards" && <GiftCardsSection />}
           {activeSection === "customization" && <CustomizationSection />}
           {activeSection === "settings" && <SettingsSection />}
@@ -1017,6 +1003,7 @@ function OrderRow({ order, onUpdateStatus, onUpdateTracking }: { order: any; onU
       <td className="px-4 py-3">
         <p className="text-slate-800">{order.shippingName || order.guestName}</p>
         <p className="text-xs text-slate-400">{order.guestEmail || ""}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{order.fulfillmentMethod === "local_pickup" ? "Local pickup" : "Ship"} · {order.paymentChoice || "email_invoice"}</p>
       </td>
       <td className="px-4 py-3 font-medium">${Number(order.total).toFixed(2)}</td>
       <td className="px-4 py-3">

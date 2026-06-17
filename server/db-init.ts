@@ -253,6 +253,17 @@ const TABLES = [
   createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   INDEX idx_product_variants_productId (productId)
+)`,
+`CREATE TABLE IF NOT EXISTS pickupSlots (
+  id int AUTO_INCREMENT NOT NULL,
+  startsAt timestamp NOT NULL,
+  endsAt timestamp NOT NULL,
+  status enum('available','booked') NOT NULL DEFAULT 'available',
+  orderId int,
+  createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_pickupSlots_startsAt (startsAt),
+  INDEX idx_pickupSlots_status (status)
 )`
 ];
 
@@ -312,6 +323,10 @@ const REQUIRED_COLUMNS: Array<[string, string, string]> = [
   // Gift card checkout, lifecycle, and audit columns for existing Railway DBs.
   ["orders", "giftCardCode", "varchar(9)"],
   ["orders", "giftCardAmount", "decimal(10,2) DEFAULT '0.00'"],
+  ["orders", "fulfillmentMethod", "varchar(32) DEFAULT 'ship'"],
+  ["orders", "paymentChoice", "varchar(32) DEFAULT 'email_invoice'"],
+  ["orders", "pickupSlotId", "int"],
+  ["orders", "pickupSlotStart", "timestamp NULL"],
   ["giftCards", "recipientEmail", "varchar(320)"],
   ["giftCards", "emailStatus", "varchar(50) DEFAULT 'pending'"],
   ["giftCards", "expiresAt", "timestamp NULL"],
@@ -949,7 +964,7 @@ async function ensureDefaultSiteSettings(conn: mysql.Connection) {
     ["customer_service_email", "CustomerService@RVRPeptides.com", "text", "Customer Service Email", "contact"],
     ["orders_email", "Orders@RVRPeptides.com", "text", "Orders Email", "contact"],
     ["mailing_list_email", "MailingList@RVRPeptides.com", "text", "Mailing List Email", "contact"],
-    ["admin_inbox_email", "", "text", "Admin Inbox Email (Gmail forwarding hub)", "contact"],
+    ["admin_inbox_email", "rvrtrainingandconsulting@gmail.com", "text", "Admin Inbox Email (Gmail hub)", "contact"],
     ["logo_url", "", "image", "Logo URL", "branding"],
     ["site_description", "", "text", "Site Description", "general"],
     ["site_tagline", "", "text", "Site Tagline", "general"],
