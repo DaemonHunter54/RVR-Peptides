@@ -146,6 +146,11 @@ export default function Checkout() {
       return;
     }
 
+    if (useGiftCard && !giftCardCode.trim()) {
+      toast.error("Please enter your gift card code.");
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -258,33 +263,28 @@ export default function Checkout() {
                 onAgreedToResearchChange={setAgreedToResearch}
                 onAgreedToAgeChange={setAgreedToAge}
                 legalName={BUSINESS.legalName}
+                useGiftCard={useGiftCard}
+                onUseGiftCardChange={setUseGiftCard}
+                giftCardCode={giftCardCode}
+                onGiftCardCodeChange={setGiftCardCode}
               />
 
+              {!isAuthenticated ? (
               <div className="bg-white rounded-xl px-5 py-3 border border-slate-200">
                 <div className="flex items-start gap-3">
-                  <Checkbox id="use-gift-card" checked={useGiftCard} onCheckedChange={(c) => setUseGiftCard(c === true)} className="mt-0.5" />
-                  <div className="flex-1">
-                    <label htmlFor="use-gift-card" className="text-sm font-medium text-slate-800 cursor-pointer">Use gift card</label>
-                    {useGiftCard ? (
-                      <Input value={giftCardCode} onChange={(e) => setGiftCardCode(e.target.value.replace(/[^A-Za-z0-9-]/g, ""))} className="mt-2 max-w-xs h-9" placeholder="XXXX-XXXX" maxLength={9} />
-                    ) : null}
-                  </div>
+                  <Checkbox id="create-account" checked={createAccount} onCheckedChange={(c) => setCreateAccount(c === true)} className="mt-0.5" />
+                  <label htmlFor="create-account" className="text-xs text-slate-600 cursor-pointer flex items-center gap-1">
+                    <UserPlus className="h-3.5 w-3.5 text-blue-600" /> Create an account after checkout
+                  </label>
                 </div>
-                {!isAuthenticated && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-start gap-3">
-                    <Checkbox id="create-account" checked={createAccount} onCheckedChange={(c) => setCreateAccount(c === true)} className="mt-0.5" />
-                    <label htmlFor="create-account" className="text-xs text-slate-600 cursor-pointer flex items-center gap-1">
-                      <UserPlus className="h-3.5 w-3.5 text-blue-600" /> Create an account after checkout
-                    </label>
-                  </div>
-                )}
-                {!isAuthenticated && createAccount ? (
+                {createAccount ? (
                   <div className="mt-3 grid sm:grid-cols-2 gap-3">
                     <Input value={accountUsername} onChange={(e) => setAccountUsername(e.target.value)} placeholder="Username" className="h-9" minLength={3} />
                     <Input type="password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} placeholder="Password (min 6)" className="h-9" minLength={6} />
                   </div>
                 ) : null}
               </div>
+              ) : null}
             </div>
 
             <div className="lg:col-span-1">

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Home, MapPin, Truck } from "lucide-react";
+import { ArrowLeft, CalendarDays, Home, MapPin, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import type { FulfillmentMethod, PaymentChoice } from "@shared/checkoutOptions";
@@ -29,37 +29,6 @@ function formatSlotTime(startsAt: string | Date) {
 }
 
 const PICKUP_PREVIEW_DAYS = 10;
-
-function buildTimeSlotLayout(slotCount: number) {
-  if (slotCount <= 0) return { cols: 1, rows: 1, stretch: true, textClass: "text-xs" };
-
-  let cols: number;
-  let textClass: string;
-  if (slotCount === 1) {
-    cols = 1;
-    textClass = "text-base";
-  } else if (slotCount === 2) {
-    cols = 2;
-    textClass = "text-sm";
-  } else if (slotCount <= 4) {
-    cols = 2;
-    textClass = "text-sm";
-  } else if (slotCount <= 6) {
-    cols = 3;
-    textClass = "text-xs";
-  } else if (slotCount <= 9) {
-    cols = 3;
-    textClass = "text-xs";
-  } else {
-    cols = 4;
-    textClass = "text-[11px]";
-  }
-
-  const rows = Math.ceil(slotCount / cols);
-  const stretch = rows <= 3;
-
-  return { cols, rows, stretch, textClass };
-}
 
 function ChoiceButton({
   onClick,
@@ -113,6 +82,64 @@ function PaymentButton({
   );
 }
 
+function GiftCardBlock({
+  useGiftCard,
+  onUseGiftCardChange,
+  giftCardCode,
+  onGiftCardCodeChange,
+}: {
+  useGiftCard: boolean;
+  onUseGiftCardChange: (v: boolean) => void;
+  giftCardCode: string;
+  onGiftCardCodeChange: (v: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5 space-y-2">
+      <p className="text-[11px] font-medium text-slate-700 leading-snug">
+        Will you be using a gift card for some or all of this payment?
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onUseGiftCardChange(true)}
+          className={cn(
+            "flex-1 rounded-lg border-2 py-2 text-xs font-semibold transition-all",
+            useGiftCard
+              ? "border-blue-600 bg-blue-600 text-white"
+              : "border-slate-200 bg-white text-slate-700 hover:border-blue-300"
+          )}
+        >
+          Yes
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onUseGiftCardChange(false);
+            onGiftCardCodeChange("");
+          }}
+          className={cn(
+            "flex-1 rounded-lg border-2 py-2 text-xs font-semibold transition-all",
+            !useGiftCard
+              ? "border-blue-600 bg-blue-600 text-white"
+              : "border-slate-200 bg-white text-slate-700 hover:border-blue-300"
+          )}
+        >
+          No
+        </button>
+      </div>
+      {useGiftCard ? (
+        <Input
+          value={giftCardCode}
+          onChange={(e) => onGiftCardCodeChange(e.target.value.replace(/[^A-Za-z0-9-]/g, ""))}
+          className="h-8 text-sm"
+          placeholder="Gift card code (XXXX-XXXX)"
+          maxLength={9}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export type CheckoutWizardForm = {
   shippingName: string;
   shippingAddress: string;
@@ -141,6 +168,10 @@ type CheckoutWizardProps = {
   onAgreedToResearchChange: (v: boolean) => void;
   onAgreedToAgeChange: (v: boolean) => void;
   legalName: string;
+  useGiftCard: boolean;
+  onUseGiftCardChange: (v: boolean) => void;
+  giftCardCode: string;
+  onGiftCardCodeChange: (v: string) => void;
 };
 
 export default function CheckoutWizard(props: CheckoutWizardProps) {
@@ -163,11 +194,16 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
     onAgreedToResearchChange,
     onAgreedToAgeChange,
     legalName,
+    useGiftCard,
+    onUseGiftCardChange,
+    giftCardCode,
+    onGiftCardCodeChange,
   } = props;
 
   const [step, setStep] = useState<WizardStep>("fulfillment");
   const [slidePhase, setSlidePhase] = useState<"enter" | "idle" | "exit">("idle");
   const [pickupDayKey, setPickupDayKey] = useState("");
+  const [pickupPhase, setPickupPhase] = useState<"days" | "times">("days");
 
   const slotsByDate = useMemo(() => {
     const map = new Map<string, PickupSlot[]>();
@@ -214,10 +250,15 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
     return slotsByDate.get(pickupDayKey) || [];
   }, [pickupDayKey, slotsByDate]);
 
-  const timeSlotLayout = useMemo(
-    () => buildTimeSlotLayout(timesForSelectedDay.length),
-    [timesForSelectedDay.length]
-  );
+  const timeSlotGridCols = useMemo(() => {
+    const count = timesForSelectedDay.length;
+    if (count <= 2) return 2;
+    if (count <= 6) return 3;
+    return 4;
+  }, [timesForSelectedDay.length]);
+
+  const showGiftCardOnShipDetails = fulfillmentMethod === "ship" && hasShippableItems;
+  const showGiftCardOnPayment = fulfillmentMethod === "local_pickup" || (fulfillmentMethod === "ship" && !hasShippableItems);
 
   const stepSequence = useMemo((): WizardStep[] => {
     if (fulfillmentMethod === "ship") {
@@ -246,7 +287,27 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
   const goBack = () => {
     const idx = stepSequence.indexOf(step);
-    if (idx > 0) goToStep(stepSequence[idx - 1]);
+    if (idx > 0) {
+      const prev = stepSequence[idx - 1];
+      if (prev === "pickup-schedule" && pickupDayKey) setPickupPhase("times");
+      goToStep(prev);
+    }
+  };
+
+  const selectPickupDay = (key: string) => {
+    setPickupDayKey(key);
+    onPickupSlotChange(null);
+    setPickupPhase("times");
+  };
+
+  const selectPickupTime = (slotId: number) => {
+    onPickupSlotChange(slotId);
+    window.setTimeout(() => goToStep("payment"), 220);
+  };
+
+  const showPickupDayPicker = () => {
+    setPickupPhase("days");
+    onPickupSlotChange(null);
   };
 
   const selectFulfillment = (method: FulfillmentMethod) => {
@@ -257,6 +318,7 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
     } else {
       onPaymentChange("local_invoice");
       setPickupDayKey("");
+      setPickupPhase("days");
       onPickupSlotChange(null);
       goToStep("pickup-schedule");
     }
@@ -264,13 +326,13 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
   const selectPayment = (choice: PaymentChoice) => {
     onPaymentChange(choice);
-    window.setTimeout(() => goToStep("agreements"), 180);
   };
 
   useEffect(() => {
     if (fulfillmentMethod !== "local_pickup") return;
     if (pickupDayKey && !slotsByDate.has(pickupDayKey)) {
       setPickupDayKey("");
+      setPickupPhase("days");
       onPickupSlotChange(null);
     }
   }, [fulfillmentMethod, pickupDayKey, slotsByDate, onPickupSlotChange]);
@@ -385,6 +447,14 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                 <Label className="text-[11px]">Order notes (optional)</Label>
                 <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-0.5 min-h-[36px] text-xs resize-none" rows={1} placeholder="Delivery instructions..." />
               </div>
+              {showGiftCardOnShipDetails ? (
+                <GiftCardBlock
+                  useGiftCard={useGiftCard}
+                  onUseGiftCardChange={onUseGiftCardChange}
+                  giftCardCode={giftCardCode}
+                  onGiftCardCodeChange={onGiftCardCodeChange}
+                />
+              ) : null}
               <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm mt-0.5" onClick={goNext}>
                 Continue
               </Button>
@@ -394,109 +464,87 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
         {showPanel("pickup-schedule") ? (
           <div className={panelClass}>
-            <div className="flex-1 flex flex-col max-w-lg mx-auto w-full pt-3 space-y-2 overflow-hidden">
-              <h2 className="text-base font-bold text-slate-900 shrink-0">Choose a meetup day and time</h2>
+            <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full pt-5">
               {pickupSlotsLoading ? (
-                <p className="text-sm text-slate-500">Loading available times...</p>
+                <p className="text-sm text-slate-500 text-center">Loading available times...</p>
               ) : pickupSlots.length === 0 ? (
                 <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
                   No meetup times are open right now. Go back and choose shipping instead.
                 </p>
+              ) : pickupPhase === "days" ? (
+                <>
+                  <h2 className="text-base font-bold text-slate-900 text-center mb-1">Choose a meetup day</h2>
+                  <p className="text-[11px] text-slate-500 text-center mb-3">Next {PICKUP_PREVIEW_DAYS} days with open slots</p>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {pickupPreviewDays.map((day) => (
+                      <button
+                        key={day.key}
+                        type="button"
+                        disabled={!day.hasSlots}
+                        onClick={() => selectPickupDay(day.key)}
+                        className={cn(
+                          "aspect-square flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 min-w-0 p-0.5",
+                          !day.hasSlots && "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
+                          day.hasSlots && "border-slate-200 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50/60"
+                        )}
+                      >
+                        <span className="text-[8px] font-semibold uppercase leading-none text-slate-500">{day.weekday}</span>
+                        <span className="text-xs font-bold leading-tight mt-0.5">{day.dayNum}</span>
+                        {day.isToday ? (
+                          <span className="text-[7px] leading-none mt-0.5 text-blue-600">Today</span>
+                        ) : day.hasSlots ? (
+                          <span className="h-1 w-1 rounded-full mt-0.5 bg-blue-500" />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <>
-                  <div className="shrink-0">
-                    <p className="text-[11px] font-medium text-slate-500 mb-1.5">Next {PICKUP_PREVIEW_DAYS} days</p>
-                    <div className="grid grid-cols-5 gap-1">
-                      {pickupPreviewDays.map((day) => {
-                        const selected = pickupDayKey === day.key;
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">Pick a time</h2>
+                      {selectedPickupDay ? (
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {selectedPickupDay.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={showPickupDayPicker}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-600 shrink-0"
+                    >
+                      <CalendarDays className="h-3 w-3" /> Change day
+                    </button>
+                  </div>
+                  {timesForSelectedDay.length === 0 ? (
+                    <p className="text-[11px] text-slate-500 text-center py-8">No times available for this day.</p>
+                  ) : (
+                    <div
+                      className="grid gap-1.5 max-h-[200px] overflow-y-auto overscroll-contain pr-0.5"
+                      style={{ gridTemplateColumns: `repeat(${timeSlotGridCols}, minmax(0, 1fr))` }}
+                    >
+                      {timesForSelectedDay.map((slot) => {
+                        const active = pickupSlotId === slot.id;
                         return (
                           <button
-                            key={day.key}
+                            key={slot.id}
                             type="button"
-                            disabled={!day.hasSlots}
-                            onClick={() => {
-                              setPickupDayKey(day.key);
-                              onPickupSlotChange(null);
-                            }}
+                            onClick={() => selectPickupTime(slot.id)}
                             className={cn(
-                              "aspect-square flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 min-w-0 p-0.5",
-                              !day.hasSlots && "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
-                              day.hasSlots && !selected && "border-slate-200 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50/60",
-                              day.hasSlots && selected && "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                              "rounded-lg border py-2.5 text-xs font-semibold transition-all flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
+                              active
+                                ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                                : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/80"
                             )}
                           >
-                            <span className={cn("text-[8px] font-semibold uppercase leading-none", selected ? "text-blue-100" : "text-slate-500")}>
-                              {day.weekday}
-                            </span>
-                            <span className="text-xs font-bold leading-tight mt-0.5">{day.dayNum}</span>
-                            {day.isToday ? (
-                              <span className={cn("text-[7px] leading-none mt-0.5", selected ? "text-blue-100" : "text-blue-600")}>Today</span>
-                            ) : day.hasSlots ? (
-                              <span className={cn("h-1 w-1 rounded-full mt-0.5", selected ? "bg-blue-200" : "bg-blue-500")} />
-                            ) : null}
+                            {formatSlotTime(slot.startsAt)}
                           </button>
                         );
                       })}
                     </div>
-                  </div>
-
-                  <div className={cn("flex flex-col min-h-0 flex-1 transition-all duration-300", !pickupDayKey && "opacity-50")}>
-                    <p className="text-[11px] font-medium text-slate-500 mb-1.5 shrink-0">
-                      {selectedPickupDay
-                        ? `Available times — ${selectedPickupDay.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
-                        : "Select a highlighted day above"}
-                    </p>
-                    {!pickupDayKey ? (
-                      <div className="flex-1 min-h-[108px] flex items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3">
-                        <p className="text-[11px] text-slate-400 text-center">Time slots appear here once you pick a day.</p>
-                      </div>
-                    ) : timesForSelectedDay.length === 0 ? (
-                      <div className="flex-1 min-h-[108px] flex items-center justify-center">
-                        <p className="text-[11px] text-slate-500">No times available for this day.</p>
-                      </div>
-                    ) : (
-                      <div className="h-[108px] overflow-y-auto overscroll-contain rounded-lg border border-slate-100 bg-slate-50/50 p-1.5 shrink-0">
-                        <div
-                          className="grid gap-1.5 min-h-full"
-                          style={{
-                            gridTemplateColumns: `repeat(${timeSlotLayout.cols}, minmax(0, 1fr))`,
-                            ...(timeSlotLayout.stretch
-                              ? { gridTemplateRows: `repeat(${timeSlotLayout.rows}, minmax(0, 1fr))` }
-                              : { gridAutoRows: "minmax(28px, auto)" }),
-                          }}
-                        >
-                          {timesForSelectedDay.map((slot) => {
-                            const active = pickupSlotId === slot.id;
-                            return (
-                              <button
-                                key={slot.id}
-                                type="button"
-                                onClick={() => onPickupSlotChange(slot.id)}
-                                className={cn(
-                                  "rounded-lg border font-semibold transition-all flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
-                                  timeSlotLayout.stretch ? "min-h-0 h-full" : "min-h-[28px]",
-                                  timeSlotLayout.textClass,
-                                  active
-                                    ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
-                                    : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/80"
-                                )}
-                              >
-                                {formatSlotTime(slot.startsAt)}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="shrink-0">
-                    <Label className="text-[11px]">Order notes (optional)</Label>
-                    <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-0.5 min-h-[36px] text-xs resize-none" rows={1} placeholder="Preferred meetup location..." />
-                  </div>
-                  <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm shrink-0" disabled={!pickupSlotId} onClick={goNext}>
-                    Continue
-                  </Button>
+                  )}
                 </>
               )}
             </div>
@@ -505,13 +553,15 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
 
         {showPanel("payment") ? (
           <div className={panelClass}>
-            <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
-              <h2 className="text-base font-bold text-slate-900 text-center mb-1">Payment method</h2>
-              <p className="text-[11px] text-slate-500 text-center mb-3">
-                {fulfillmentMethod === "ship"
-                  ? "Shipped orders are paid by email invoice."
-                  : "Choose how you will pay at your local meetup."}
-              </p>
+            <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full space-y-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 text-center mb-1">Payment method</h2>
+                <p className="text-[11px] text-slate-500 text-center">
+                  {fulfillmentMethod === "ship"
+                    ? "Shipped orders are paid by email invoice."
+                    : "Choose how you will pay at your local meetup."}
+                </p>
+              </div>
               <div className="flex gap-2">
                 {fulfillmentMethod === "ship" ? (
                   <>
@@ -528,8 +578,25 @@ export default function CheckoutWizard(props: CheckoutWizardProps) {
                 )}
               </div>
               {fulfillmentMethod === "ship" ? (
-                <p className="text-[10px] text-slate-400 text-center mt-2">Card and cash are available for local pickup orders.</p>
+                <p className="text-[10px] text-slate-400 text-center">Card and cash are available for local pickup orders.</p>
               ) : null}
+              {showGiftCardOnPayment ? (
+                <GiftCardBlock
+                  useGiftCard={useGiftCard}
+                  onUseGiftCardChange={onUseGiftCardChange}
+                  giftCardCode={giftCardCode}
+                  onGiftCardCodeChange={onGiftCardCodeChange}
+                />
+              ) : null}
+              {fulfillmentMethod === "local_pickup" ? (
+                <div>
+                  <Label className="text-[11px]">Order notes (optional)</Label>
+                  <Textarea value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} className="mt-0.5 min-h-[36px] text-xs resize-none" rows={1} placeholder="Preferred meetup location..." />
+                </div>
+              ) : null}
+              <Button type="button" className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm" onClick={goNext}>
+                Continue
+              </Button>
             </div>
           </div>
         ) : null}
