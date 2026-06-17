@@ -122,17 +122,8 @@ export default function Footer() {
                   <span className="text-xs block" style={{ color: footerCopyrightText }}>Support</span>
                 </p>
               </div>
-              <p className="text-sm italic font-medium mb-4" style={{ color: footerAccent }} data-rvr-setting="footer_disclaimer">
+              <p className="text-sm italic font-medium" style={{ color: footerAccent }} data-rvr-setting="footer_disclaimer">
                 {footerDisclaimer}
-              </p>
-              <p className="text-sm leading-relaxed mb-4" style={{ color: footerText }}>
-                {legalName} is a chemical supplier. {legalName} is not a compounding pharmacy or chemical compounding facility as defined under 503A of the Federal Food, Drug, and Cosmetic act. {legalName} is not an outsourcing facility as defined under 503B of the Federal Food, Drug, and Cosmetic act.
-              </p>
-              <p className="text-sm leading-relaxed mb-4" style={{ color: footerText }}>
-                The statements made within this website have not been evaluated by the US Food and Drug Administration. The products we offer are not intended to diagnose, treat, cure or prevent any disease.
-              </p>
-              <p className="text-sm leading-relaxed" style={{ color: footerText }}>
-                Human/Animal Consumption Prohibited. Laboratory/In-Vitro Experimental Use Only
               </p>
             </div>
 
@@ -167,6 +158,18 @@ export default function Footer() {
                 Invoicing and local payment options. All prices in USD.
               </p>
             </div>
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-white/10 space-y-4">
+            <p className="text-sm leading-relaxed" style={{ color: footerText }}>
+              {legalName} is a chemical supplier. {legalName} is not a compounding pharmacy or chemical compounding facility as defined under 503A of the Federal Food, Drug, and Cosmetic act. {legalName} is not an outsourcing facility as defined under 503B of the Federal Food, Drug, and Cosmetic act.
+            </p>
+            <p className="text-sm leading-relaxed" style={{ color: footerText }}>
+              The statements made within this website have not been evaluated by the US Food and Drug Administration. The products we offer are not intended to diagnose, treat, cure or prevent any disease.
+            </p>
+            <p className="text-sm leading-relaxed" style={{ color: footerText }}>
+              Human/Animal Consumption Prohibited. Laboratory/In-Vitro Experimental Use Only
+            </p>
           </div>
         </div>
       </div>
