@@ -28,13 +28,24 @@ import { themeValue } from "@/lib/siteTheme";
 import { toast } from "sonner";
 import { ProductResearchWorkflow, type ProductResearchDraft } from "@/components/admin/ProductResearchWorkflow";
 import AdminPickupCalendar from "@/components/admin/AdminPickupCalendar";
-import AdminMailInbox from "@/components/admin/AdminMailInbox";
+
+const GMAIL_URL = "https://mail.google.com/";
+
+function openGmail() {
+  window.open(GMAIL_URL, "_blank", "noopener,noreferrer");
+}
 
 // ─── Admin Layout ────────────────────────────────────────────────────
 export default function AdminPanel() {
   const { user, isAuthenticated, loading } = useAuth();
   const { section } = useParams<{ section?: string }>();
   const activeSection = section || "dashboard";
+
+  useEffect(() => {
+    if (section === "email") {
+      openGmail();
+    }
+  }, [section]);
 
   if (loading) {
     return (
@@ -62,7 +73,6 @@ export default function AdminPanel() {
     { id: "products", label: "Products", icon: Package },
     { id: "orders", label: "Orders", icon: ShoppingCart },
     { id: "calendar", label: "Meetup Calendar", icon: CalendarDays },
-    { id: "email", label: "Email", icon: Mail },
     { id: "discounts", label: "Discounts", icon: Tag },
     { id: "gift-cards", label: "Gift Cards", icon: Gift },
     { id: "customers", label: "Customers", icon: Users },
@@ -71,7 +81,7 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-slate-200 fixed h-full overflow-y-auto hidden lg:block">
         <div className="p-4 border-b border-slate-100">
@@ -82,8 +92,16 @@ export default function AdminPanel() {
               className="w-full h-auto object-contain"
             />
           </Link>
-          <div className="mt-2">
+          <div className="mt-2 flex items-center justify-between gap-2">
             <span className="font-bold text-slate-800 text-sm">Admin Panel</span>
+            <button
+              type="button"
+              onClick={openGmail}
+              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Email
+            </button>
           </div>
         </div>
         <nav className="p-3 space-y-1">
@@ -102,14 +120,21 @@ export default function AdminPanel() {
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 lg:ml-64 flex flex-col min-h-0 ${activeSection === "email" ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
-        {activeSection !== "email" ? (
-        <div className="lg:hidden shrink-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2">
+      <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+        <div className="lg:hidden shrink-0 bg-white border-b border-slate-200 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="flex items-center gap-2 min-w-0">
               <img src={ASSETS.logoIcon} alt="RVR" className="h-8 w-8" />
               <span className="font-bold text-slate-800 text-sm">Admin</span>
             </Link>
+            <button
+              type="button"
+              onClick={openGmail}
+              className="inline-flex items-center gap-1 shrink-0 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Email
+            </button>
           </div>
           <div className="flex gap-1 overflow-x-auto">
             {menuItems.map((item) => (
@@ -121,21 +146,11 @@ export default function AdminPanel() {
             ))}
           </div>
         </div>
-        ) : null}
-        <div
-          className={
-            activeSection === "email"
-              ? "flex-1 flex flex-col min-h-0 overflow-hidden"
-              : activeSection === "customization"
-                ? ""
-                : "p-6 lg:p-8"
-          }
-        >
-          {activeSection === "dashboard" && <DashboardSection />}
+        <div className={activeSection === "customization" ? "" : "p-6 lg:p-8"}>
+          {(activeSection === "dashboard" || activeSection === "email") && <DashboardSection />}
           {activeSection === "products" && <ProductsSection />}
           {activeSection === "orders" && <OrdersSection />}
           {activeSection === "calendar" && <AdminPickupCalendar />}
-          {activeSection === "email" && <AdminMailInbox />}
           {activeSection === "discounts" && <DiscountsSection />}
           {activeSection === "customers" && <CustomersSection />}
           {activeSection === "gift-cards" && <GiftCardsSection />}
