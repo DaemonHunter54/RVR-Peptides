@@ -2064,11 +2064,11 @@ function SettingsSection() {
     {
       title: "Contact & Email",
       items: [
-        { key: "customer_service_email", label: "Customer Service Email", type: "text", placeholder: "CustomerService@RVRPeptides.com" },
-        { key: "orders_email", label: "Orders Email", type: "text", placeholder: "Orders@RVRPeptides.com" },
-        { key: "contact_email", label: "Support Email", type: "text", placeholder: "Support@RVRPeptides.com" },
-        { key: "mailing_list_email", label: "Mailing List Email", type: "text", placeholder: "MailingList@RVRPeptides.com" },
-        { key: "admin_inbox_email", label: "Admin Inbox Email (Gmail hub)", type: "text", placeholder: "owner@gmail.com" },
+        { key: "customer_service_email", label: "Customer Service Email", type: "text", placeholder: "rvrpeptides@gmail.com" },
+        { key: "orders_email", label: "Orders Email", type: "text", placeholder: "rvrpeptides@gmail.com" },
+        { key: "contact_email", label: "Support Email", type: "text", placeholder: "rvrpeptides@gmail.com" },
+        { key: "mailing_list_email", label: "Mailing List Email", type: "text", placeholder: "rvrpeptides@gmail.com" },
+        { key: "admin_inbox_email", label: "Admin Inbox Email (Gmail hub)", type: "text", placeholder: "rvrpeptides@gmail.com" },
         { key: "contact_phone", label: "Contact Phone", type: "text", placeholder: "+1 (555) 123-4567" },
       ],
     },

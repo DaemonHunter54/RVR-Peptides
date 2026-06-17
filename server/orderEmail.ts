@@ -1,4 +1,5 @@
 import * as db from "./db";
+import { BUSINESS } from "../shared/business";
 
 type OrderLine = {
   productName: string;
@@ -34,7 +35,7 @@ export async function sendNewOrderEmails(orderId: number) {
   const ownerEmail =
     (await db.getSetting("admin_inbox_email")) ||
     (await db.getSetting("orders_email")) ||
-    "rvrtrainingandconsulting@gmail.com";
+    BUSINESS.ownerInboxEmail;
   const fromEmail = process.env.ORDERS_FROM_EMAIL || process.env.FROM_EMAIL || "Orders@RVRPeptides.com";
   const customerEmail = order.guestEmail || (order.userId ? (await db.getUserById(order.userId))?.email : undefined);
 
@@ -81,7 +82,7 @@ export async function sendNewOrderEmails(orderId: number) {
           : "We will contact you to confirm your local meetup time."
         : "You will receive an email invoice shortly to complete payment before your order ships.",
       "",
-      "Questions? Reply to this email or contact CustomerService@RVRPeptides.com.",
+      `Questions? Reply to this email or contact ${BUSINESS.customerServiceEmail}.`,
     ].join("\n");
 
     await sendViaResend(fromEmail, customerEmail, `Order received — ${order.orderNumber}`, customerText);

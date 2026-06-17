@@ -953,6 +953,42 @@ async function addColumnIfMissing(conn: mysql.Connection, table: string, column:
 }
 
 
+async function migrateLegacyContactEmails(conn: mysql.Connection) {
+  const ownerEmail = "rvrpeptides@gmail.com";
+  const legacyEmails = [
+    "support@rvrpeptides.com",
+    "customerservice@rvrpeptides.com",
+    "orders@rvrpeptides.com",
+    "mailinglist@rvrpeptides.com",
+    "rvrtrainingandconsulting@gmail.com",
+  ];
+  const keys = [
+    "contact_email",
+    "customer_service_email",
+    "orders_email",
+    "mailing_list_email",
+    "admin_inbox_email",
+  ];
+
+  for (const key of keys) {
+    try {
+      await conn.execute(
+        `UPDATE siteSettings
+         SET settingValue = ?
+         WHERE settingKey = ?
+           AND (
+             settingValue IS NULL
+             OR TRIM(settingValue) = ''
+             OR LOWER(TRIM(settingValue)) IN (${legacyEmails.map(() => "?").join(", ")})
+           )`,
+        [ownerEmail, key, ...legacyEmails]
+      );
+    } catch (error) {
+      console.warn(`[DB init] Could not migrate ${key} to owner inbox:`, error);
+    }
+  }
+}
+
 async function ensureDefaultSiteSettings(conn: mysql.Connection) {
   // Seed known admin settings only when missing. Never overwrite existing values;
   // admin changes must survive restarts, deploys, and redeploys.
@@ -969,12 +1005,12 @@ async function ensureDefaultSiteSettings(conn: mysql.Connection) {
     ["paymentcloud_billing_descriptor", "RVR Peptides LLC", "text", "Billing Descriptor", "payments"],
     ["business_legal_name", "River Valley Research Peptides LLC", "text", "Legal Business Name", "general"],
     ["flat_rate_shipping", "0", "text", "Flat Rate Shipping", "shipping"],
-    ["contact_email", "Support@RVRPeptides.com", "text", "Contact Email", "contact"],
+    ["contact_email", "rvrpeptides@gmail.com", "text", "Contact Email", "contact"],
     ["contact_phone", "", "text", "Contact Phone", "contact"],
-    ["customer_service_email", "CustomerService@RVRPeptides.com", "text", "Customer Service Email", "contact"],
-    ["orders_email", "Orders@RVRPeptides.com", "text", "Orders Email", "contact"],
-    ["mailing_list_email", "MailingList@RVRPeptides.com", "text", "Mailing List Email", "contact"],
-    ["admin_inbox_email", "rvrtrainingandconsulting@gmail.com", "text", "Admin Inbox Email (Gmail hub)", "contact"],
+    ["customer_service_email", "rvrpeptides@gmail.com", "text", "Customer Service Email", "contact"],
+    ["orders_email", "rvrpeptides@gmail.com", "text", "Orders Email", "contact"],
+    ["mailing_list_email", "rvrpeptides@gmail.com", "text", "Mailing List Email", "contact"],
+    ["admin_inbox_email", "rvrpeptides@gmail.com", "text", "Admin Inbox Email (Gmail hub)", "contact"],
     ["logo_url", "", "image", "Logo URL", "branding"],
     ["site_description", "", "text", "Site Description", "general"],
     ["site_tagline", "", "text", "Site Tagline", "general"],
@@ -1132,6 +1168,7 @@ export async function ensureDatabaseReady() {
       await ensureConfiguredSuperAdmin(conn);
       await ensureProductColumnTypes(conn);
       await ensureDefaultSiteSettings(conn);
+      await migrateLegacyContactEmails(conn);
       await clearLegacyResearchDefaultsOnce(conn);
       await disableFeaturedProductsOnce(conn);
       await clearProductDescriptionsAndFeaturedOnce(conn);
